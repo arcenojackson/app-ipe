@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "890190525302",
+    "project_id": "app-ipe",
+    "storage_bucket": "app-ipe.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:890190525302:android:44bb1305681ecac4988057",
+        "android_client_info": {
+          "package_name": "com.ipe.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "890190525302-hbgsivb0a09i10smcnjr6t90pqrj23qm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ipe.app",
+            "certificate_hash": "0e53efcfa67c8460fbdc2631d37c5f1e7f219990"
+          }
+        },
+        {
+          "client_id": "890190525302-4qs960gi7dsp541rnnlsilrub0vq95m1.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAUtGn0cJ6QtBPewKExWgE14NFUKI9BB-I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "890190525302-4qs960gi7dsp541rnnlsilrub0vq95m1.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "890190525302-numq83pisle4l2ek0i7viksol3or26i6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ipe.app"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

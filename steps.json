@@ -1,0 +1,87 @@
+[
+    {
+        "type": "step",
+        "title": "Prelúdio",
+        "description": "opcional"
+    },
+    {
+        "type": "step",
+        "title": "Chamada à Oração",
+        "description": "Pedidos públicos de oração"
+    },
+    {
+        "type": "step",
+        "title": "Saudação a todos",
+        "description": "Informar sobre o direito de imagem"
+    },
+    {
+        "type": "step",
+        "title": "Leitura Bíblica: ",
+        "description": "(Adoração e louvor)"
+    },
+    {
+        "type": "step",
+        "title": "Cântico: ",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Leitura Bíblica: ",
+        "description": "(Confissão e Contrição)"
+    },
+    {
+        "type": "step",
+        "title": "Cântico: ",
+        "description": "*Dízimos"
+    },
+    {
+        "type": "step",
+        "title": "Oração",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Equipe de louvor:",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Chamada para culto infantil e de adolescentes",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Mensagem",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Leitura Bíblica: ",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Tema da mensagem: ",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Oração final",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Benção",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Avisos",
+        "description": ""
+    },
+    {
+        "type": "step",
+        "title": "Poslúdio",
+        "description": "opcional"
+    }
+]
