@@ -15,8 +15,6 @@ ThemeData buildAppTheme() {
     onSecondary: Colors.white,
     surface: surface,
     onSurface: Colors.white,
-    background: background,
-    onBackground: Colors.white,
     error: Color(0xFFFF5470),
     onError: Colors.white,
   );
@@ -98,9 +96,7 @@ ThemeData buildAppTheme() {
     iconTheme: const IconThemeData(color: Colors.white70),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       contentTextStyle: const TextStyle(color: Colors.white),
     ),
   );

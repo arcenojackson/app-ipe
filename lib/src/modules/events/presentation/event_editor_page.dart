@@ -326,7 +326,7 @@ class _EventEditorPageState extends State<EventEditorPage>
         _musics = musics;
         _people = people;
       });
-    } catch (e, stackTrace) {
+    } catch (e) {
       setState(() {
         _event = null;
       });
@@ -489,7 +489,7 @@ class _StepEditorSheetState extends State<StepEditorSheet> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _type,
+                initialValue: _type,
                 items: const [
                   DropdownMenuItem(value: 'step', child: Text('Etapa')),
                   DropdownMenuItem(value: 'music', child: Text('Música')),

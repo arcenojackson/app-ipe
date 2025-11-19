@@ -51,15 +51,13 @@ class EventsRepository {
       if (data['date'] != null && data['date'] is Timestamp) {
         data['date'] = (data['date'] as Timestamp).toDate();
       }
-      
+
       final event = EventModel.fromJson(data);
-      
+
       return event;
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (e is AppException) rethrow;
-      throw AppException(
-        message: 'Erro ao buscar serviço: ${e.toString()}',
-      );
+      throw AppException(message: 'Erro ao buscar serviço: ${e.toString()}');
     }
   }
 
@@ -109,9 +107,7 @@ class EventsRepository {
       return EventModel.fromJson(data);
     } catch (e) {
       if (e is AppException) rethrow;
-      throw AppException(
-        message: 'Erro ao criar serviço: ${e.toString()}',
-      );
+      throw AppException(message: 'Erro ao criar serviço: ${e.toString()}');
     }
   }
 
@@ -132,9 +128,7 @@ class EventsRepository {
       return await fetchById(id);
     } catch (e) {
       if (e is AppException) rethrow;
-      throw AppException(
-        message: 'Erro ao atualizar serviço: ${e.toString()}',
-      );
+      throw AppException(message: 'Erro ao atualizar serviço: ${e.toString()}');
     }
   }
 
@@ -142,9 +136,7 @@ class EventsRepository {
     try {
       await _firestore.collection('services').doc(id).delete();
     } catch (e) {
-      throw AppException(
-        message: 'Erro ao excluir serviço: ${e.toString()}',
-      );
+      throw AppException(message: 'Erro ao excluir serviço: ${e.toString()}');
     }
   }
 
@@ -182,10 +174,8 @@ class EventsRepository {
         }
         return EventModel.fromJson(data);
       }).toList();
-    } catch (e, stackTrace) {
-      throw AppException(
-        message: 'Erro ao carregar serviços: ${e.toString()}',
-      );
+    } catch (e) {
+      throw AppException(message: 'Erro ao carregar serviços: ${e.toString()}');
     }
   }
 
@@ -203,10 +193,8 @@ class EventsRepository {
         }
         return EventModel.fromJson(data);
       }).toList();
-    } catch (e, stackTrace) {
-      throw AppException(
-        message: 'Erro ao carregar serviços: ${e.toString()}',
-      );
+    } catch (e) {
+      throw AppException(message: 'Erro ao carregar serviços: ${e.toString()}');
     }
   }
 }

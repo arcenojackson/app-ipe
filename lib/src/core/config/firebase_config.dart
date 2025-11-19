@@ -3,6 +3,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
 import 'package:ipe_flutter/firebase_options.dart';
 
 class FirebaseConfig {
@@ -32,7 +33,10 @@ class FirebaseConfig {
 
       _auth!.authStateChanges().listen((User? user) {
         if (user != null) {
+          // Usuário autenticado - logs gerenciados pelo Crashlytics em produção
+          if (kDebugMode) {
           print('✅ Usuário logado: ${user.email} (${user.uid})');
+          }
         }
       });
     } catch (e) {

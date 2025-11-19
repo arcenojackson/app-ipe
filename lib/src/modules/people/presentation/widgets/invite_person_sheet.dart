@@ -33,9 +33,11 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
 
   String _getAppStoreLink() {
     if (Platform.isIOS) {
-      return 'https://apps.apple.com/app/app-ipe/id123456789'; // TODO: Ajustar com o ID correto
+      // TODO: Substituir com o ID real do App Store após publicação
+      // Link será: https://apps.apple.com/app/app-ipe/id[SEU_APP_ID]
+      return 'https://apps.apple.com/app/app-ipe';
     } else if (Platform.isAndroid) {
-      return 'https://play.google.com/store/apps/details?id=com.ipe.app'; // TODO: Ajustar com o package correto
+      return 'https://play.google.com/store/apps/details?id=com.ipe.app';
     }
     return 'https://apps.apple.com/app/app-ipe'; // Fallback
   }
