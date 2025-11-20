@@ -19,6 +19,8 @@ class IpeApp extends StatelessWidget {
           title: AppConfig.appName,
           debugShowCheckedModeBanner: false,
           theme: buildAppTheme(),
+          // Usar key baseado no estado de autenticação para forçar reconstrução
+          key: ValueKey('app-${appState.isAuthenticated}'),
           home: _buildHome(appState),
         );
       },

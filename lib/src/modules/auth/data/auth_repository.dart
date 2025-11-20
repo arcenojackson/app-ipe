@@ -45,6 +45,7 @@ class AuthRepository {
           name: credential.user!.displayName ?? credential.user!.email?.split('@').first ?? 'Usuário',
           email: credential.user!.email ?? email,
           isAdmin: false,
+          isPending: true,
         );
         await _createUserInFirestore(newUser);
         await _sessionStorage.saveUser(newUser);
@@ -80,6 +81,7 @@ class AuthRepository {
         name: name,
         email: email,
         isAdmin: false,
+        isPending: true,
       );
 
       await _createUserInFirestore(userModel);
@@ -128,6 +130,7 @@ class AuthRepository {
           name: userCredential.user!.displayName ?? 'Usuário Google',
           email: userCredential.user!.email ?? '',
           isAdmin: false,
+          isPending: true,
         );
 
         await _createUserInFirestore(userModel);
@@ -148,6 +151,56 @@ class AuthRepository {
     await _auth.signOut();
     await _googleSignIn.signOut();
     await _sessionStorage.clear();
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw AppException(message: 'Nenhum usuário logado');
+      }
+
+      final uid = user.uid;
+
+      // 1. Deletar dados do Firestore primeiro (enquanto ainda temos autenticação)
+      try {
+        await _firestore.collection('users').doc(uid).delete();
+      } on FirebaseException catch (firestoreError) {
+        // Se for erro de permissão, logamos mas continuamos com a exclusão do Auth
+        if (firestoreError.code == 'permission-denied') {
+          print('Aviso: Sem permissão para deletar do Firestore. Continuando com exclusão do Auth.');
+        } else {
+          // Para outros erros do Firestore, relançamos
+          throw AppException(
+            message: 'Erro ao remover dados do Firestore: ${firestoreError.message}',
+          );
+        }
+      }
+
+      // 2. Deletar conta do Firebase Auth (CRÍTICO - deve sempre executar)
+      // IMPORTANTE: user.delete() remove a autenticação, então deve ser a última operação autenticada
+      await user.delete();
+
+      // 3. Limpar sessão local
+      await _sessionStorage.clear();
+
+      // 4. Fazer logout do Google se aplicável
+      await _googleSignIn.signOut();
+
+      // 5. Garantir que não há usuário autenticado
+      await _auth.signOut();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        throw AppException(
+          message: 'Por segurança, faça login novamente antes de excluir a conta',
+        );
+      }
+      throw AppException(message: 'Erro ao excluir conta: ${e.message}');
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      throw AppException(message: 'Erro ao excluir conta: ${e.toString()}');
+    }
   }
 
   Future<UserModel?> restoreSession() async {
@@ -194,9 +247,9 @@ class AuthRepository {
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {
       case 'user-not-found':
-        return 'Usuário não encontrado.';
       case 'wrong-password':
-        return 'Senha incorreta.';
+      case 'invalid-credential':
+        return 'Erro de login: Os dados informados estão incorretos ou não existem';
       case 'email-already-in-use':
         return 'Este email já está em uso.';
       case 'weak-password':

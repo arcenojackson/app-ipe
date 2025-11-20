@@ -65,21 +65,39 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> deleteAccount() async {
+    try {
+      await _authRepository.deleteAccount();
+      // Limpar o usuário atual após exclusão bem-sucedida
+      _currentUser = null;
+      // Notificar imediatamente para que a UI atualize (igual ao signOut)
+      notifyListeners();
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<void> _executeAuth(Future<void> Function() action) async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
       await action();
+      // Após sucesso, o _currentUser já foi atualizado, então notificamos
+      _isLoading = false;
+      notifyListeners();
     } on AppException catch (error) {
       _error = error.message;
+      _isLoading = false;
+      notifyListeners();
       rethrow;
     } catch (error) {
       _error = 'Erro inesperado. Tente novamente.';
-      rethrow;
-    } finally {
       _isLoading = false;
       notifyListeners();
+      rethrow;
     }
   }
 

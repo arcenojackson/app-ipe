@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/models/user.dart';
+import '../../auth/presentation/settings_page.dart';
 import '../../events/presentation/agenda_section.dart';
 import '../../events/presentation/planning_section.dart';
 import '../../musics/presentation/musics_section.dart';
@@ -89,14 +90,27 @@ class _HomeShellState extends State<HomeShell> {
                         ],
                       ),
                     ),
-                    if (current.section != HomeSection.planning &&
-                        current.section != HomeSection.people &&
-                        current.section != HomeSection.musics)
-                      IconButton(
-                        tooltip: 'Sair',
-                        onPressed: () => context.read<AppState>().signOut(),
-                        icon: const Icon(Icons.logout_rounded),
+                    IconButton(
+                      tooltip: 'Perfil',
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (context) => const SettingsPage(),
+                          ),
+                        );
+                      },
+                      icon: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: Colors.white,
+                        child: Text(
+                          _getUserInitials(user.name),
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: const Color(0xFF0D1220),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
+                    ),
                   ],
                 ),
               ),
@@ -171,9 +185,27 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  String _getUserInitials(String name) {
+    if (name.isEmpty) return '?';
+    
+    final parts = name.trim().split(' ').where((part) => part.isNotEmpty).toList();
+    
+    if (parts.isEmpty) return '?';
+    
+    if (parts.length == 1) {
+      return parts[0][0].toUpperCase();
+    }
+    
+    // Retorna primeira letra do primeiro nome e primeira letra do segundo nome
+    return '${parts[0][0].toUpperCase()}${parts[1][0].toUpperCase()}';
+  }
+
   List<_HomeDestination> _buildDestinations(UserModel user) {
-    final isAdmin = user.isAdmin;
+    final isAdmin = user.isAdminUser;
+    final isStandard = user.isStandardUser;
+    
     final destinations = <_HomeDestination>[
+      // Agenda - Todos os usuários têm acesso
       _HomeDestination(
         section: HomeSection.agenda,
         icon: Icons.calendar_month_outlined,
@@ -193,6 +225,7 @@ class _HomeShellState extends State<HomeShell> {
           },
         ),
       ),
+      // Planejamento - Apenas Admin
       if (isAdmin)
         _HomeDestination(
           section: HomeSection.planning,
@@ -213,6 +246,7 @@ class _HomeShellState extends State<HomeShell> {
             },
           ),
         ),
+      // Pessoas - Todos os usuários têm acesso
       _HomeDestination(
         section: HomeSection.people,
         icon: Icons.person_rounded,
@@ -223,7 +257,8 @@ class _HomeShellState extends State<HomeShell> {
             'Veja quem participa das equipes, promova líderes e acompanhe o ministério.',
         builder: (context) => PeopleSection(currentUser: user),
       ),
-      if (isAdmin)
+      // Repertório - Admin e Padrão têm acesso (apenas visualização para Padrão)
+      if (isAdmin || isStandard)
         _HomeDestination(
           section: HomeSection.musics,
           icon: Icons.music_note_rounded,

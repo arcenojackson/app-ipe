@@ -181,7 +181,7 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
                 decoration: const InputDecoration(
                   labelText: 'Número de WhatsApp',
                   hintText: '(11) 99999-9999',
-                  helperText: 'Digite apenas números ou com formatação',
+                  helperText: 'Digite apenas números',
                 ),
                 keyboardType: TextInputType.phone,
                 validator: (value) {

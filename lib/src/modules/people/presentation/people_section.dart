@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../auth/models/user.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/utils/app_toast.dart';
+import '../../../shared/state/app_state.dart';
 import '../data/people_repository.dart';
 import 'widgets/invite_person_sheet.dart';
 
@@ -30,6 +31,8 @@ class _PeopleSectionState extends State<PeopleSection> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isLimitedUser = widget.currentUser.isPending && !widget.currentUser.isAdmin;
+    
     return Stack(
       children: [
         RefreshIndicator(
@@ -37,6 +40,33 @@ class _PeopleSectionState extends State<PeopleSection> {
           color: theme.colorScheme.primary,
           child: _isLoading
               ? const Center(child: CircularProgressIndicator())
+              : isLimitedUser
+              ? ListView(
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
+                  padding: const EdgeInsets.only(bottom: 160),
+                  children: [
+                    const SizedBox(height: 120),
+                    Icon(
+                      Icons.info_outline,
+                      size: 64,
+                      color: theme.colorScheme.primary.withOpacity(0.8),
+                    ),
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Text(
+                        'Você possui um acesso limitado ao app por enquanto, aguarde até que algum usuário administrador lhe dê as permissões necessárias.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.white70,
+                          height: 1.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                )
               : _error != null
               ? ListView(
                   physics: const BouncingScrollPhysics(
@@ -102,26 +132,139 @@ class _PeopleSectionState extends State<PeopleSection> {
                             ),
                           ),
                           const SizedBox(width: 16),
-                          if (widget.currentUser.isAdmin)
+                          // Mostrar menu apenas se for admin e não for o próprio usuário
+                          if (widget.currentUser.isAdmin && person.id != widget.currentUser.id)
                             PopupMenuButton<String>(
                               color: theme.colorScheme.surface,
                               position: PopupMenuPosition.over,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(18),
                               ),
-                              itemBuilder: (_) => [
-                                PopupMenuItem(
-                                  value: person.isAdmin ? 'remove' : 'add',
-                                  child: Text(
-                                    person.isAdmin
-                                        ? 'Remover administrador'
-                                        : 'Tornar administrador',
+                              itemBuilder: (_) {
+                                final items = <PopupMenuEntry<String>>[];
+                                
+                                // Se o usuário está pendente, mostrar opção de aprovar
+                                if (person.isPending) {
+                                  items.add(
+                                    PopupMenuItem(
+                                      value: 'approve',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.check_circle_outline,
+                                            color: Colors.green.shade400,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Aprovar usuário',
+                                            style: TextStyle(
+                                              color: Colors.green.shade400,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                } else if (person.isAdmin) {
+                                  // Se for admin, mostrar opção de remover admin
+                                  items.add(
+                                    PopupMenuItem(
+                                      value: 'remove',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.admin_panel_settings_outlined,
+                                            color: Colors.orange.shade400,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Remover administrador',
+                                            style: TextStyle(
+                                              color: Colors.orange.shade400,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                } else {
+                                  // Se não for admin e não estiver pendente, mostrar opção de tornar admin
+                                  items.add(
+                                    PopupMenuItem(
+                                      value: 'add',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            Icons.admin_panel_settings_outlined,
+                                            color: theme.colorScheme.primary,
+                                            size: 20,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          const Text(
+                                            'Tornar administrador',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }
+                                
+                                // Divisor antes de excluir
+                                items.add(const PopupMenuDivider());
+                                
+                                // Opção de excluir
+                                items.add(
+                                  PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red.shade300,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          'Excluir usuário',
+                                          style: TextStyle(
+                                            color: Colors.red.shade300,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                              ],
-                              onSelected: (value) =>
-                                  _toggleAdmin(person, value == 'add'),
+                                );
+                                
+                                return items;
+                              },
+                              onSelected: (value) {
+                                if (value == 'delete') {
+                                  _showDeleteConfirmation(person);
+                                } else if (value == 'approve') {
+                                  _approveUser(person);
+                                } else {
+                                  _toggleAdmin(person, value == 'add');
+                                }
+                              },
                               child: const Icon(Icons.more_horiz_rounded),
+                            )
+                          // Se for o próprio usuário e for admin, mostrar badge de Admin
+                          else if (person.id == widget.currentUser.id && person.isAdmin)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 6,
+                                horizontal: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Text('Admin'),
                             )
                           else if (person.isAdmin)
                             Container(
@@ -141,14 +284,16 @@ class _PeopleSectionState extends State<PeopleSection> {
                   },
                 ),
         ),
-        Positioned(
-          bottom: 130,
-          right: 0,
-          child: FloatingActionButton(
-            onPressed: _onCreatePerson,
-            child: const Icon(Icons.add),
+        // Botão de convidar apenas para Admin
+        if (widget.currentUser.isAdminUser)
+          Positioned(
+            bottom: 130,
+            right: 0,
+            child: FloatingActionButton(
+              onPressed: _onCreatePerson,
+              child: const Icon(Icons.add),
+            ),
           ),
-        ),
       ],
     );
   }
@@ -159,7 +304,9 @@ class _PeopleSectionState extends State<PeopleSection> {
       _error = null;
     });
     try {
-      final people = await context.read<PeopleRepository>().fetchAll();
+      final people = await context.read<PeopleRepository>().fetchAll(
+        currentUser: widget.currentUser,
+      );
       setState(() => _people = people);
     } catch (error) {
       setState(() => _error = 'Erro ao carregar os usuários.');
@@ -195,11 +342,110 @@ class _PeopleSectionState extends State<PeopleSection> {
     }
   }
 
+  Future<void> _approveUser(UserModel user) async {
+    try {
+      await context.read<PeopleRepository>().approveUser(
+        userId: user.id,
+      );
+      if (mounted) {
+        showSuccessToast(
+          context,
+          '${user.name} foi aprovado com sucesso.',
+        );
+        await _loadPeople();
+      }
+    } catch (error) {
+      if (mounted) {
+        final errorMessage = error.toString().contains('permission')
+            ? 'Sem permissão para aprovar usuário. Verifique as regras do Firestore.'
+            : 'Erro ao aprovar o usuário: ${error.toString()}';
+        showErrorToast(context, errorMessage);
+      }
+    }
+  }
+
   Future<void> _onCreatePerson() async {
     await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const InvitePersonSheet(),
     );
+  }
+
+  Future<void> _showDeleteConfirmation(UserModel user) async {
+    final theme = Theme.of(context);
+    final isSelf = user.id == widget.currentUser.id;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        title: Text(
+          isSelf ? 'Excluir sua conta?' : 'Excluir usuário?',
+          style: theme.textTheme.titleLarge,
+        ),
+        content: Text(
+          isSelf
+              ? 'Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita e você será desconectado do app.'
+              : 'Tem certeza que deseja excluir o usuário "${user.name}"? Esta ação não pode ser desfeita.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Cancelar',
+              style: TextStyle(color: theme.colorScheme.onSurface),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red.shade300,
+            ),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _deleteUser(user);
+    }
+  }
+
+  Future<void> _deleteUser(UserModel user) async {
+    try {
+      await context.read<PeopleRepository>().deleteUser(userId: user.id);
+      
+      if (mounted) {
+        final isSelf = user.id == widget.currentUser.id;
+        
+        showSuccessToast(
+          context,
+          isSelf
+              ? 'Sua conta foi excluída com sucesso.'
+              : 'Usuário excluído com sucesso.',
+        );
+
+        // Se o usuário excluiu a si mesmo, fazer logout
+        if (isSelf) {
+          await context.read<AppState>().signOut();
+        } else {
+          // Recarregar a lista de usuários
+          await _loadPeople();
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        final errorMessage = error.toString().contains('permission')
+            ? 'Sem permissão para excluir usuário. Verifique as regras do Firestore.'
+            : 'Erro ao excluir o usuário: ${error.toString()}';
+        showErrorToast(context, errorMessage);
+      }
+    }
   }
 }

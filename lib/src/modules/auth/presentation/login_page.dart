@@ -191,20 +191,6 @@ class _LoginPageState extends State<LoginPage> {
               return null;
             },
           ),
-                // Link "Esqueceu sua senha?"
-                if (!_isSignUp)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: () {
-                        // TODO: Implementar recuperação de senha
-                      },
-                      child: Text(
-                        'Esqueceu sua senha?',
-                        style: TextStyle(color: Theme.of(context).colorScheme.primary),
-                      ),
-                    ),
-                  ),
                 const SizedBox(height: 24),
                 // Botão Entrar
                 SizedBox(
