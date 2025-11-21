@@ -1,6 +1,9 @@
+import 'dart:io' show Platform;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 import '../../../core/config/firebase_config.dart';
 import '../../../core/utils/app_exception.dart';
@@ -144,6 +147,88 @@ class AuthRepository {
       rethrow;
     } catch (e) {
       throw AppException(message: 'Erro no login com Google: ${e.toString()}');
+    }
+  }
+
+  Future<UserModel> signInWithApple() async {
+    try {
+      // Verificar se está rodando no iOS
+      if (!Platform.isIOS) {
+        throw AppException(message: 'Sign In with Apple está disponível apenas no iOS');
+      }
+
+      // Verificar se o Sign In with Apple está disponível
+      final isAvailable = await SignInWithApple.isAvailable();
+      if (!isAvailable) {
+        throw AppException(message: 'Sign In with Apple não está disponível neste dispositivo');
+      }
+
+      // Solicitar credenciais do Apple
+      final appleCredential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // Criar OAuth credential para Firebase
+      final oauthCredential = OAuthProvider('apple.com').credential(
+        idToken: appleCredential.identityToken,
+        accessToken: appleCredential.authorizationCode,
+      );
+
+      // Fazer login no Firebase com a credencial do Apple
+      final userCredential = await _auth.signInWithCredential(oauthCredential);
+
+      // Verificar se o usuário já existe no Firestore
+      var userModel = await _getUserFromFirestore(userCredential.user!.uid);
+
+      if (userModel == null) {
+        // Obter nome do usuário (pode vir do Apple ou ser null)
+        String? userName;
+        if (appleCredential.givenName != null || appleCredential.familyName != null) {
+          final parts = <String>[];
+          if (appleCredential.givenName != null) {
+            parts.add(appleCredential.givenName!);
+          }
+          if (appleCredential.familyName != null) {
+            parts.add(appleCredential.familyName!);
+          }
+          userName = parts.join(' ');
+        }
+
+        // Criar usuário no Firestore se não existir
+        userModel = UserModel(
+          id: userCredential.user!.uid,
+          name: userName ?? 
+                userCredential.user!.displayName ?? 
+                userCredential.user!.email?.split('@').first ?? 
+                'Usuário Apple',
+          email: userCredential.user!.email ?? 
+                 appleCredential.email ?? 
+                 '',
+          isAdmin: false,
+          isPending: true,
+        );
+
+        await _createUserInFirestore(userModel);
+      }
+
+      await _sessionStorage.saveUser(userModel);
+      return userModel;
+    } on SignInWithAppleAuthorizationException catch (e) {
+      // Tratar exceções específicas do Sign In with Apple
+      if (e.code == AuthorizationErrorCode.canceled) {
+        throw AppException(message: 'Login com Apple cancelado pelo usuário');
+      }
+      final errorMessage = e.message.isNotEmpty ? e.message : 'Erro desconhecido';
+      throw AppException(message: 'Erro na autenticação com Apple: $errorMessage');
+    } on AppException {
+      rethrow;
+    } on FirebaseAuthException catch (e) {
+      throw AppException(message: _handleAuthException(e));
+    } catch (e) {
+      throw AppException(message: 'Erro no login com Apple: ${e.toString()}');
     }
   }
 

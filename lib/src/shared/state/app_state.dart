@@ -59,6 +59,12 @@ class AppState extends ChangeNotifier {
     });
   }
 
+  Future<void> signInWithApple() async {
+    await _executeAuth(() async {
+      _currentUser = await _authRepository.signInWithApple();
+    });
+  }
+
   Future<void> signOut() async {
     await _authRepository.signOut();
     _currentUser = null;

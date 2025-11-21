@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -43,19 +45,19 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       backgroundColor: _darkBackground,
       body: SafeArea(
-            child: SingleChildScrollView(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Form(
             key: _formKey,
-                  child: Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                const SizedBox(height: 60),
+              children: [
+                const SizedBox(height: 10),
                 // Logo do app (ícone circular)
-                              Container(
+                Container(
                   width: 112,
                   height: 112,
-                                decoration: BoxDecoration(
+                  decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white, width: 2),
                   ),
@@ -86,10 +88,10 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 const SizedBox(height: 40),
                 // Campo de Email
-          TextFormField(
+                TextFormField(
                   controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.next,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Email',
@@ -117,29 +119,32 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     focusedErrorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: Colors.red,
+                        width: 1.5,
+                      ),
                     ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Informe o e-mail';
-              }
-              final emailRegex = RegExp(
-                r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
-                caseSensitive: false,
-              );
-              if (!emailRegex.hasMatch(value)) {
-                return 'E-mail inválido';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 16),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Informe o e-mail';
+                    }
+                    final emailRegex = RegExp(
+                      r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
+                      caseSensitive: false,
+                    );
+                    if (!emailRegex.hasMatch(value)) {
+                      return 'E-mail inválido';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
                 // Campo de Senha
-          TextFormField(
+                TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
-            textInputAction: TextInputAction.done,
+                  textInputAction: TextInputAction.done,
                   style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Senha',
@@ -150,7 +155,9 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                         color: Colors.white70,
                       ),
                       onPressed: () {
@@ -178,19 +185,22 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     focusedErrorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                      borderSide: const BorderSide(
+                        color: Colors.red,
+                        width: 1.5,
+                      ),
                     ),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Informe a senha';
-              }
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Informe a senha';
+                    }
                     if (value.length < 6) {
                       return 'Senha deve ter 6 caracteres ou mais';
-              }
-              return null;
-            },
-          ),
+                    }
+                    return null;
+                  },
+                ),
                 const SizedBox(height: 24),
                 // Botão Entrar
                 SizedBox(
@@ -209,19 +219,23 @@ class _LoginPageState extends State<LoginPage> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: Theme.of(context).colorScheme.primary.withOpacity(0.5),
+                      disabledBackgroundColor: Theme.of(
+                        context,
+                      ).colorScheme.primary.withOpacity(0.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                       elevation: 0,
                     ),
-            child: isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
+                    child: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white,
+                              ),
                             ),
                           )
                         : Text(
@@ -310,16 +324,18 @@ class _LoginPageState extends State<LoginPage> {
                           color: Colors.white.withOpacity(0.2),
                           thickness: 1,
                         ),
-          ),
-        ],
-      ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 24),
                   // Botão Continuar com Google
                   SizedBox(
                     width: double.infinity,
                     height: 50,
                     child: OutlinedButton(
-                      onPressed: isLoading ? null : () => _onSignInWithGoogle(context),
+                      onPressed: isLoading
+                          ? null
+                          : () => _onSignInWithGoogle(context),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white, width: 1.5),
@@ -335,7 +351,7 @@ class _LoginPageState extends State<LoginPage> {
                             width: 20,
                             height: 20,
                             child: Stack(
-        children: [
+                              children: [
                                 Container(
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
@@ -347,16 +363,17 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 Center(
                                   child: ShaderMask(
-                                    shaderCallback: (bounds) => const LinearGradient(
-                                      colors: [
-                                        Color(0xFF4285F4), // azul
-                                        Color(0xFFEA4335), // vermelho
-                                        Color(0xFFFBBC05), // amarelo
-                                        Color(0xFF34A853), // verde
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ).createShader(bounds),
+                                    shaderCallback: (bounds) =>
+                                        const LinearGradient(
+                                          colors: [
+                                            Color(0xFF4285F4), // azul
+                                            Color(0xFFEA4335), // vermelho
+                                            Color(0xFFFBBC05), // amarelo
+                                            Color(0xFF34A853), // verde
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ).createShader(bounds),
                                     child: const Text(
                                       'G',
                                       style: TextStyle(
@@ -382,8 +399,50 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ),
+                  // Botão Continuar com Apple (apenas iOS)
+                  if (Platform.isIOS) ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: OutlinedButton(
+                        onPressed: isLoading
+                            ? null
+                            : () => _onSignInWithApple(context),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(
+                            color: Colors.white,
+                            width: 1.5,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Logo da Apple
+                            const Icon(
+                              Icons.apple,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 12),
+                            const Text(
+                              'Continuar com Apple',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
-                const SizedBox(height: 40),
+                const SizedBox(height: 16),
                 // Texto de termos
                 Padding(
                   padding: const EdgeInsets.only(bottom: 24),
@@ -410,8 +469,8 @@ class _LoginPageState extends State<LoginPage> {
     FocusScope.of(context).unfocus();
     try {
       await context.read<AppState>().signIn(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
       );
     } catch (_) {
       // O AppState já trata a mensagem de erro através do SnackBar.
@@ -425,10 +484,10 @@ class _LoginPageState extends State<LoginPage> {
       // Para criar conta, vamos precisar adicionar um campo de nome
       // Por enquanto, usando o email como nome
       await context.read<AppState>().signUp(
-            name: _emailController.text.trim().split('@').first,
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
+        name: _emailController.text.trim().split('@').first,
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
       setState(() {
         _isSignUp = false;
       });
@@ -445,5 +504,13 @@ class _LoginPageState extends State<LoginPage> {
       // O AppState já trata a mensagem de erro através do SnackBar.
     }
   }
-}
 
+  Future<void> _onSignInWithApple(BuildContext context) async {
+    FocusScope.of(context).unfocus();
+    try {
+      await context.read<AppState>().signInWithApple();
+    } catch (_) {
+      // O AppState já trata a mensagem de erro através do SnackBar.
+    }
+  }
+}
