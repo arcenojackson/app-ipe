@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Feature Graphic - App IPE</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 1024px;
+            height: 500px;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #2F4F2F 0%, #1a3a1a 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        
+        .container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            position: relative;
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        .logo-placeholder {
+            width: 120px;
+            height: 120px;
+            background: white;
+            border-radius: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .logo-placeholder img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 12px;
+        }
+        
+        .logo-placeholder::before {
+            content: 'IPE';
+            font-size: 48px;
+            font-weight: bold;
+            color: #2F4F2F;
+            letter-spacing: 2px;
+            position: absolute;
+        }
+        
+        .logo-placeholder.has-logo::before {
+            display: none;
+        }
+        
+        .app-name {
+            color: white;
+            font-size: 64px;
+            font-weight: 700;
+            margin-bottom: 16px;
+            text-align: center;
+            text-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+            letter-spacing: -1px;
+        }
+        
+        .subtitle {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 24px;
+            font-weight: 400;
+            text-align: center;
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+            max-width: 800px;
+            line-height: 1.4;
+        }
+        
+        .decoration {
+            position: absolute;
+            opacity: 0.1;
+        }
+        
+        .decoration-1 {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background: white;
+            top: -100px;
+            right: -100px;
+        }
+        
+        .decoration-2 {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: white;
+            bottom: -75px;
+            left: -75px;
+        }
+        
+        .features {
+            display: flex;
+            gap: 40px;
+            margin-top: 40px;
+            color: rgba(255, 255, 255, 0.85);
+            font-size: 18px;
+        }
+        
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .feature::before {
+            content: '✓';
+            color: #6B8E23;
+            font-weight: bold;
+            font-size: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="decoration decoration-1"></div>
+    <div class="decoration decoration-2"></div>
+    
+    <div class="container">
+        <div class="logo-container">
+            <div class="logo-placeholder" id="logoContainer">
+                <!-- Para usar o logo real, descomente a linha abaixo e ajuste o caminho -->
+                <img src="./android/app/src/main/assets/play-store/app-icon-512x512.png" alt="IPE Logo" onload="this.parentElement.classList.add('has-logo')">
+            </div>
+        </div>
+        
+        <h1 class="app-name">App IPE</h1>
+        
+        <p class="subtitle">
+            Para membros e equipes da<br>
+            Igreja Presbiteriana do Estreito
+        </p>
+        
+        <div class="features">
+            <div class="feature">Eventos</div>
+            <div class="feature">Pessoas</div>
+            <div class="feature">Músicas</div>
+        </div>
+    </div>
+    
+    <script>
+        // Instruções para capturar a imagem:
+        // 1. Abra este arquivo no navegador
+        // 2. Ajuste o zoom para 100%
+        // 3. Use uma extensão de screenshot ou ferramenta para capturar exatamente 1024x500px
+        // 4. Ou use o DevTools do navegador para capturar a viewport
+        
+        // Alternativa: Use uma ferramenta online como:
+        // - htmlcsstoimage.com
+        // - screenshot.guru
+        // - ou qualquer ferramenta de screenshot que permita definir dimensões exatas
+    </script>
+</body>
+</html>
+
