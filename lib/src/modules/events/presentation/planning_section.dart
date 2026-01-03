@@ -30,6 +30,22 @@ class _PlanningSectionState extends State<PlanningSection> {
   List<EventModel> _events = const [];
   String? _error;
 
+  /// Compara apenas a data (sem hora) de dois DateTime
+  bool _isDateBeforeToday(DateTime date) {
+    final now = DateTime.now();
+    final eventDate = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return eventDate.isBefore(today);
+  }
+
+  /// Verifica se a data é igual ou maior que hoje
+  bool _isDateTodayOrAfter(DateTime date) {
+    final now = DateTime.now();
+    final eventDate = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return !eventDate.isBefore(today);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -93,12 +109,14 @@ class _PlanningSectionState extends State<PlanningSection> {
                   separatorBuilder: (_, __) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final event = _events[index];
+                    final isPastEvent = _isDateBeforeToday(event.date);
                     return _PlanningCard(
                       event: event,
                       dateLabel: _dateFormat.format(event.date),
+                      isPastEvent: isPastEvent,
                       onOpen: () => _openEvent(event),
-                      onEdit: () => _onEditEvent(event),
-                      onDelete: () => _onDeleteEvent(event),
+                      onEdit: isPastEvent ? null : () => _onEditEvent(event),
+                      onDelete: isPastEvent ? null : () => _onDeleteEvent(event),
                     );
                   },
                 ),
@@ -121,12 +139,38 @@ class _PlanningSectionState extends State<PlanningSection> {
       _error = null;
     });
     try {
-      final events = await context.read<EventsRepository>().fetchAllServices();
+      final allEvents = await context.read<EventsRepository>().fetchAllServices();
+      
+      // Separar eventos futuros e passados
+      final futureEvents = allEvents
+          .where((event) => _isDateTodayOrAfter(event.date))
+          .toList();
+      final pastEvents = allEvents
+          .where((event) => _isDateBeforeToday(event.date))
+          .toList();
+      
+      // Ordenar eventos futuros por data crescente
+      futureEvents.sort((a, b) => a.date.compareTo(b.date));
+      
+      // Encontrar o último evento passado (mais recente)
+      EventModel? lastPastEvent;
+      if (pastEvents.isNotEmpty) {
+        pastEvents.sort((a, b) => b.date.compareTo(a.date));
+        lastPastEvent = pastEvents.first;
+      }
+      
+      // Combinar: eventos futuros + último evento passado (se existir)
+      final filteredEvents = <EventModel>[];
+      if (lastPastEvent != null) {
+        filteredEvents.add(lastPastEvent);
+      }
+      filteredEvents.addAll(futureEvents);
+      
       setState(() {
-        _events = events;
+        _events = filteredEvents;
       });
       // Notificar o HomeShell sobre o estado dos eventos
-      widget.onEventsChanged?.call(events.isNotEmpty);
+      widget.onEventsChanged?.call(filteredEvents.isNotEmpty);
     } catch (error) {
       setState(() => _error = 'Erro ao carregar os serviços.');
       widget.onEventsChanged?.call(false);
@@ -201,78 +245,88 @@ class _PlanningCard extends StatelessWidget {
   const _PlanningCard({
     required this.event,
     required this.dateLabel,
+    required this.isPastEvent,
     required this.onOpen,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
   });
 
   final EventModel event;
   final String dateLabel;
+  final bool isPastEvent;
   final VoidCallback onOpen;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onOpen,
-      child: GlassContainer(
-        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 22),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 52,
-              width: 52,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.secondary.withOpacity(0.18),
-                borderRadius: BorderRadius.circular(18),
+    // Aplicar opacidade reduzida para eventos passados
+    final opacity = isPastEvent ? 0.5 : 1.0;
+    
+    return Opacity(
+      opacity: opacity,
+      child: GestureDetector(
+        onTap: onOpen,
+        child: GlassContainer(
+          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 22),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 52,
+                width: 52,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.secondary.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Icon(
+                  Icons.calendar_month,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
-              child: const Icon(
-                Icons.calendar_month,
-                color: Colors.white,
-                size: 24,
+              const SizedBox(width: 18),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      event.name,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Data · $dateLabel',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white60,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 18),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    event.name,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+                  IconButton(
+                    tooltip: 'Editar',
+                    icon: const Icon(Icons.edit_outlined, size: 20),
+                    onPressed: onEdit,
+                    color: onEdit == null ? Colors.white38 : null,
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Data · $dateLabel',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: Colors.white60,
-                    ),
+                  IconButton(
+                    tooltip: 'Excluir',
+                    icon: const Icon(Icons.delete_outline, size: 20),
+                    onPressed: onDelete,
+                    color: onDelete == null ? Colors.white38 : null,
                   ),
                 ],
               ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: 'Editar',
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  onPressed: onEdit,
-                ),
-                IconButton(
-                  tooltip: 'Excluir',
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  onPressed: onDelete,
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

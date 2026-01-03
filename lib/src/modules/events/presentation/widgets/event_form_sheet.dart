@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../data/events_repository.dart';
 import '../../models/event.dart';
+import '../../models/event_template.dart';
 import '../../../../shared/utils/app_toast.dart';
 
 class EventFormSheet extends StatefulWidget {
@@ -24,6 +25,9 @@ class _EventFormSheetState extends State<EventFormSheet> {
 
   late DateTime _selectedDate;
   bool _isSubmitting = false;
+  List<EventTemplateModel> _templates = const [];
+  String? _selectedTemplateId;
+  bool _isLoadingTemplates = true;
 
   @override
   void initState() {
@@ -35,6 +39,7 @@ class _EventFormSheetState extends State<EventFormSheet> {
       _startController.text = event.start.isEmpty ? '19:30' : event.start;
     }
     _dateController.text = _dateFormat.format(_selectedDate);
+    _loadTemplates();
   }
 
   @override
@@ -127,6 +132,41 @@ class _EventFormSheetState extends State<EventFormSheet> {
                   ),
                 ),
               ),
+              if (widget.event == null) ...[
+                const SizedBox(height: 16),
+                _isLoadingTemplates
+                    ? const SizedBox(
+                        height: 56,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : DropdownButtonFormField<String?>(
+                        value: _selectedTemplateId,
+                        decoration: const InputDecoration(
+                          labelText: 'Template (opcional)',
+                          hintText: 'Selecione um template',
+                          suffixIcon: Icon(Icons.description),
+                        ),
+                        items: [
+                          const DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('Nenhum template'),
+                          ),
+                          ..._templates.map((template) {
+                            return DropdownMenuItem<String?>(
+                              value: template.id,
+                              child: Text(template.name),
+                            );
+                          }),
+                        ],
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) {
+                                setState(() {
+                                  _selectedTemplateId = value;
+                                });
+                              },
+                      ),
+              ],
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -199,6 +239,24 @@ class _EventFormSheetState extends State<EventFormSheet> {
     }
   }
 
+  Future<void> _loadTemplates() async {
+    if (widget.event != null) return; // Não carregar templates ao editar
+    
+    try {
+      final repository = context.read<EventsRepository>();
+      final templates = await repository.fetchAllTemplates();
+      setState(() {
+        _templates = templates;
+        _isLoadingTemplates = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingTemplates = false;
+      });
+      // Não mostrar erro ao usuário - apenas não mostrar templates
+    }
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isSubmitting = true);
@@ -209,6 +267,7 @@ class _EventFormSheetState extends State<EventFormSheet> {
           name: _nameController.text.trim(),
           date: _selectedDate,
           start: _startController.text.trim(),
+          templateId: _selectedTemplateId,
         );
         if (mounted) {
           Navigator.of(context).pop(true);

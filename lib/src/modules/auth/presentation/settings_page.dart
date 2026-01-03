@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../../../shared/widgets/glass_container.dart';
+import '../../events/presentation/event_history_page.dart';
+import '../../events/presentation/event_template_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -136,6 +138,73 @@ class SettingsPage extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
                     ],
+
+                    // Seção de Eventos
+                    Text(
+                      'Eventos',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GlassContainer(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(
+                              Icons.history,
+                              color: Colors.white70,
+                            ),
+                            title: const Text(
+                              'Acessar histórico de eventos',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Visualizar todos os eventos passados',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white60,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _navigateToEventHistory(context),
+                          ),
+                          const Divider(height: 1, color: Colors.white12),
+                          ListTile(
+                            leading: const Icon(
+                              Icons.settings_outlined,
+                              color: Colors.white70,
+                            ),
+                            title: const Text(
+                              'Configurar template de evento',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Personalizar etapas padrão dos eventos',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white60,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _navigateToEventTemplate(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
 
                     // Seção de Conta
                     Text(
@@ -310,6 +379,22 @@ class SettingsPage extends StatelessWidget {
             child: const Text('Sair'),
           ),
         ],
+      ),
+    );
+  }
+
+  void _navigateToEventHistory(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const EventHistoryPage(),
+      ),
+    );
+  }
+
+  void _navigateToEventTemplate(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const EventTemplatePage(),
       ),
     );
   }

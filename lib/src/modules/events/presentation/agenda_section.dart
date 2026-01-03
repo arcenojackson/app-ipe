@@ -9,11 +9,7 @@ import '../models/event.dart';
 import 'event_viewer_page.dart';
 
 class AgendaSection extends StatefulWidget {
-  const AgendaSection({
-    super.key,
-    required this.user,
-    this.onEventsChanged,
-  });
+  const AgendaSection({super.key, required this.user, this.onEventsChanged});
 
   final UserModel user;
   final ValueChanged<bool>? onEventsChanged;
@@ -92,20 +88,35 @@ class _AgendaSectionState extends State<AgendaSection> {
     );
   }
 
+  /// Verifica se a data é igual ou maior que hoje
+  bool _isDateTodayOrAfter(DateTime date) {
+    final now = DateTime.now();
+    final eventDate = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return !eventDate.isBefore(today);
+  }
+
   Future<void> _loadEvents() async {
     setState(() {
       _isLoading = true;
       _error = null;
     });
     try {
-      final events = await context.read<EventsRepository>().fetchServicesForUser(
-        widget.user.id,
-      );
+      final allEvents = await context
+          .read<EventsRepository>()
+          .fetchServicesForUser(widget.user.id);
+      // Filtrar apenas eventos futuros ou de hoje (data >= hoje)
+      final futureEvents = allEvents
+          .where((event) => _isDateTodayOrAfter(event.date))
+          .toList();
+      // Ordenar por data crescente (mais próximo primeiro)
+      futureEvents.sort((a, b) => a.date.compareTo(b.date));
+
       setState(() {
-        _events = events;
+        _events = futureEvents;
       });
       // Notificar o HomeShell sobre o estado dos eventos
-      widget.onEventsChanged?.call(events.isNotEmpty);
+      widget.onEventsChanged?.call(futureEvents.isNotEmpty);
     } catch (error) {
       setState(() => _error = 'Erro ao carregar seus serviços.');
       widget.onEventsChanged?.call(false);

@@ -9,9 +9,8 @@ import '../../people/data/people_repository.dart';
 import '../data/events_repository.dart';
 import '../models/event.dart';
 import '../../people/presentation/widgets/people_selector_sheet.dart';
-import '../../musics/presentation/widgets/music_selector_sheet.dart';
-import '../../musics/presentation/widgets/tone_selector_sheet.dart';
 import '../../../shared/utils/app_toast.dart';
+import 'widgets/step_editor_sheet.dart';
 
 class _CustomFABLocation extends FloatingActionButtonLocation {
   final double offset;
@@ -53,6 +52,16 @@ class _EventEditorPageState extends State<EventEditorPage>
   List<UserModel> _people = const [];
   List<String> _selectedPeople = const [];
 
+  /// Compara apenas a data (sem hora) de dois DateTime
+  bool _isDateBeforeToday(DateTime date) {
+    final now = DateTime.now();
+    final eventDate = DateTime(date.year, date.month, date.day);
+    final today = DateTime(now.year, now.month, now.day);
+    return eventDate.isBefore(today);
+  }
+
+  bool get _isPastEvent => _event != null && _isDateBeforeToday(_event!.date);
+
   @override
   void initState() {
     super.initState();
@@ -90,7 +99,7 @@ class _EventEditorPageState extends State<EventEditorPage>
           TextButton.icon(
             icon: const Icon(Icons.save),
             label: const Text('Salvar'),
-            onPressed: _isSaving ? null : _save,
+            onPressed: (_isSaving || _isPastEvent) ? null : _save,
           ),
         ],
         bottom: TabBar(
@@ -115,15 +124,17 @@ class _EventEditorPageState extends State<EventEditorPage>
               controller: _tabController,
               children: [_buildStepsTab(), _buildTeamTab()],
             ),
-      floatingActionButton: _currentTabIndex == 0
-          ? FloatingActionButton(
-              onPressed: _addStep,
-              child: const Icon(Icons.add),
-            )
-          : FloatingActionButton(
-              onPressed: _manageTeam,
-              child: const Icon(Icons.group_add),
-            ),
+      floatingActionButton: _isPastEvent
+          ? null
+          : (_currentTabIndex == 0
+              ? FloatingActionButton(
+                  onPressed: _addStep,
+                  child: const Icon(Icons.add),
+                )
+              : FloatingActionButton(
+                  onPressed: _manageTeam,
+                  child: const Icon(Icons.group_add),
+                )),
       floatingActionButtonLocation: const _CustomFABLocation(offset: 80),
     );
   }
@@ -152,13 +163,17 @@ class _EventEditorPageState extends State<EventEditorPage>
     return ReorderableListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _steps.length,
-      onReorder: (oldIndex, newIndex) {
-        setState(() {
-          if (newIndex > oldIndex) newIndex -= 1;
-          final item = _steps.removeAt(oldIndex);
-          _steps.insert(newIndex, item);
-        });
-      },
+      onReorder: _isPastEvent
+          ? (oldIndex, newIndex) {
+              // Não permitir reordenação em eventos passados
+            }
+          : (oldIndex, newIndex) {
+              setState(() {
+                if (newIndex > oldIndex) newIndex -= 1;
+                final item = _steps.removeAt(oldIndex);
+                _steps.insert(newIndex, item);
+              });
+            },
       proxyDecorator: (child, index, animation) {
         return AnimatedBuilder(
           animation: animation,
@@ -237,21 +252,23 @@ class _EventEditorPageState extends State<EventEditorPage>
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () => _editStep(index),
+                      onPressed: _isPastEvent ? null : () => _editStep(index),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
                         minWidth: 32,
                         minHeight: 32,
                       ),
+                      color: _isPastEvent ? Colors.white38 : null,
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete, size: 20),
-                      onPressed: () => _removeStep(index),
+                      onPressed: _isPastEvent ? null : () => _removeStep(index),
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
                         minWidth: 32,
                         minHeight: 32,
                       ),
+                      color: _isPastEvent ? Colors.white38 : null,
                     ),
                   ],
                 ),
@@ -282,9 +299,11 @@ class _EventEditorPageState extends State<EventEditorPage>
                 avatar: CircleAvatar(
                   child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
                 ),
-                onDeleted: () => setState(() {
-                  _selectedPeople = List.of(_selectedPeople)..remove(user.id);
-                }),
+                onDeleted: _isPastEvent
+                    ? null
+                    : () => setState(() {
+                          _selectedPeople = List.of(_selectedPeople)..remove(user.id);
+                        }),
               ),
             )
             .toList(),
@@ -400,6 +419,10 @@ class _EventEditorPageState extends State<EventEditorPage>
   }
 
   Future<void> _save() async {
+    if (_isPastEvent) {
+      showErrorToast(context, 'Não é possível salvar alterações em eventos passados.');
+      return;
+    }
     setState(() => _isSaving = true);
     try {
       await context.read<EventsRepository>().updateEventDetails(
@@ -415,175 +438,5 @@ class _EventEditorPageState extends State<EventEditorPage>
         setState(() => _isSaving = false);
       }
     }
-  }
-}
-
-class StepEditorSheet extends StatefulWidget {
-  const StepEditorSheet({super.key, required this.musics, this.initialStep});
-
-  final List<MusicModel> musics;
-  final EventStepModel? initialStep;
-
-  @override
-  State<StepEditorSheet> createState() => _StepEditorSheetState();
-}
-
-class _StepEditorSheetState extends State<StepEditorSheet> {
-  final _formKey = GlobalKey<FormState>();
-  late String _type;
-  late TextEditingController _titleController;
-  late TextEditingController _descriptionController;
-  String? _selectedMusicId;
-  String? _musicTone;
-
-  @override
-  void initState() {
-    super.initState();
-    final initial = widget.initialStep;
-    _type = initial?.type == EventStepType.music ? 'music' : 'step';
-    _titleController = TextEditingController(text: initial?.title ?? '');
-    _descriptionController = TextEditingController(
-      text: initial?.description ?? '',
-    );
-    _selectedMusicId = initial?.musicId;
-    _musicTone = initial?.musicTone ?? '0';
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16,
-        right: 16,
-        top: 24,
-      ),
-      child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 48,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white24,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Text(
-                widget.initialStep == null ? 'Adicionar item' : 'Editar item',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                initialValue: _type,
-                items: const [
-                  DropdownMenuItem(value: 'step', child: Text('Etapa')),
-                  DropdownMenuItem(value: 'music', child: Text('Música')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _type = value);
-                  }
-                },
-                decoration: const InputDecoration(labelText: 'Tipo'),
-              ),
-              if (_type == 'music') ...[
-                const SizedBox(height: 16),
-                MusicSelectorField(
-                  musics: widget.musics,
-                  selectedId: _selectedMusicId,
-                  onSelect: (music) {
-                    setState(() {
-                      _selectedMusicId = music.id;
-                      _titleController.text = music.title;
-                      _musicTone = music.tone;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-                ToneSelectorSheet(
-                  selectedTone: _musicTone,
-                  onToneSelected: (tone) => setState(() => _musicTone = tone),
-                ),
-              ] else ...[
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _titleController,
-                  decoration: const InputDecoration(
-                    labelText: 'Título',
-                    hintText: 'Título da etapa ou música',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Informe o título';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _descriptionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Descrição',
-                    hintText: 'Detalhes adicionais',
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _submit,
-                  child: const Text('Salvar'),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    EventStepModel step;
-    if (_type == 'music') {
-      final musicId = _selectedMusicId;
-      if (musicId == null) {
-        showErrorToast(context, 'Selecione uma música.');
-        return;
-      }
-      // Quando for música, o título já foi preenchido automaticamente da música selecionada
-      // e não usamos descrição
-      step = EventStepModel(
-        title: _titleController.text.trim(),
-        description: '', // Descrição não é usada para músicas
-        type: EventStepType.music,
-        musicId: musicId,
-        musicTone: _musicTone ?? '0',
-      );
-    } else {
-      step = EventStepModel(
-        title: _titleController.text.trim(),
-        description: _descriptionController.text.trim(),
-        type: EventStepType.step,
-      );
-    }
-    Navigator.of(context).pop(step);
   }
 }

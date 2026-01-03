@@ -7,6 +7,7 @@ import '../../../core/config/firebase_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/utils/app_exception.dart';
 import '../models/event.dart';
+import '../models/event_template.dart';
 
 class EventsRepository {
   EventsRepository({required ApiClient apiClient}) : _apiClient = apiClient;
@@ -74,6 +75,7 @@ class EventsRepository {
     required String name,
     required DateTime date,
     required String start,
+    String? templateId,
   }) async {
     try {
       final userId = _currentUserId;
@@ -81,8 +83,19 @@ class EventsRepository {
         throw AppException(message: 'Usuário não autenticado.');
       }
 
-      // Carregar steps padrão do arquivo JSON
-      final defaultSteps = await _loadDefaultSteps();
+      List<EventStepModel> steps = const [];
+      
+      // Se um template foi selecionado, usar as etapas do template
+      if (templateId != null) {
+        try {
+          final template = await fetchTemplateById(templateId);
+          steps = template.steps;
+        } catch (e) {
+          // Se não conseguir carregar o template, criar sem etapas
+          steps = const [];
+        }
+      }
+      // Se nenhum template foi selecionado, criar sem etapas (conforme solicitado)
 
       final docRef = _firestore.collection('services').doc();
       final eventData = {
@@ -91,7 +104,7 @@ class EventsRepository {
         'start': start,
         'userId': userId,
         'people': <String>[],
-        'steps': defaultSteps.map((step) => step.toJson()).toList(),
+        'steps': steps.map((step) => step.toJson()).toList(),
       };
 
       await docRef.set(eventData);
@@ -195,6 +208,176 @@ class EventsRepository {
       }).toList();
     } catch (e) {
       throw AppException(message: 'Erro ao carregar serviços: ${e.toString()}');
+    }
+  }
+
+  // ========== MÉTODOS PARA TEMPLATES ==========
+
+  /// Busca todos os templates do Firestore
+  Future<List<EventTemplateModel>> fetchAllTemplates() async {
+    try {
+      final snapshot =
+          await _firestore.collection('services_templates').get();
+
+      // Se não houver documentos, retornar lista vazia (não é um erro)
+      if (snapshot.docs.isEmpty) {
+        return const [];
+      }
+
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        // Converter Timestamp do Firestore para DateTime se necessário
+        if (data['createdAt'] != null && data['createdAt'] is Timestamp) {
+          data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
+        }
+        return EventTemplateModel.fromJson(data);
+      }).toList();
+    } catch (e) {
+      // Se a collection não existir, retornar lista vazia ao invés de erro
+      if (e.toString().contains('permission') ||
+          e.toString().contains('not-found') ||
+          e.toString().contains('NOT_FOUND')) {
+        return const [];
+      }
+      throw AppException(
+          message: 'Erro ao carregar templates: ${e.toString()}');
+    }
+  }
+
+  /// Busca um template por ID
+  Future<EventTemplateModel> fetchTemplateById(String id) async {
+    try {
+      final doc =
+          await _firestore.collection('services_templates').doc(id).get();
+      if (!doc.exists) {
+        throw AppException(message: 'Template não encontrado.');
+      }
+      final data = doc.data()!;
+      data['id'] = doc.id;
+      // Converter Timestamp do Firestore para DateTime se necessário
+      if (data['createdAt'] != null && data['createdAt'] is Timestamp) {
+        data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
+      }
+      return EventTemplateModel.fromJson(data);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException(
+          message: 'Erro ao buscar template: ${e.toString()}');
+    }
+  }
+
+  /// Cria um template padrão baseado no steps.json
+  Future<EventTemplateModel> createDefaultTemplate() async {
+    try {
+      final userId = _currentUserId;
+      if (userId == null) {
+        throw AppException(message: 'Usuário não autenticado.');
+      }
+
+      final defaultSteps = await _loadDefaultSteps();
+      // Filtrar apenas etapas (sem músicas)
+      final stepsOnly = defaultSteps
+          .where((step) => step.type == EventStepType.step)
+          .toList();
+
+      final docRef = _firestore.collection('services_templates').doc();
+      final templateData = {
+        'name': 'Template Padrão',
+        'steps': stepsOnly.map((step) => step.toJson()).toList(),
+        'userId': userId,
+        'createdAt': Timestamp.now(),
+      };
+
+      await docRef.set(templateData);
+
+      // Buscar o documento criado
+      final doc = await docRef.get();
+      final data = doc.data()!;
+      data['id'] = doc.id;
+      if (data['createdAt'] != null && data['createdAt'] is Timestamp) {
+        data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
+      }
+      return EventTemplateModel.fromJson(data);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException(
+          message: 'Erro ao criar template padrão: ${e.toString()}');
+    }
+  }
+
+  /// Cria um novo template
+  Future<EventTemplateModel> createTemplate({
+    required String name,
+    required List<EventStepModel> steps,
+  }) async {
+    try {
+      final userId = _currentUserId;
+      if (userId == null) {
+        throw AppException(message: 'Usuário não autenticado.');
+      }
+
+      // Filtrar apenas etapas (sem músicas)
+      final stepsOnly =
+          steps.where((step) => step.type == EventStepType.step).toList();
+
+      final docRef = _firestore.collection('services_templates').doc();
+      final templateData = {
+        'name': name,
+        'steps': stepsOnly.map((step) => step.toJson()).toList(),
+        'userId': userId,
+        'createdAt': Timestamp.now(),
+      };
+
+      await docRef.set(templateData);
+
+      // Buscar o documento criado
+      final doc = await docRef.get();
+      final data = doc.data()!;
+      data['id'] = doc.id;
+      if (data['createdAt'] != null && data['createdAt'] is Timestamp) {
+        data['createdAt'] = (data['createdAt'] as Timestamp).toDate();
+      }
+      return EventTemplateModel.fromJson(data);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException(
+          message: 'Erro ao criar template: ${e.toString()}');
+    }
+  }
+
+  /// Atualiza um template
+  Future<EventTemplateModel> updateTemplate({
+    required String id,
+    required String name,
+    required List<EventStepModel> steps,
+  }) async {
+    try {
+      // Filtrar apenas etapas (sem músicas)
+      final stepsOnly =
+          steps.where((step) => step.type == EventStepType.step).toList();
+
+      await _firestore.collection('services_templates').doc(id).update({
+        'name': name,
+        'steps': stepsOnly.map((step) => step.toJson()).toList(),
+      });
+
+      // Buscar o template atualizado
+      return await fetchTemplateById(id);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException(
+          message: 'Erro ao atualizar template: ${e.toString()}');
+    }
+  }
+
+  /// Exclui um template
+  Future<void> deleteTemplate(String id) async {
+    try {
+      await _firestore.collection('services_templates').doc(id).delete();
+    } catch (e) {
+      throw AppException(
+          message: 'Erro ao excluir template: ${e.toString()}');
     }
   }
 }

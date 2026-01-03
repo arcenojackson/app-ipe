@@ -28,11 +28,40 @@ class _PeopleSectionState extends State<PeopleSection> {
     _loadPeople();
   }
 
+  Widget? _buildStatusLabel(UserModel person, ThemeData theme) {
+    // Label "Demonstrativo" apenas para demo@mail.com
+    if (person.email.toLowerCase() == 'demo@mail.com') {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text('Demonstrativo'),
+      );
+    }
+
+    // Label "Admin" para todos os administradores
+    if (person.isAdmin) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.primary.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Text('Admin'),
+      );
+    }
+
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isLimitedUser = widget.currentUser.isPending && !widget.currentUser.isAdmin;
-    
+    final isLimitedUser =
+        widget.currentUser.isPending && !widget.currentUser.isAdmin;
+
     return Stack(
       children: [
         RefreshIndicator(
@@ -75,7 +104,11 @@ class _PeopleSectionState extends State<PeopleSection> {
                   padding: const EdgeInsets.only(bottom: 160),
                   children: [
                     const SizedBox(height: 120),
-                    Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red.shade300,
+                    ),
                     const SizedBox(height: 16),
                     Text(
                       _error!,
@@ -91,6 +124,12 @@ class _PeopleSectionState extends State<PeopleSection> {
                   separatorBuilder: (_, __) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final person = _people[index];
+                    final statusLabel = _buildStatusLabel(person, theme);
+                    final showMenu =
+                        widget.currentUser.isAdmin &&
+                        person.id != widget.currentUser.id &&
+                        person.email.toLowerCase() != 'demo@mail.com';
+
                     return GlassContainer(
                       padding: const EdgeInsets.symmetric(
                         vertical: 18,
@@ -100,9 +139,8 @@ class _PeopleSectionState extends State<PeopleSection> {
                         children: [
                           CircleAvatar(
                             radius: 24,
-                            backgroundColor: theme.colorScheme.primary.withOpacity(
-                              0.15,
-                            ),
+                            backgroundColor: theme.colorScheme.primary
+                                .withOpacity(0.15),
                             child: Text(
                               person.name.isNotEmpty
                                   ? person.name[0].toUpperCase()
@@ -132,8 +170,13 @@ class _PeopleSectionState extends State<PeopleSection> {
                             ),
                           ),
                           const SizedBox(width: 16),
+                          // Mostrar labels de status (sempre que existir)
+                          if (statusLabel != null) ...[
+                            statusLabel,
+                            const SizedBox(width: 8),
+                          ],
                           // Mostrar menu apenas se for admin e não for o próprio usuário
-                          if (widget.currentUser.isAdmin && person.id != widget.currentUser.id)
+                          if (showMenu)
                             PopupMenuButton<String>(
                               color: theme.colorScheme.surface,
                               position: PopupMenuPosition.over,
@@ -142,7 +185,7 @@ class _PeopleSectionState extends State<PeopleSection> {
                               ),
                               itemBuilder: (_) {
                                 final items = <PopupMenuEntry<String>>[];
-                                
+
                                 // Se o usuário está pendente, mostrar opção de aprovar
                                 if (person.isPending) {
                                   items.add(
@@ -213,10 +256,10 @@ class _PeopleSectionState extends State<PeopleSection> {
                                     ),
                                   );
                                 }
-                                
+
                                 // Divisor antes de excluir
                                 items.add(const PopupMenuDivider());
-                                
+
                                 // Opção de excluir
                                 items.add(
                                   PopupMenuItem(
@@ -239,7 +282,7 @@ class _PeopleSectionState extends State<PeopleSection> {
                                     ),
                                   ),
                                 );
-                                
+
                                 return items;
                               },
                               onSelected: (value) {
@@ -253,31 +296,9 @@ class _PeopleSectionState extends State<PeopleSection> {
                               },
                               child: const Icon(Icons.more_horiz_rounded),
                             )
-                          // Se for o próprio usuário e for admin, mostrar badge de Admin
-                          else if (person.id == widget.currentUser.id && person.isAdmin)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 6,
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Text('Admin'),
-                            )
-                          else if (person.isAdmin)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 6,
-                                horizontal: 12,
-                              ),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Text('Admin'),
-                            ),
+                          // Espaço para alinhar a label quando não há menu
+                          else if (statusLabel != null)
+                            const SizedBox(width: 25),
                         ],
                       ),
                     );
@@ -306,6 +327,10 @@ class _PeopleSectionState extends State<PeopleSection> {
     try {
       final people = await context.read<PeopleRepository>().fetchAll(
         currentUser: widget.currentUser,
+      );
+      // Ordenar lista em ordem alfabética por nome
+      people.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
       );
       setState(() => _people = people);
     } catch (error) {
@@ -344,14 +369,9 @@ class _PeopleSectionState extends State<PeopleSection> {
 
   Future<void> _approveUser(UserModel user) async {
     try {
-      await context.read<PeopleRepository>().approveUser(
-        userId: user.id,
-      );
+      await context.read<PeopleRepository>().approveUser(userId: user.id);
       if (mounted) {
-        showSuccessToast(
-          context,
-          '${user.name} foi aprovado com sucesso.',
-        );
+        showSuccessToast(context, '${user.name} foi aprovado com sucesso.');
         await _loadPeople();
       }
     } catch (error) {
@@ -375,14 +395,12 @@ class _PeopleSectionState extends State<PeopleSection> {
   Future<void> _showDeleteConfirmation(UserModel user) async {
     final theme = Theme.of(context);
     final isSelf = user.id == widget.currentUser.id;
-    
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(18),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text(
           isSelf ? 'Excluir sua conta?' : 'Excluir usuário?',
           style: theme.textTheme.titleLarge,
@@ -403,9 +421,7 @@ class _PeopleSectionState extends State<PeopleSection> {
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red.shade300,
-            ),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade300),
             child: const Text('Excluir'),
           ),
         ],
@@ -420,10 +436,10 @@ class _PeopleSectionState extends State<PeopleSection> {
   Future<void> _deleteUser(UserModel user) async {
     try {
       await context.read<PeopleRepository>().deleteUser(userId: user.id);
-      
+
       if (mounted) {
         final isSelf = user.id == widget.currentUser.id;
-        
+
         showSuccessToast(
           context,
           isSelf
