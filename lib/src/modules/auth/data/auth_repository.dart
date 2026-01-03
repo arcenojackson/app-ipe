@@ -11,15 +11,16 @@ import '../../auth/models/user.dart';
 import '../../../shared/services/session_storage.dart';
 
 class AuthRepository {
-  AuthRepository({
-    required SessionStorage sessionStorage,
-  }) : _sessionStorage = sessionStorage;
+  AuthRepository({required SessionStorage sessionStorage})
+    : _sessionStorage = sessionStorage;
 
   final SessionStorage _sessionStorage;
   final FirebaseAuth _auth = FirebaseConfig.auth;
   final FirebaseFirestore _firestore = FirebaseConfig.firestore;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: ['email', 'profile'],
+    serverClientId:
+        '890190525302-4qs960gi7dsp541rnnlsilrub0vq95m1.apps.googleusercontent.com',
   );
 
   // Stream do usuário atual
@@ -45,7 +46,10 @@ class AuthRepository {
         // Se não existe no Firestore, criar com dados básicos
         final newUser = UserModel(
           id: credential.user!.uid,
-          name: credential.user!.displayName ?? credential.user!.email?.split('@').first ?? 'Usuário',
+          name:
+              credential.user!.displayName ??
+              credential.user!.email?.split('@').first ??
+              'Usuário',
           email: credential.user!.email ?? email,
           isAdmin: false,
           isPending: true,
@@ -108,10 +112,13 @@ class AuthRepository {
       }
 
       // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       if (googleAuth.accessToken == null || googleAuth.idToken == null) {
-        throw AppException(message: 'Falha ao obter tokens de autenticação do Google');
+        throw AppException(
+          message: 'Falha ao obter tokens de autenticação do Google',
+        );
       }
 
       // Create a new credential
@@ -154,13 +161,17 @@ class AuthRepository {
     try {
       // Verificar se está rodando no iOS
       if (!Platform.isIOS) {
-        throw AppException(message: 'Sign In with Apple está disponível apenas no iOS');
+        throw AppException(
+          message: 'Sign In with Apple está disponível apenas no iOS',
+        );
       }
 
       // Verificar se o Sign In with Apple está disponível
       final isAvailable = await SignInWithApple.isAvailable();
       if (!isAvailable) {
-        throw AppException(message: 'Sign In with Apple não está disponível neste dispositivo');
+        throw AppException(
+          message: 'Sign In with Apple não está disponível neste dispositivo',
+        );
       }
 
       // Solicitar credenciais do Apple
@@ -186,7 +197,8 @@ class AuthRepository {
       if (userModel == null) {
         // Obter nome do usuário (pode vir do Apple ou ser null)
         String? userName;
-        if (appleCredential.givenName != null || appleCredential.familyName != null) {
+        if (appleCredential.givenName != null ||
+            appleCredential.familyName != null) {
           final parts = <String>[];
           if (appleCredential.givenName != null) {
             parts.add(appleCredential.givenName!);
@@ -200,13 +212,12 @@ class AuthRepository {
         // Criar usuário no Firestore se não existir
         userModel = UserModel(
           id: userCredential.user!.uid,
-          name: userName ?? 
-                userCredential.user!.displayName ?? 
-                userCredential.user!.email?.split('@').first ?? 
-                'Usuário Apple',
-          email: userCredential.user!.email ?? 
-                 appleCredential.email ?? 
-                 '',
+          name:
+              userName ??
+              userCredential.user!.displayName ??
+              userCredential.user!.email?.split('@').first ??
+              'Usuário Apple',
+          email: userCredential.user!.email ?? appleCredential.email ?? '',
           isAdmin: false,
           isPending: true,
         );
@@ -221,8 +232,12 @@ class AuthRepository {
       if (e.code == AuthorizationErrorCode.canceled) {
         throw AppException(message: 'Login com Apple cancelado pelo usuário');
       }
-      final errorMessage = e.message.isNotEmpty ? e.message : 'Erro desconhecido';
-      throw AppException(message: 'Erro na autenticação com Apple: $errorMessage');
+      final errorMessage = e.message.isNotEmpty
+          ? e.message
+          : 'Erro desconhecido';
+      throw AppException(
+        message: 'Erro na autenticação com Apple: $errorMessage',
+      );
     } on AppException {
       rethrow;
     } on FirebaseAuthException catch (e) {
@@ -253,11 +268,14 @@ class AuthRepository {
       } on FirebaseException catch (firestoreError) {
         // Se for erro de permissão, logamos mas continuamos com a exclusão do Auth
         if (firestoreError.code == 'permission-denied') {
-          print('Aviso: Sem permissão para deletar do Firestore. Continuando com exclusão do Auth.');
+          print(
+            'Aviso: Sem permissão para deletar do Firestore. Continuando com exclusão do Auth.',
+          );
         } else {
           // Para outros erros do Firestore, relançamos
           throw AppException(
-            message: 'Erro ao remover dados do Firestore: ${firestoreError.message}',
+            message:
+                'Erro ao remover dados do Firestore: ${firestoreError.message}',
           );
         }
       }
@@ -277,7 +295,8 @@ class AuthRepository {
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
         throw AppException(
-          message: 'Por segurança, faça login novamente antes de excluir a conta',
+          message:
+              'Por segurança, faça login novamente antes de excluir a conta',
         );
       }
       throw AppException(message: 'Erro ao excluir conta: ${e.message}');

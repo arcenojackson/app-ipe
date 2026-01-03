@@ -31,3 +31,8 @@
 -keep class com.google.android.play.core.** { *; }
 -keep interface com.google.android.play.core.** { *; }
 
+# Google Sign-In
+-keep class com.google.android.gms.auth.** { *; }
+-keep class com.google.android.gms.common.** { *; }
+-dontwarn com.google.android.gms.**
+

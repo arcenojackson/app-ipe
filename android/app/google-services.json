@@ -14,11 +14,27 @@
       },
       "oauth_client": [
         {
+          "client_id": "890190525302-al43ina7cls1hdpis47f7snla9dejtlu.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ipe.app",
+            "certificate_hash": "70577b40ce527620b9a1e6cade005eea94ece306"
+          }
+        },
+        {
           "client_id": "890190525302-hbgsivb0a09i10smcnjr6t90pqrj23qm.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.ipe.app",
             "certificate_hash": "0e53efcfa67c8460fbdc2631d37c5f1e7f219990"
+          }
+        },
+        {
+          "client_id": "890190525302-kj4oin81g5ombkakb5t78di1aaofonj1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ipe.app",
+            "certificate_hash": "122c1a0d1dd30c47a501ab728bc587d477592f54"
           }
         },
         {
