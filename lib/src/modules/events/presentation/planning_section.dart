@@ -103,7 +103,9 @@ class _PlanningSectionState extends State<PlanningSection> {
                   ],
                 )
               : ListView.separated(
-                  physics: const BouncingScrollPhysics(),
+                  physics: const BouncingScrollPhysics(
+                    parent: AlwaysScrollableScrollPhysics(),
+                  ),
                   padding: const EdgeInsets.only(bottom: 160),
                   itemCount: _events.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 16),

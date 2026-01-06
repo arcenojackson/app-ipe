@@ -146,19 +146,54 @@ class _EventViewerPageState extends State<EventViewerPage>
   }
 
   Widget _buildTeamTab() {
-    final team = _people
-        .where((user) => _event!.peopleIds.contains(user.id))
-        .toList();
-    if (team.isEmpty) {
+    final allPeopleIds = _event!.people.allPeopleIds;
+    if (allPeopleIds.isEmpty) {
       return const Center(child: Text('Nenhuma pessoa atribuída.'));
     }
-    return Padding(
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: team.map((user) => UserChip(user: user)).toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_event!.people.elo.isNotEmpty) ...[
+            _buildPeopleSection('Equipe de Louvor', _event!.people.elo),
+            const SizedBox(height: 24),
+          ],
+          if (_event!.people.preacher.isNotEmpty) ...[
+            _buildPeopleSection('Pregador', _event!.people.preacher),
+            const SizedBox(height: 24),
+          ],
+          if (_event!.people.lead.isNotEmpty) ...[
+            _buildPeopleSection('Dirigente', _event!.people.lead),
+          ],
+        ],
       ),
+    );
+  }
+
+  Widget _buildPeopleSection(String title, List<String> peopleIds) {
+    final people = _people.where((user) => peopleIds.contains(user.id)).toList();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: people
+              .map((user) => UserChip(user: user))
+              .toList(),
+        ),
+      ],
     );
   }
 

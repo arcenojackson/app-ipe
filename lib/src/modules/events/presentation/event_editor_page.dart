@@ -50,7 +50,7 @@ class _EventEditorPageState extends State<EventEditorPage>
   List<EventStepModel> _steps = const [];
   List<MusicModel> _musics = const [];
   List<UserModel> _people = const [];
-  List<String> _selectedPeople = const [];
+  EventPeople _selectedPeople = const EventPeople();
 
   /// Compara apenas a data (sem hora) de dois DateTime
   bool _isDateBeforeToday(DateTime date) {
@@ -112,7 +112,7 @@ class _EventEditorPageState extends State<EventEditorPage>
           unselectedLabelColor: Colors.white,
           tabs: const [
             Tab(text: 'Etapas'),
-            Tab(text: 'Equipe'),
+            Tab(text: 'Pessoas'),
           ],
         ),
       ),
@@ -281,34 +281,87 @@ class _EventEditorPageState extends State<EventEditorPage>
   }
 
   Widget _buildTeamTab() {
-    if (_selectedPeople.isEmpty) {
+    final allPeopleIds = _selectedPeople.allPeopleIds;
+    if (allPeopleIds.isEmpty) {
       return const Center(child: Text('Nenhuma pessoa atribuída ao evento.'));
     }
-    final team = _people
-        .where((user) => _selectedPeople.contains(user.id))
-        .toList();
-    return Padding(
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: team
-            .map(
-              (user) => InputChip(
-                label: Text(user.name),
-                avatar: CircleAvatar(
-                  child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
-                ),
-                onDeleted: _isPastEvent
-                    ? null
-                    : () => setState(() {
-                          _selectedPeople = List.of(_selectedPeople)..remove(user.id);
-                        }),
-              ),
-            )
-            .toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_selectedPeople.elo.isNotEmpty) ...[
+            _buildPeopleSection('Equipe de Louvor', _selectedPeople.elo, 'elo'),
+            const SizedBox(height: 24),
+          ],
+          if (_selectedPeople.preacher.isNotEmpty) ...[
+            _buildPeopleSection('Pregador', _selectedPeople.preacher, 'preacher'),
+            const SizedBox(height: 24),
+          ],
+          if (_selectedPeople.lead.isNotEmpty) ...[
+            _buildPeopleSection('Dirigente', _selectedPeople.lead, 'lead'),
+          ],
+        ],
       ),
     );
+  }
+
+  Widget _buildPeopleSection(String title, List<String> peopleIds, String type) {
+    final people = _people.where((user) => peopleIds.contains(user.id)).toList();
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: people
+              .map(
+                (user) => InputChip(
+                  label: Text(user.name),
+                  avatar: CircleAvatar(
+                    child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
+                  ),
+                  onDeleted: _isPastEvent
+                      ? null
+                      : () => _removePerson(user.id, type),
+                ),
+              )
+              .toList(),
+        ),
+      ],
+    );
+  }
+
+  void _removePerson(String userId, String type) {
+    setState(() {
+      switch (type) {
+        case 'elo':
+          _selectedPeople = _selectedPeople.copyWith(
+            elo: List.of(_selectedPeople.elo)..remove(userId),
+          );
+          break;
+        case 'preacher':
+          _selectedPeople = _selectedPeople.copyWith(
+            preacher: List.of(_selectedPeople.preacher)..remove(userId),
+          );
+          break;
+        case 'lead':
+          _selectedPeople = _selectedPeople.copyWith(
+            lead: List.of(_selectedPeople.lead)..remove(userId),
+          );
+          break;
+      }
+    });
   }
 
   Future<void> _loadData() async {
@@ -335,13 +388,13 @@ class _EventEditorPageState extends State<EventEditorPage>
         people = await peopleRepository.fetchAll();
       } catch (e) {
         // Não mostrar erro ao usuário - apenas usar lista vazia
-        // A aba Equipe já mostra mensagem apropriada quando não há pessoas
+        // A aba Pessoas já mostra mensagem apropriada quando não há pessoas
       }
 
       setState(() {
         _event = event;
         _steps = List.of(event.steps);
-        _selectedPeople = List.of(event.peopleIds);
+        _selectedPeople = event.people;
         _musics = musics;
         _people = people;
       });
@@ -393,6 +446,15 @@ class _EventEditorPageState extends State<EventEditorPage>
   }
 
   Future<void> _manageTeam() async {
+    // Mostrar mini modal com opções primeiro
+    final option = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _PeopleTypeSelectorSheet(),
+    );
+
+    if (option == null) return;
+
     // Recarregar usuários da collection users antes de abrir a modal
     try {
       final peopleRepository = context.read<PeopleRepository>();
@@ -407,14 +469,47 @@ class _EventEditorPageState extends State<EventEditorPage>
       return;
     }
 
+    // Determinar filtros baseado na opção escolhida
+    bool filterByELO = false;
+    List<String> currentSelectedIds = [];
+
+    switch (option) {
+      case 'elo':
+        filterByELO = true;
+        currentSelectedIds = _selectedPeople.elo;
+        break;
+      case 'pregador':
+        currentSelectedIds = _selectedPeople.preacher;
+        break;
+      case 'dirigente':
+        currentSelectedIds = _selectedPeople.lead;
+        break;
+    }
+
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) =>
-          PeopleSelectorSheet(people: _people, selectedIds: _selectedPeople),
+      builder: (_) => PeopleSelectorSheet(
+        people: _people,
+        selectedIds: currentSelectedIds,
+        eventDate: _event?.date,
+        filterByELO: filterByELO,
+      ),
     );
     if (result != null) {
-      setState(() => _selectedPeople = result);
+      setState(() {
+        switch (option) {
+          case 'elo':
+            _selectedPeople = _selectedPeople.copyWith(elo: result);
+            break;
+          case 'pregador':
+            _selectedPeople = _selectedPeople.copyWith(preacher: result);
+            break;
+          case 'dirigente':
+            _selectedPeople = _selectedPeople.copyWith(lead: result);
+            break;
+        }
+      });
     }
   }
 
@@ -428,7 +523,7 @@ class _EventEditorPageState extends State<EventEditorPage>
       await context.read<EventsRepository>().updateEventDetails(
         id: widget.eventId,
         steps: _steps,
-        peopleIds: _selectedPeople,
+        people: _selectedPeople,
       );
       if (!mounted) return;
       showSuccessToast(context, 'Evento atualizado com sucesso!');
@@ -438,5 +533,113 @@ class _EventEditorPageState extends State<EventEditorPage>
         setState(() => _isSaving = false);
       }
     }
+  }
+}
+
+class _PeopleTypeSelectorSheet extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1220),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Adicionar pessoa',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+              ),
+              const SizedBox(height: 24),
+              _OptionTile(
+                icon: Icons.music_note,
+                title: 'Adicionar Equipe de louvor',
+                onTap: () => Navigator.of(context).pop('elo'),
+              ),
+              const SizedBox(height: 12),
+              _OptionTile(
+                icon: Icons.mic,
+                title: 'Adicionar pregador',
+                onTap: () => Navigator.of(context).pop('pregador'),
+              ),
+              const SizedBox(height: 12),
+              _OptionTile(
+                icon: Icons.person,
+                title: 'Adicionar dirigente',
+                onTap: () => Navigator.of(context).pop('dirigente'),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  const _OptionTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.1),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: Theme.of(context).colorScheme.primary, size: 24),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: Colors.white.withOpacity(0.5),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

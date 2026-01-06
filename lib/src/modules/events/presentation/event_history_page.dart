@@ -55,7 +55,7 @@ class _EventHistoryPageState extends State<EventHistoryPage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Histórico de Eventos',
+                      'Histórico de Liturgias',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
@@ -123,9 +123,8 @@ class _EventHistoryPageState extends State<EventHistoryPage> {
                           physics: const BouncingScrollPhysics(
                             parent: AlwaysScrollableScrollPhysics(),
                           ),
-                          padding: const EdgeInsets.only(bottom: 120),
+                          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
                           children: [
-                            const SizedBox(height: 120),
                             Icon(
                               Icons.error_outline,
                               size: 48,
@@ -144,9 +143,8 @@ class _EventHistoryPageState extends State<EventHistoryPage> {
                           physics: const BouncingScrollPhysics(
                             parent: AlwaysScrollableScrollPhysics(),
                           ),
-                          padding: const EdgeInsets.only(bottom: 120),
+                          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
                           children: const [
-                            SizedBox(height: 120),
                             Icon(
                               Icons.history,
                               size: 72,
@@ -161,7 +159,7 @@ class _EventHistoryPageState extends State<EventHistoryPage> {
                         )
                       : ListView.separated(
                           physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.only(bottom: 120),
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
                           itemCount: _events.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 16),
                           itemBuilder: (context, index) {

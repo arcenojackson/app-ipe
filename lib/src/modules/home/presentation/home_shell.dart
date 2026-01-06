@@ -118,7 +118,8 @@ class _HomeShellState extends State<HomeShell> {
                   current.section != HomeSection.people &&
                   !(current.section == HomeSection.planning &&
                       _planningHasEvents) &&
-                  !(current.section == HomeSection.agenda && _agendaHasEvents))
+                  !(current.section == HomeSection.agenda && _agendaHasEvents) &&
+                  current.section != HomeSection.agenda)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                   child: GlassContainer(

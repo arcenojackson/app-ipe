@@ -51,7 +51,7 @@ class _EventTemplatePageState extends State<EventTemplatePage> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Templates de Eventos',
+                      'Templates de Liturgias',
                       style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
@@ -72,9 +72,8 @@ class _EventTemplatePageState extends State<EventTemplatePage> {
                           physics: const BouncingScrollPhysics(
                             parent: AlwaysScrollableScrollPhysics(),
                           ),
-                          padding: const EdgeInsets.only(bottom: 120),
+                          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
                           children: [
-                            const SizedBox(height: 120),
                             Icon(
                               Icons.error_outline,
                               size: 48,
@@ -93,9 +92,8 @@ class _EventTemplatePageState extends State<EventTemplatePage> {
                           physics: const BouncingScrollPhysics(
                             parent: AlwaysScrollableScrollPhysics(),
                           ),
-                          padding: const EdgeInsets.only(bottom: 120),
+                          padding: const EdgeInsets.fromLTRB(24, 120, 24, 120),
                           children: const [
-                            SizedBox(height: 120),
                             Icon(
                               Icons.description_outlined,
                               size: 72,
@@ -110,7 +108,7 @@ class _EventTemplatePageState extends State<EventTemplatePage> {
                         )
                       : ListView.separated(
                           physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.only(bottom: 120),
+                          padding: const EdgeInsets.fromLTRB(24, 0, 24, 120),
                           itemCount: _templates.length,
                           separatorBuilder: (_, __) => const SizedBox(height: 16),
                           itemBuilder: (context, index) {

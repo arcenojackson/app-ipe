@@ -5,6 +5,8 @@ import '../../../shared/utils/app_toast.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../events/presentation/event_history_page.dart';
 import '../../events/presentation/event_template_page.dart';
+import '../../events/presentation/calendar_page.dart';
+import '../../societies/presentation/societies_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -139,9 +141,76 @@ class SettingsPage extends StatelessWidget {
                       const SizedBox(height: 24),
                     ],
 
-                    // Seção de Eventos
+                    // Seção de Sociedades internas
                     Text(
-                      'Eventos',
+                      'Sociedades internas',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white70,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    GlassContainer(
+                      padding: EdgeInsets.zero,
+                      child: Column(
+                        children: [
+                          ListTile(
+                            leading: const Icon(
+                              Icons.groups,
+                              color: Colors.white70,
+                            ),
+                            title: const Text(
+                              'Equipes e Diretorias',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Gerenciar equipes e diretorias das sociedades e ministérios',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white60,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _navigateToSocieties(context),
+                          ),
+                          const Divider(height: 1, color: Colors.white12),
+                          ListTile(
+                            leading: const Icon(
+                              Icons.calendar_month,
+                              color: Colors.white70,
+                            ),
+                            title: const Text(
+                              'Calendário anual',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Visualizar e gerenciar eventos do calendário',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white60,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _navigateToCalendar(context),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Seção de Liturgias
+                    Text(
+                      'Liturgias',
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: Colors.white70,
@@ -158,7 +227,7 @@ class SettingsPage extends StatelessWidget {
                               color: Colors.white70,
                             ),
                             title: const Text(
-                              'Acessar histórico de eventos',
+                              'Histórico de liturgias',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
@@ -183,7 +252,7 @@ class SettingsPage extends StatelessWidget {
                               color: Colors.white70,
                             ),
                             title: const Text(
-                              'Configurar template de evento',
+                              'Templates de liturgias',
                               style: TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.w500,
@@ -395,6 +464,22 @@ class SettingsPage extends StatelessWidget {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const EventTemplatePage(),
+      ),
+    );
+  }
+
+  void _navigateToCalendar(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const CalendarPage(),
+      ),
+    );
+  }
+
+  void _navigateToSocieties(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const SocietiesPage(),
       ),
     );
   }

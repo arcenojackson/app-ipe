@@ -3,10 +3,12 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/models/user.dart';
+import '../../societies/data/societies_repository.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../data/events_repository.dart';
 import '../models/event.dart';
 import 'event_viewer_page.dart';
+import 'worship_team_availability_modal.dart';
 
 class AgendaSection extends StatefulWidget {
   const AgendaSection({super.key, required this.user, this.onEventsChanged});
@@ -23,15 +25,19 @@ class _AgendaSectionState extends State<AgendaSection> {
   bool _isLoading = true;
   List<EventModel> _events = const [];
   String? _error;
+  bool _isELOMember = false;
 
   @override
   void initState() {
     super.initState();
     _loadEvents();
+    _checkELOMembership();
   }
 
   @override
   Widget build(BuildContext context) {
+    final shouldShowAvailabilityButton = _shouldShowAvailabilityButton();
+
     return RefreshIndicator(
       onRefresh: _loadEvents,
       color: Theme.of(context).colorScheme.primary,
@@ -44,7 +50,14 @@ class _AgendaSectionState extends State<AgendaSection> {
               ),
               padding: const EdgeInsets.only(bottom: 120),
               children: [
-                const SizedBox(height: 120),
+                if (shouldShowAvailabilityButton) ...[
+                  const SizedBox(height: 20),
+                  _AvailabilityButton(
+                    onTap: () => _openAvailabilityModal(context),
+                  ),
+                  const SizedBox(height: 20),
+                ] else
+                  const SizedBox(height: 20),
                 Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
                 const SizedBox(height: 16),
                 Text(
@@ -60,31 +73,97 @@ class _AgendaSectionState extends State<AgendaSection> {
                 parent: AlwaysScrollableScrollPhysics(),
               ),
               padding: const EdgeInsets.only(bottom: 120),
-              children: const [
-                SizedBox(height: 120),
-                Icon(Icons.event_busy, size: 72, color: Colors.white38),
-                SizedBox(height: 16),
-                Text(
+              children: [
+                if (shouldShowAvailabilityButton) ...[
+                  const SizedBox(height: 20),
+                  _AvailabilityButton(
+                    onTap: () => _openAvailabilityModal(context),
+                  ),
+                  const SizedBox(height: 20),
+                ] else
+                  const SizedBox(height: 20),
+                const Icon(Icons.event_busy, size: 72, color: Colors.white38),
+                const SizedBox(height: 16),
+                const Text(
                   'Nada marcado por aqui.\nQue tal aproveitar para ensaiar algo novo?',
                   textAlign: TextAlign.center,
                 ),
               ],
             )
-          : ListView.separated(
-              physics: const BouncingScrollPhysics(),
+          : ListView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               padding: const EdgeInsets.only(bottom: 120),
-              itemCount: _events.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 16),
-              itemBuilder: (context, index) {
-                final event = _events[index];
-                return _EventCard(
-                  event: event,
-                  subtitle:
-                      '${event.start}h · ${_dateFormat.format(event.date)}',
-                  onTap: () => _openEvent(event),
-                );
-              },
+              children: [
+                if (shouldShowAvailabilityButton) ...[
+                  const SizedBox(height: 20),
+                  _AvailabilityButton(
+                    onTap: () => _openAvailabilityModal(context),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+                ...List.generate(_events.length, (index) {
+                  final event = _events[index];
+                  return Padding(
+                    padding: EdgeInsets.only(
+                      bottom: index < _events.length - 1 ? 16 : 0,
+                    ),
+                    child: _EventCard(
+                      event: event,
+                      subtitle:
+                          '${event.start}h · ${_dateFormat.format(event.date)}',
+                      onTap: () => _openEvent(event),
+                    ),
+                  );
+                }),
+              ],
             ),
+    );
+  }
+
+  /// Verifica se o usuário é membro da sociedade ELO
+  Future<void> _checkELOMembership() async {
+    try {
+      final societiesRepository = context.read<SocietiesRepository>();
+      final eloSociety = await societiesRepository.fetchByName('ELO');
+
+      if (eloSociety != null) {
+        final isMember =
+            eloSociety.membersIds.contains(widget.user.id) ||
+            eloSociety.boardIds.contains(widget.user.id);
+        if (mounted) {
+          setState(() {
+            _isELOMember = isMember;
+          });
+        }
+      }
+    } catch (e) {
+      // Em caso de erro, não exibir o botão
+      if (mounted) {
+        setState(() {
+          _isELOMember = false;
+        });
+      }
+    }
+  }
+
+  /// Verifica se a data atual está entre os dias 05 e 25 do mês
+  /// E se o usuário é membro da sociedade ELO
+  bool _shouldShowAvailabilityButton() {
+    if (!_isELOMember) return false;
+
+    final now = DateTime.now();
+    return now.day >= 5 && now.day <= 25;
+  }
+
+  Future<void> _openAvailabilityModal(BuildContext context) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) =>
+          WorshipTeamAvailabilityModal(userId: widget.user.id),
     );
   }
 
@@ -117,6 +196,9 @@ class _AgendaSectionState extends State<AgendaSection> {
       });
       // Notificar o HomeShell sobre o estado dos eventos
       widget.onEventsChanged?.call(futureEvents.isNotEmpty);
+
+      // Atualizar verificação de membresia ELO ao recarregar
+      await _checkELOMembership();
     } catch (error) {
       setState(() => _error = 'Erro ao carregar seus serviços.');
       widget.onEventsChanged?.call(false);
@@ -192,6 +274,37 @@ class _EventCard extends StatelessWidget {
               ),
             ),
             const Icon(Icons.chevron_right_rounded, color: Colors.white54),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AvailabilityButton extends StatelessWidget {
+  const _AvailabilityButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: GlassContainer(
+        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.music_note, color: theme.colorScheme.primary, size: 24),
+            const SizedBox(width: 12),
+            Text(
+              'Informar disponibilidade',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
           ],
         ),
       ),

@@ -9,6 +9,7 @@ import 'src/modules/auth/data/auth_repository.dart';
 import 'src/modules/events/data/events_repository.dart';
 import 'src/modules/musics/data/musics_repository.dart';
 import 'src/modules/people/data/people_repository.dart';
+import 'src/modules/societies/data/societies_repository.dart';
 import 'src/shared/services/session_storage.dart';
 import 'src/shared/state/app_state.dart';
 
@@ -43,6 +44,9 @@ void main() async {
         ),
         Provider<PeopleRepository>.value(
           value: PeopleRepository(apiClient: apiClient),
+        ),
+        Provider<SocietiesRepository>.value(
+          value: SocietiesRepository(),
         ),
         ChangeNotifierProvider<AppState>.value(value: appState),
       ],

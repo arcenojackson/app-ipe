@@ -1,5 +1,54 @@
 import 'dart:convert';
 
+class EventPeople {
+  const EventPeople({
+    this.elo = const [],
+    this.preacher = const [],
+    this.lead = const [],
+  });
+
+  final List<String> elo;
+  final List<String> preacher;
+  final List<String> lead;
+
+  factory EventPeople.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const EventPeople();
+    return EventPeople(
+      elo: _parsePeopleList(json['elo']),
+      preacher: _parsePeopleList(json['preacher']),
+      lead: _parsePeopleList(json['lead']),
+    );
+  }
+
+  static List<String> _parsePeopleList(dynamic value) {
+    if (value == null) return const [];
+    if (value is List) {
+      return value.map((e) => e.toString()).toList();
+    }
+    return const [];
+  }
+
+  Map<String, dynamic> toJson() => {
+    'elo': elo,
+    'preacher': preacher,
+    'lead': lead,
+  };
+
+  EventPeople copyWith({
+    List<String>? elo,
+    List<String>? preacher,
+    List<String>? lead,
+  }) {
+    return EventPeople(
+      elo: elo ?? this.elo,
+      preacher: preacher ?? this.preacher,
+      lead: lead ?? this.lead,
+    );
+  }
+
+  List<String> get allPeopleIds => [...elo, ...preacher, ...lead];
+}
+
 class EventModel {
   const EventModel({
     required this.id,
@@ -7,7 +56,7 @@ class EventModel {
     required this.date,
     required this.start,
     this.steps = const [],
-    this.peopleIds = const [],
+    this.people = const EventPeople(),
   });
 
   final String id;
@@ -15,16 +64,34 @@ class EventModel {
   final DateTime date;
   final String start;
   final List<EventStepModel> steps;
-  final List<String> peopleIds;
+  final EventPeople people;
+
+  // Mantido para compatibilidade com código antigo
+  List<String> get peopleIds => people.allPeopleIds;
 
   factory EventModel.fromJson(Map<String, dynamic> json) {
+    // Tentar primeiro a nova estrutura (people como objeto)
+    if (json['people'] is Map) {
+      return EventModel(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        date: _parseDate(json['date']),
+        start: json['start']?.toString() ?? '',
+        steps: _parseSteps(json['steps']),
+        people: EventPeople.fromJson(json['people'] as Map<String, dynamic>),
+      );
+    }
+    // Fallback para estrutura antiga (people como array)
+    final oldPeopleIds = _parsePeople(json['people']);
     return EventModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       date: _parseDate(json['date']),
       start: json['start']?.toString() ?? '',
       steps: _parseSteps(json['steps']),
-      peopleIds: _parsePeople(json['people']),
+      people: EventPeople(
+        elo: oldPeopleIds, // Migração: coloca todos no elo por padrão
+      ),
     );
   }
 
@@ -73,7 +140,7 @@ class EventModel {
     'date': date.toIso8601String(),
     'start': start,
     'steps': steps.map((e) => e.toJson()).toList(),
-    'people': peopleIds,
+    'people': people.toJson(),
   };
 
   EventModel copyWith({
@@ -82,7 +149,7 @@ class EventModel {
     DateTime? date,
     String? start,
     List<EventStepModel>? steps,
-    List<String>? peopleIds,
+    EventPeople? people,
   }) {
     return EventModel(
       id: id ?? this.id,
@@ -90,7 +157,7 @@ class EventModel {
       date: date ?? this.date,
       start: start ?? this.start,
       steps: steps ?? this.steps,
-      peopleIds: peopleIds ?? this.peopleIds,
+      people: people ?? this.people,
     );
   }
 }
