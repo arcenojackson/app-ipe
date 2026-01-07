@@ -14,7 +14,9 @@ import 'widgets/calendar_event_form_sheet.dart';
 enum CalendarViewMode { day, week, month }
 
 class CalendarPage extends StatefulWidget {
-  const CalendarPage({super.key});
+  const CalendarPage({super.key, this.hideHeader = false});
+
+  final bool hideHeader;
 
   @override
   State<CalendarPage> createState() => _CalendarPageState();
@@ -43,7 +45,7 @@ class _CalendarPageState extends State<CalendarPage> {
       final repository = context.read<SocietiesRepository>();
       final societies = await repository.fetchAll();
       final categoryColors = <String, Color>{};
-      
+
       for (final society in societies) {
         categoryColors[society.name] = Color(society.color);
       }
@@ -96,16 +98,14 @@ class _CalendarPageState extends State<CalendarPage> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: events.map((event) {
-        final color = _categoryColors[event.category] ?? 
+        final color =
+            _categoryColors[event.category] ??
             Theme.of(context).colorScheme.primary;
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 1.5),
           width: 6.0,
           height: 6.0,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color,
-          ),
+          decoration: BoxDecoration(shape: BoxShape.circle, color: color),
         );
       }).toList(),
     );
@@ -131,7 +131,7 @@ class _CalendarPageState extends State<CalendarPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => CalendarEventFormSheet(
         initialDate: _selectedDay,
-        selectedCategory: _selectedCategories.isEmpty 
+        selectedCategory: _selectedCategories.isEmpty
             ? 'Geral'
             : _selectedCategories.first,
         eventsForDate: _getEventsForDay(_selectedDay),
@@ -176,9 +176,7 @@ class _CalendarPageState extends State<CalendarPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Excluir'),
           ),
         ],
@@ -205,6 +203,204 @@ class _CalendarPageState extends State<CalendarPage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final content = Column(
+      children: [
+        // AppBar - apenas quando não está no menu principal
+        if (!widget.hideHeader)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.of(context).pop(),
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Calendário Anual',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // Filtro de categoria
+        if (_selectedCategories.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: GlassContainer(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(Icons.label, size: 16, color: theme.colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: _selectedCategories.map((category) {
+                        // Obter a cor da categoria (society ou verde para "Geral")
+                        final categoryColor = category == 'Geral'
+                            ? theme.colorScheme.primary
+                            : (_categoryColors[category] ??
+                                  theme.colorScheme.primary);
+
+                        return Chip(
+                          label: Text(category),
+                          backgroundColor: categoryColor.withOpacity(0.2),
+                          labelStyle: theme.textTheme.bodySmall?.copyWith(
+                            color: categoryColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          deleteIcon: Icon(
+                            Icons.close,
+                            size: 16,
+                            color: categoryColor,
+                          ),
+                          onDeleted: () {
+                            setState(() {
+                              _selectedCategories.remove(category);
+                            });
+                            _loadEvents();
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                  if (_selectedCategories.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedCategories.clear();
+                        });
+                        _loadEvents();
+                      },
+                      child: const Text('Limpar'),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+        // Modo de visualização
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: SegmentedButtonTheme(
+            data: SegmentedButtonThemeData(style: SegmentedButton.styleFrom()),
+            child: SegmentedButton<CalendarViewMode>(
+              segments: [
+                ButtonSegment(
+                  value: CalendarViewMode.day,
+                  label: const Text('Dia'),
+                  icon: const SizedBox.shrink(),
+                ),
+                ButtonSegment(
+                  value: CalendarViewMode.week,
+                  label: const Text('Semana'),
+                  icon: const SizedBox.shrink(),
+                ),
+                ButtonSegment(
+                  value: CalendarViewMode.month,
+                  label: const Text('Mês'),
+                  icon: const SizedBox.shrink(),
+                ),
+              ],
+              selected: {_viewMode},
+              onSelectionChanged: (Set<CalendarViewMode> newSelection) {
+                setState(() {
+                  _viewMode = newSelection.first;
+                });
+              },
+            ),
+          ),
+        ),
+
+        // Calendário
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        size: 48,
+                        color: Colors.red.shade300,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _loadEvents,
+                        child: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                )
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Column(
+                      children: [
+                        Expanded(
+                          flex: _viewMode == CalendarViewMode.day ? 1 : 4,
+                          child: _buildCalendarView(),
+                        ),
+                        // Lista de eventos do dia selecionado
+                        if (_viewMode == CalendarViewMode.month ||
+                            _viewMode == CalendarViewMode.week)
+                          Flexible(flex: 2, child: _buildEventList()),
+                      ],
+                    );
+                  },
+                ),
+        ),
+      ],
+    );
+
+    if (widget.hideHeader) {
+      // Quando acessado pelo menu principal, usar Stack com Positioned
+      return Stack(
+        children: [
+          content,
+          // Botão de filtro (acima do botão +)
+          Positioned(
+            bottom: 200,
+            right: 0,
+            child: FloatingActionButton(
+              heroTag: 'filter',
+              onPressed: _showCategoryFilter,
+              child: const Icon(Icons.filter_list),
+            ),
+          ),
+          // Botão de adicionar (mesma posição que Planejar e Músicas)
+          Positioned(
+            bottom: 130,
+            right: 0,
+            child: FloatingActionButton(
+              heroTag: 'add',
+              onPressed: _showAddEventDialog,
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Quando acessado pelas Configurações, usar Scaffold completo
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -214,176 +410,31 @@ class _CalendarPageState extends State<CalendarPage> {
             end: Alignment.bottomCenter,
           ),
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // AppBar
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.arrow_back),
-                      onPressed: () => Navigator.of(context).pop(),
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Calendário Anual',
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.filter_list),
-                      onPressed: _showCategoryFilter,
-                      color: Colors.white,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: _showAddEventDialog,
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
-              ),
-
-              // Filtro de categoria
-              if (_selectedCategories.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: GlassContainer(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      children: [
-                        Icon(Icons.label, size: 16, color: theme.colorScheme.primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: _selectedCategories.map((category) {
-                              // Obter a cor da categoria (society ou verde para "Geral")
-                              final categoryColor = category == 'Geral'
-                                  ? theme.colorScheme.primary
-                                  : (_categoryColors[category] ?? theme.colorScheme.primary);
-                              
-                              return Chip(
-                                label: Text(category),
-                                backgroundColor: categoryColor.withOpacity(0.2),
-                                labelStyle: theme.textTheme.bodySmall?.copyWith(
-                                  color: categoryColor,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                deleteIcon: Icon(
-                                  Icons.close,
-                                  size: 16,
-                                  color: categoryColor,
-                                ),
-                                onDeleted: () {
-                                  setState(() {
-                                    _selectedCategories.remove(category);
-                                  });
-                                  _loadEvents();
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                        if (_selectedCategories.isNotEmpty) ...[
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _selectedCategories.clear();
-                              });
-                              _loadEvents();
-                            },
-                            child: const Text('Limpar'),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Modo de visualização
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: SegmentedButton<CalendarViewMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: CalendarViewMode.day,
-                      label: Text('Dia'),
-                      icon: Icon(Icons.view_day),
-                    ),
-                    ButtonSegment(
-                      value: CalendarViewMode.week,
-                      label: Text('Semana'),
-                      icon: Icon(Icons.view_week),
-                    ),
-                    ButtonSegment(
-                      value: CalendarViewMode.month,
-                      label: Text('Mês'),
-                      icon: Icon(Icons.view_module),
-                    ),
-                  ],
-                  selected: {_viewMode},
-                  onSelectionChanged: (Set<CalendarViewMode> newSelection) {
-                    setState(() {
-                      _viewMode = newSelection.first;
-                    });
-                  },
-                ),
-              ),
-
-              // Calendário
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.error_outline,
-                                    size: 48, color: Colors.red.shade300),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _error!,
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodyLarge,
-                                ),
-                                const SizedBox(height: 16),
-                                ElevatedButton(
-                                  onPressed: _loadEvents,
-                                  child: const Text('Tentar novamente'),
-                                ),
-                              ],
-                            ),
-                          )
-                        : Column(
-                            children: [
-                              Flexible(
-                                flex: 3,
-                                child: _buildCalendarView(),
-                              ),
-                              // Lista de eventos do dia selecionado
-                              if (_viewMode == CalendarViewMode.month ||
-                                  _viewMode == CalendarViewMode.week)
-                                Flexible(
-                                  flex: 2,
-                                  child: _buildEventList(),
-                                ),
-                            ],
-                          ),
-              ),
-            ],
+        child: SafeArea(child: content),
+      ),
+      floatingActionButton: Stack(
+        children: [
+          // Botão de filtro (acima do botão + padrão do Flutter)
+          Positioned(
+            bottom: 80,
+            right: 16,
+            child: FloatingActionButton(
+              heroTag: 'filter',
+              onPressed: _showCategoryFilter,
+              child: const Icon(Icons.filter_list),
+            ),
           ),
-        ),
+          // Botão de adicionar (posição padrão do Flutter: bottom: 16, right: 16)
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: FloatingActionButton(
+              heroTag: 'add',
+              onPressed: _showAddEventDialog,
+              child: const Icon(Icons.add),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -406,14 +457,12 @@ class _CalendarPageState extends State<CalendarPage> {
       focusedDay: _focusedDay,
       selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
       eventLoader: _getEventsForDay,
-      startingDayOfWeek: StartingDayOfWeek.monday,
+      startingDayOfWeek: StartingDayOfWeek.sunday,
+      locale: 'pt_BR',
       calendarBuilders: CalendarBuilders(
         markerBuilder: (context, date, events) {
           if (events.isEmpty) return null;
-          return Positioned(
-            bottom: 1,
-            child: _buildEventMarkers(events),
-          );
+          return Positioned(bottom: 1, child: _buildEventMarkers(events));
         },
       ),
       calendarStyle: CalendarStyle(
@@ -458,13 +507,11 @@ class _CalendarPageState extends State<CalendarPage> {
       eventLoader: _getEventsForDay,
       startingDayOfWeek: StartingDayOfWeek.monday,
       calendarFormat: CalendarFormat.week,
+      locale: 'pt_BR',
       calendarBuilders: CalendarBuilders(
         markerBuilder: (context, date, events) {
           if (events.isEmpty) return null;
-          return Positioned(
-            bottom: 1,
-            child: _buildEventMarkers(events),
-          );
+          return Positioned(bottom: 1, child: _buildEventMarkers(events));
         },
       ),
       calendarStyle: CalendarStyle(
@@ -516,7 +563,9 @@ class _CalendarPageState extends State<CalendarPage> {
                 icon: const Icon(Icons.chevron_left, color: Colors.white),
                 onPressed: () {
                   setState(() {
-                    _selectedDay = _selectedDay.subtract(const Duration(days: 1));
+                    _selectedDay = _selectedDay.subtract(
+                      const Duration(days: 1),
+                    );
                     _focusedDay = _selectedDay;
                   });
                 },
@@ -552,17 +601,21 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildDayEventList(List<CalendarEventModel> events) {
     if (events.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.event_busy, size: 64, color: Colors.white38),
-            const SizedBox(height: 16),
-            const Text(
-              'Nenhum evento neste dia',
-              style: TextStyle(color: Colors.white70),
-            ),
-          ],
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.only(top: 40),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.event_busy, size: 64, color: Colors.white38),
+              const SizedBox(height: 16),
+              const Text(
+                'Nenhum evento neste dia',
+                style: TextStyle(color: Colors.white70),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -602,18 +655,12 @@ class _CalendarPageState extends State<CalendarPage> {
                       const SizedBox(height: 4),
                       Text(
                         event.category,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         event.start,
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ],
                   ),
@@ -649,22 +696,21 @@ class _CalendarPageState extends State<CalendarPage> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(top: 8),
+      margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.2),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Text(
               'Eventos do dia ${DateFormat('dd/MM').format(_selectedDay)}',
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 16,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -750,12 +796,17 @@ class _CalendarPageState extends State<CalendarPage> {
   void _showCategoryFilter() {
     // Criar uma cópia local das categorias selecionadas para o modal
     final tempSelectedCategories = List<String>.from(_selectedCategories);
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      useSafeArea: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.7,
+          ),
           decoration: const BoxDecoration(
             color: Color(0xFF1A1F2E),
             borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -767,57 +818,74 @@ class _CalendarPageState extends State<CalendarPage> {
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   'Filtrar por Categoria',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: Colors.white),
                 ),
               ),
-            ListView.builder(
-              shrinkWrap: true,
-              itemCount: 2 + _societies.length, // Todos + Geral + societies
-              itemBuilder: (context, index) {
-                String category;
-                if (index == 0) {
-                  category = 'Todos';
-                } else if (index == 1) {
-                  category = 'Geral';
-                } else {
-                  final society = _societies[index - 2];
-                  category = society.name;
-                }
-                
-                final isSelected = category == 'Todos' 
-                    ? tempSelectedCategories.isEmpty
-                    : tempSelectedCategories.contains(category);
-                
-                return CheckboxListTile(
-                  value: isSelected,
-                  title: Text(
-                    category,
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : Colors.white70,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                    ),
+              Flexible(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.4,
                   ),
-                  activeColor: Theme.of(context).colorScheme.primary,
-                  onChanged: category == 'Todos' 
-                      ? null // "Todos" não pode ser selecionado manualmente (é o estado padrão quando nada está selecionado)
-                      : (bool? value) {
-                          setModalState(() {
-                            if (value == true) {
-                              if (!tempSelectedCategories.contains(category)) {
-                                tempSelectedCategories.add(category);
-                              }
-                            } else {
-                              tempSelectedCategories.remove(category);
-                            }
-                          });
-                        },
-                );
-              },
-            ),
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount:
+                        2 + _societies.length, // Todos + Geral + societies
+                    itemBuilder: (context, index) {
+                      String category;
+                      if (index == 0) {
+                        category = 'Todos';
+                      } else if (index == 1) {
+                        category = 'Geral';
+                      } else {
+                        final society = _societies[index - 2];
+                        category = society.name;
+                      }
+
+                      final isSelected = category == 'Todos'
+                          ? tempSelectedCategories.isEmpty
+                          : tempSelectedCategories.contains(category);
+
+                      return CheckboxListTile(
+                        value: isSelected,
+                        title: Text(
+                          category,
+                          style: TextStyle(
+                            color: isSelected ? Colors.white : Colors.white70,
+                            fontWeight: isSelected
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        activeColor: Theme.of(context).colorScheme.primary,
+                        onChanged: category == 'Todos'
+                            ? null // "Todos" não pode ser selecionado manualmente (é o estado padrão quando nada está selecionado)
+                            : (bool? value) {
+                                setModalState(() {
+                                  if (value == true) {
+                                    if (!tempSelectedCategories.contains(
+                                      category,
+                                    )) {
+                                      tempSelectedCategories.add(category);
+                                    }
+                                  } else {
+                                    tempSelectedCategories.remove(category);
+                                  }
+                                });
+                              },
+                      );
+                    },
+                  ),
+                ),
+              ),
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  top: 16,
+                  bottom: MediaQuery.of(context).padding.bottom + 16,
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -833,7 +901,9 @@ class _CalendarPageState extends State<CalendarPage> {
                     FilledButton(
                       onPressed: () {
                         setState(() {
-                          _selectedCategories = List<String>.from(tempSelectedCategories);
+                          _selectedCategories = List<String>.from(
+                            tempSelectedCategories,
+                          );
                         });
                         Navigator.of(context).pop();
                         _loadEvents();
@@ -843,7 +913,6 @@ class _CalendarPageState extends State<CalendarPage> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -851,4 +920,3 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 }
-

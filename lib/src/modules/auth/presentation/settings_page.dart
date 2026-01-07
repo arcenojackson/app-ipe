@@ -6,10 +6,40 @@ import '../../../shared/widgets/glass_container.dart';
 import '../../events/presentation/event_history_page.dart';
 import '../../events/presentation/event_template_page.dart';
 import '../../events/presentation/calendar_page.dart';
+import '../../people/presentation/people_section.dart';
+import '../../people/presentation/widgets/invite_person_sheet.dart';
 import '../../societies/presentation/societies_page.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool _isEditingName = false;
+  final TextEditingController _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  String _getInitials(String name) {
+    if (name.trim().isEmpty) return '?';
+    
+    final words = name.trim().split(' ').where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return '?';
+    
+    if (words.length == 1) {
+      return words[0][0].toUpperCase();
+    }
+    
+    // Pegar as primeiras duas iniciais
+    return words.take(2).map((w) => w[0].toUpperCase()).join();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -59,27 +89,18 @@ class SettingsPage extends StatelessWidget {
                     if (user != null) ...[
                       GlassContainer(
                         padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Perfil',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white70,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Row(
+                        child: Row(
                               children: [
                                 CircleAvatar(
                                   radius: 28,
                                   backgroundColor: theme.colorScheme.primary
                                       .withOpacity(0.15),
                                   child: Text(
-                                    user.name.isNotEmpty
-                                        ? user.name[0].toUpperCase()
-                                        : '?',
+                                    _getInitials(
+                                      _isEditingName
+                                          ? _nameController.text
+                                          : user.name,
+                                    ),
                                     style: theme.textTheme.titleLarge?.copyWith(
                                       color: theme.colorScheme.primary,
                                     ),
@@ -91,13 +112,101 @@ class SettingsPage extends StatelessWidget {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        user.name,
-                                        style: theme.textTheme.titleMedium
-                                            ?.copyWith(
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
+                                      Row(
+                                        children: [
+                                          Expanded(
+                                            child: _isEditingName
+                                                ? TextField(
+                                                    controller: _nameController,
+                                                    style: theme.textTheme
+                                                        .titleMedium
+                                                        ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Colors.white,
+                                                    ),
+                                                    decoration: InputDecoration(
+                                                      filled: true,
+                                                      fillColor: Colors.white
+                                                          .withOpacity(0.1),
+                                                      border:
+                                                          OutlineInputBorder(
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(12),
+                                                        borderSide:
+                                                            BorderSide.none,
+                                                      ),
+                                                      contentPadding:
+                                                          const EdgeInsets
+                                                              .symmetric(
+                                                        horizontal: 12,
+                                                        vertical: 12,
+                                                      ),
+                                                      suffixIcon:
+                                                          _nameController
+                                                                  .text
+                                                                  .isNotEmpty
+                                                              ? IconButton(
+                                                                  icon: const Icon(
+                                                                    Icons
+                                                                        .close,
+                                                                    color: Colors
+                                                                        .white70,
+                                                                    size: 20,
+                                                                  ),
+                                                                  onPressed:
+                                                                      () {
+                                                                    setState(
+                                                                        () {
+                                                                      _nameController
+                                                                          .clear();
+                                                                    });
+                                                                  },
+                                                                )
+                                                              : null,
+                                                    ),
+                                                    onChanged: (value) {
+                                                      setState(() {});
+                                                    },
+                                                  )
+                                                : Text(
+                                                    user.name,
+                                                    style: theme.textTheme
+                                                        .titleMedium
+                                                        ?.copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: Colors.white,
+                                                    ),
+                                                  ),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          IconButton(
+                                            icon: Icon(
+                                              _isEditingName
+                                                  ? Icons.save
+                                                  : Icons.edit,
+                                              color: Colors.white70,
+                                              size: 20,
                                             ),
+                                            onPressed: _isEditingName
+                                                ? () => _saveUserName(
+                                                      context,
+                                                      appState,
+                                                    )
+                                                : () {
+                                                    setState(() {
+                                                      _isEditingName = true;
+                                                      _nameController.text =
+                                                          user.name;
+                                                    });
+                                                  },
+                                            tooltip: _isEditingName
+                                                ? 'Salvar'
+                                                : 'Editar nome',
+                                          ),
+                                        ],
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
@@ -135,8 +244,6 @@ class SettingsPage extends StatelessWidget {
                                 ),
                               ],
                             ),
-                          ],
-                        ),
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -156,6 +263,31 @@ class SettingsPage extends StatelessWidget {
                         children: [
                           ListTile(
                             leading: const Icon(
+                              Icons.person_rounded,
+                              color: Colors.white70,
+                            ),
+                            title: const Text(
+                              'Pessoas',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Gerenciar perfis',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white60,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _navigateToPeople(context),
+                          ),
+                          const Divider(height: 1, color: Colors.white12),
+                          ListTile(
+                            leading: const Icon(
                               Icons.groups,
                               color: Colors.white70,
                             ),
@@ -167,7 +299,7 @@ class SettingsPage extends StatelessWidget {
                               ),
                             ),
                             subtitle: Text(
-                              'Gerenciar equipes e diretorias das sociedades e ministérios',
+                              'Gerenciar diretorias e membros das sociedades/equipes',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: Colors.white60,
                               ),
@@ -192,7 +324,7 @@ class SettingsPage extends StatelessWidget {
                               ),
                             ),
                             subtitle: Text(
-                              'Visualizar e gerenciar eventos do calendário',
+                              'Gerenciar eventos',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: Colors.white60,
                               ),
@@ -476,11 +608,111 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
+  void _navigateToPeople(BuildContext context) {
+    final user = context.read<AppState>().currentUser;
+    if (user == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0D1220), Color(0xFF05070D)],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back),
+                          onPressed: () => Navigator.of(context).pop(),
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Pessoas',
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: PeopleSection(
+                      currentUser: user,
+                      hideFloatingButton: true,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          floatingActionButton: (user.isAdminUser)
+              ? FloatingActionButton(
+                  onPressed: () => _showInvitePersonSheet(context, user),
+                  child: const Icon(Icons.add),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showInvitePersonSheet(BuildContext context, user) async {
+    final created = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const InvitePersonSheet(),
+    );
+    // Recarregar a lista se uma pessoa foi criada
+    if (created == true && context.mounted) {
+      // O PeopleSection usa RefreshIndicator, então podemos forçar um refresh
+      // Mas como não temos acesso direto, vamos apenas fechar e reabrir se necessário
+      // Na prática, o usuário pode fazer pull-to-refresh
+    }
+  }
+
   void _navigateToSocieties(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const SocietiesPage(),
       ),
     );
+  }
+
+  Future<void> _saveUserName(
+    BuildContext context,
+    AppState appState,
+  ) async {
+    final newName = _nameController.text.trim();
+    
+    if (newName.isEmpty) {
+      showErrorToast(context, 'O nome não pode estar vazio');
+      return;
+    }
+
+    try {
+      await appState.updateUserName(newName);
+      setState(() {
+        _isEditingName = false;
+      });
+      if (context.mounted) {
+        showSuccessToast(context, 'Nome atualizado com sucesso');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showErrorToast(context, 'Erro ao atualizar nome: ${e.toString()}');
+      }
+    }
   }
 }

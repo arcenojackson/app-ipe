@@ -6,6 +6,7 @@ import '../../data/events_repository.dart';
 import '../../models/event.dart';
 import '../../models/event_template.dart';
 import '../../../../shared/utils/app_toast.dart';
+import '../../../../shared/utils/platform_utils.dart';
 
 class EventFormSheet extends StatefulWidget {
   const EventFormSheet({super.key, this.event});
@@ -53,10 +54,12 @@ class _EventFormSheetState extends State<EventFormSheet> {
   @override
   Widget build(BuildContext context) {
     final title = widget.event == null ? 'Novo evento' : 'Editar evento';
+    final mediaQuery = MediaQuery.of(context);
+    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: mediaQuery.viewInsets.bottom + androidBottomPadding,
         left: 16,
         right: 16,
         top: 24,
@@ -212,9 +215,12 @@ class _EventFormSheetState extends State<EventFormSheet> {
         if (parts.length == 2) {
           final hour = int.tryParse(parts[0]);
           final minute = int.tryParse(parts[1]);
-          if (hour != null && minute != null && 
-              hour >= 0 && hour < 24 && 
-              minute >= 0 && minute < 60) {
+          if (hour != null &&
+              minute != null &&
+              hour >= 0 &&
+              hour < 24 &&
+              minute >= 0 &&
+              minute < 60) {
             return TimeOfDay(hour: hour, minute: minute);
           }
         }
@@ -241,7 +247,7 @@ class _EventFormSheetState extends State<EventFormSheet> {
 
   Future<void> _loadTemplates() async {
     if (widget.event != null) return; // Não carregar templates ao editar
-    
+
     try {
       final repository = context.read<EventsRepository>();
       final templates = await repository.fetchAllTemplates();

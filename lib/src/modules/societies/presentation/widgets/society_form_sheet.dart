@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../data/societies_repository.dart';
 import '../../models/society.dart';
 import '../../../../shared/utils/app_toast.dart';
+import '../../../../shared/utils/platform_utils.dart';
 
 class SocietyFormSheet extends StatefulWidget {
   const SocietyFormSheet({super.key, this.society});
@@ -57,11 +58,15 @@ class _SocietyFormSheetState extends State<SocietyFormSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.society == null ? 'Nova sociedade' : 'Editar sociedade';
+    final title = widget.society == null
+        ? 'Nova sociedade'
+        : 'Editar sociedade';
+    final mediaQuery = MediaQuery.of(context);
+    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: mediaQuery.viewInsets.bottom + androidBottomPadding,
         left: 16,
         right: 16,
         top: 24,
@@ -115,10 +120,7 @@ class _SocietyFormSheetState extends State<SocietyFormSheet> {
                 },
               ),
               const SizedBox(height: 24),
-              Text(
-                'Cor',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              Text('Cor', style: Theme.of(context).textTheme.titleMedium),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
@@ -222,4 +224,3 @@ class _SocietyFormSheetState extends State<SocietyFormSheet> {
     }
   }
 }
-

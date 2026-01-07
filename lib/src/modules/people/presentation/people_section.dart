@@ -9,9 +9,14 @@ import '../data/people_repository.dart';
 import 'widgets/invite_person_sheet.dart';
 
 class PeopleSection extends StatefulWidget {
-  const PeopleSection({super.key, required this.currentUser});
+  const PeopleSection({
+    super.key,
+    required this.currentUser,
+    this.hideFloatingButton = false,
+  });
 
   final UserModel currentUser;
+  final bool hideFloatingButton;
 
   @override
   State<PeopleSection> createState() => _PeopleSectionState();
@@ -305,8 +310,8 @@ class _PeopleSectionState extends State<PeopleSection> {
                   },
                 ),
         ),
-        // Botão de convidar apenas para Admin
-        if (widget.currentUser.isAdminUser)
+        // Botão de convidar apenas para Admin (quando não está escondido)
+        if (widget.currentUser.isAdminUser && !widget.hideFloatingButton)
           Positioned(
             bottom: 130,
             right: 0,

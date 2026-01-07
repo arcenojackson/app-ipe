@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../shared/utils/app_toast.dart';
+import '../../../../shared/utils/platform_utils.dart';
 import '../../../musics/models/music.dart';
 import '../../../musics/presentation/widgets/music_selector_sheet.dart';
 import '../../../musics/presentation/widgets/tone_selector_sheet.dart';
@@ -55,9 +56,12 @@ class _StepEditorSheetState extends State<StepEditorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
+
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: mediaQuery.viewInsets.bottom + androidBottomPadding,
         left: 16,
         right: 16,
         top: 24,
@@ -81,9 +85,7 @@ class _StepEditorSheetState extends State<StepEditorSheet> {
                 ),
               ),
               Text(
-                widget.initialStep == null
-                    ? 'Adicionar item'
-                    : 'Editar item',
+                widget.initialStep == null ? 'Adicionar item' : 'Editar item',
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 16),
@@ -104,10 +106,7 @@ class _StepEditorSheetState extends State<StepEditorSheet> {
               else
                 const Text(
                   'Tipo: Etapa',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
               if (_type == 'music' && !widget.isTemplateMode) ...[
                 const SizedBox(height: 16),
@@ -193,4 +192,3 @@ class _StepEditorSheetState extends State<StepEditorSheet> {
     Navigator.of(context).pop(step);
   }
 }
-

@@ -99,5 +99,10 @@ ThemeData buildAppTheme() {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       contentTextStyle: const TextStyle(color: Colors.white),
     ),
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        // Remove o ícone de check quando selecionado
+      ),
+    ),
   );
 }

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../shared/utils/app_toast.dart';
+import '../../../../shared/utils/platform_utils.dart';
 import '../../../../shared/widgets/glass_container.dart';
 import '../../../societies/data/societies_repository.dart';
 import '../../../societies/models/society.dart';
@@ -56,7 +57,9 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
     } else {
       // Modo criação
       _selectedDate = widget.initialDate;
-      _selectedCategory = widget.selectedCategory.isEmpty ? 'Geral' : widget.selectedCategory;
+      _selectedCategory = widget.selectedCategory.isEmpty
+          ? 'Geral'
+          : widget.selectedCategory;
       _dateController.text = _dateFormat.format(_selectedDate);
       _timeController.text = _timeFormat.format(_selectedDate);
     }
@@ -115,7 +118,9 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
       ),
       child: Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
+          bottom:
+              MediaQuery.of(context).viewInsets.bottom +
+              PlatformUtils.getModalBottomPadding(context),
           left: 24,
           right: 24,
           top: 24,
@@ -171,7 +176,10 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
                     hintText: 'Selecione a data',
                     labelStyle: const TextStyle(color: Colors.white70),
                     hintStyle: const TextStyle(color: Colors.white54),
-                    suffixIcon: const Icon(Icons.calendar_today, color: Colors.white70),
+                    suffixIcon: const Icon(
+                      Icons.calendar_today,
+                      color: Colors.white70,
+                    ),
                   ),
                   onTap: _isSubmitting ? null : _selectDate,
                 ),
@@ -199,80 +207,84 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
                         child: Center(child: CircularProgressIndicator()),
                       )
                     : _societies.isEmpty
-                        ? TextFormField(
-                            controller: TextEditingController(text: _selectedCategory),
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              labelText: 'Categoria',
-                              labelStyle: TextStyle(color: Colors.white70),
-                              hintText: 'Digite o nome da categoria',
-                              hintStyle: TextStyle(color: Colors.white54),
-                            ),
-                            onChanged: (value) {
-                              _selectedCategory = value;
-                            },
-                          )
-                        : DropdownButtonFormField<String>(
-                            value: _selectedCategory.isEmpty 
-                                ? 'Geral'
-                                : _selectedCategory,
-                            style: const TextStyle(color: Colors.white),
-                            decoration: const InputDecoration(
-                              labelText: 'Categoria',
-                              labelStyle: TextStyle(color: Colors.white70),
-                              suffixIcon: Icon(Icons.label, color: Colors.white70),
-                            ),
-                            dropdownColor: const Color(0xFF1A1F2E),
-                            items: [
-                              // Opção fixa "Geral" com bolinha verde
-                              DropdownMenuItem<String>(
-                                value: 'Geral',
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 16,
-                                      height: 16,
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primary,
-                                        shape: BoxShape.circle,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    const Text('Geral'),
-                                  ],
-                                ),
-                              ),
-                              // Societies do Firestore
-                              ..._societies.map((society) {
-                                return DropdownMenuItem<String>(
-                                  value: society.name,
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 16,
-                                        height: 16,
-                                        decoration: BoxDecoration(
-                                          color: Color(society.color),
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Text(society.name),
-                                    ],
+                    ? TextFormField(
+                        controller: TextEditingController(
+                          text: _selectedCategory,
+                        ),
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'Categoria',
+                          labelStyle: TextStyle(color: Colors.white70),
+                          hintText: 'Digite o nome da categoria',
+                          hintStyle: TextStyle(color: Colors.white54),
+                        ),
+                        onChanged: (value) {
+                          _selectedCategory = value;
+                        },
+                      )
+                    : DropdownButtonFormField<String>(
+                        value: _selectedCategory.isEmpty
+                            ? 'Geral'
+                            : _selectedCategory,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'Categoria',
+                          labelStyle: TextStyle(color: Colors.white70),
+                          suffixIcon: Icon(Icons.label, color: Colors.white70),
+                        ),
+                        dropdownColor: const Color(0xFF1A1F2E),
+                        items: [
+                          // Opção fixa "Geral" com bolinha verde
+                          DropdownMenuItem<String>(
+                            value: 'Geral',
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 16,
+                                  height: 16,
+                                  decoration: BoxDecoration(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                    shape: BoxShape.circle,
                                   ),
-                                );
-                              }),
-                            ],
-                            onChanged: _isSubmitting
-                                ? null
-                                : (value) {
-                                    if (value != null) {
-                                      setState(() {
-                                        _selectedCategory = value;
-                                      });
-                                    }
-                                  },
+                                ),
+                                const SizedBox(width: 12),
+                                const Text('Geral'),
+                              ],
+                            ),
                           ),
+                          // Societies do Firestore
+                          ..._societies.map((society) {
+                            return DropdownMenuItem<String>(
+                              value: society.name,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 16,
+                                    height: 16,
+                                    decoration: BoxDecoration(
+                                      color: Color(society.color),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(society.name),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                        onChanged: _isSubmitting
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _selectedCategory = value;
+                                  });
+                                }
+                              },
+                      ),
                 // Lista de eventos da data selecionada
                 if (_eventsForDate.isNotEmpty) ...[
                   const SizedBox(height: 24),
@@ -304,7 +316,8 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         event.name,
@@ -386,8 +399,10 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
       // Preservar a hora ao mudar a data
       final timeParts = _timeController.text.split(':');
       final hour = timeParts.length == 2 ? int.tryParse(timeParts[0]) ?? 0 : 0;
-      final minute = timeParts.length == 2 ? int.tryParse(timeParts[1]) ?? 0 : 0;
-      
+      final minute = timeParts.length == 2
+          ? int.tryParse(timeParts[1]) ?? 0
+          : 0;
+
       setState(() {
         _selectedDate = DateTime(
           picked.year,
@@ -411,9 +426,12 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
         if (parts.length == 2) {
           final hour = int.tryParse(parts[0]);
           final minute = int.tryParse(parts[1]);
-          if (hour != null && minute != null && 
-              hour >= 0 && hour < 24 && 
-              minute >= 0 && minute < 60) {
+          if (hour != null &&
+              minute != null &&
+              hour >= 0 &&
+              hour < 24 &&
+              minute >= 0 &&
+              minute < 60) {
             return TimeOfDay(hour: hour, minute: minute);
           }
         }
@@ -435,7 +453,7 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
       final formatted =
           '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}';
       _timeController.text = formatted;
-      
+
       // Atualizar _selectedDate com a nova hora
       setState(() {
         _selectedDate = DateTime(
@@ -449,7 +467,6 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
     }
   }
 
-
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -459,8 +476,10 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
       // Combinar data e hora
       final timeParts = _timeController.text.split(':');
       final hour = timeParts.length == 2 ? int.tryParse(timeParts[0]) ?? 0 : 0;
-      final minute = timeParts.length == 2 ? int.tryParse(timeParts[1]) ?? 0 : 0;
-      
+      final minute = timeParts.length == 2
+          ? int.tryParse(timeParts[1]) ?? 0
+          : 0;
+
       final eventDate = DateTime(
         _selectedDate.year,
         _selectedDate.month,
@@ -470,7 +489,7 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
       );
 
       final repository = context.read<EventsRepository>();
-      
+
       if (widget.event != null) {
         // Modo edição
         await repository.updateCalendarEvent(
@@ -515,4 +534,3 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
     }
   }
 }
-

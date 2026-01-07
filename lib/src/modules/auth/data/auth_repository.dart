@@ -347,6 +347,38 @@ class AuthRepository {
     }
   }
 
+  Future<UserModel> updateUserName(String newName) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        throw AppException(message: 'Nenhum usuário logado');
+      }
+
+      // Atualizar displayName no Firebase Auth
+      await user.updateDisplayName(newName);
+
+      // Atualizar nome no Firestore
+      await _firestore.collection('users').doc(user.uid).update({
+        'name': newName,
+      });
+
+      // Buscar usuário atualizado do Firestore
+      final updatedUser = await _getUserFromFirestore(user.uid);
+      if (updatedUser == null) {
+        throw AppException(message: 'Erro ao buscar usuário atualizado');
+      }
+
+      // Atualizar sessão local
+      await _sessionStorage.saveUser(updatedUser);
+
+      return updatedUser;
+    } on FirebaseAuthException catch (e) {
+      throw AppException(message: _handleAuthException(e));
+    } catch (e) {
+      throw AppException(message: 'Erro ao atualizar nome: ${e.toString()}');
+    }
+  }
+
   // Tratar exceções do Firebase Auth
   String _handleAuthException(FirebaseAuthException e) {
     switch (e.code) {

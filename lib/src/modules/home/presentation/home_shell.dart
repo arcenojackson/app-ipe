@@ -5,12 +5,13 @@ import '../../auth/models/user.dart';
 import '../../auth/presentation/settings_page.dart';
 import '../../events/presentation/agenda_section.dart';
 import '../../events/presentation/planning_section.dart';
+import '../../events/presentation/calendar_page.dart';
 import '../../musics/presentation/musics_section.dart';
-import '../../people/presentation/people_section.dart';
 import '../../../shared/state/app_state.dart';
+import '../../../shared/utils/platform_utils.dart';
 import '../../../shared/widgets/glass_container.dart';
 
-enum HomeSection { agenda, planning, people, musics }
+enum HomeSection { agenda, planning, calendar, musics }
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
@@ -45,6 +46,8 @@ class _HomeShellState extends State<HomeShell> {
 
     final current = _destinations[_currentIndex];
     final colorScheme = Theme.of(context).colorScheme;
+    final bottomNavPadding = PlatformUtils.getBottomNavigationPadding(context);
+    final hasButtonNav = PlatformUtils.hasButtonNavigation(context);
 
     return Scaffold(
       extendBody: true,
@@ -73,10 +76,10 @@ class _HomeShellState extends State<HomeShell> {
                           Text(
                             current.section == HomeSection.planning
                                 ? 'Planejar'
-                                : current.section == HomeSection.people
-                                ? 'Pessoas'
+                                : current.section == HomeSection.calendar
+                                ? 'Calendário'
                                 : current.section == HomeSection.musics
-                                ? 'Repertório'
+                                ? 'Músicas'
                                 : 'Olá, ${user.name.split(' ').first}',
                             style: Theme.of(context).textTheme.headlineSmall
                                 ?.copyWith(fontWeight: FontWeight.w700),
@@ -104,10 +107,11 @@ class _HomeShellState extends State<HomeShell> {
                         backgroundColor: Colors.white,
                         child: Text(
                           _getUserInitials(user.name),
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF0D1220),
-                            fontWeight: FontWeight.w600,
-                          ),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: const Color(0xFF0D1220),
+                                fontWeight: FontWeight.w600,
+                              ),
                         ),
                       ),
                     ),
@@ -115,10 +119,11 @@ class _HomeShellState extends State<HomeShell> {
                 ),
               ),
               if (current.section != HomeSection.musics &&
-                  current.section != HomeSection.people &&
+                  current.section != HomeSection.calendar &&
                   !(current.section == HomeSection.planning &&
                       _planningHasEvents) &&
-                  !(current.section == HomeSection.agenda && _agendaHasEvents) &&
+                  !(current.section == HomeSection.agenda &&
+                      _agendaHasEvents) &&
                   current.section != HomeSection.agenda)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
@@ -172,7 +177,7 @@ class _HomeShellState extends State<HomeShell> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: hasButtonNav ? bottomNavPadding + 8 : 8),
             ],
           ),
         ),
@@ -182,29 +187,34 @@ class _HomeShellState extends State<HomeShell> {
         destinations: _destinations,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         colorScheme: colorScheme,
+        bottomPadding: bottomNavPadding,
+        hasButtonNavigation: hasButtonNav,
       ),
     );
   }
 
   String _getUserInitials(String name) {
     if (name.isEmpty) return '?';
-    
-    final parts = name.trim().split(' ').where((part) => part.isNotEmpty).toList();
-    
+
+    final parts = name
+        .trim()
+        .split(' ')
+        .where((part) => part.isNotEmpty)
+        .toList();
+
     if (parts.isEmpty) return '?';
-    
+
     if (parts.length == 1) {
       return parts[0][0].toUpperCase();
     }
-    
+
     // Retorna primeira letra do primeiro nome e primeira letra do segundo nome
     return '${parts[0][0].toUpperCase()}${parts[1][0].toUpperCase()}';
   }
 
   List<_HomeDestination> _buildDestinations(UserModel user) {
     final isAdmin = user.isAdminUser;
-    final isStandard = user.isStandardUser;
-    
+
     final destinations = <_HomeDestination>[
       // Agenda - Todos os usuários têm acesso
       _HomeDestination(
@@ -247,29 +257,27 @@ class _HomeShellState extends State<HomeShell> {
             },
           ),
         ),
-      // Pessoas - Todos os usuários têm acesso
+      // Calendário - Todos os usuários têm acesso
       _HomeDestination(
-        section: HomeSection.people,
-        icon: Icons.person_rounded,
-        navLabel: 'Pessoas',
-        title: 'Equipe e membros',
-        subtitle: 'Gerencie perfis e equipes',
-        description:
-            'Veja quem participa das equipes, promova líderes e acompanhe o ministério.',
-        builder: (context) => PeopleSection(currentUser: user),
+        section: HomeSection.calendar,
+        icon: Icons.calendar_month,
+        navLabel: 'Calendário',
+        title: 'Calendário anual',
+        subtitle: 'Visualize e gerencie eventos do calendário',
+        description: 'Visualizar e gerencie eventos do calendário',
+        builder: (context) => const CalendarPage(hideHeader: true),
       ),
-      // Repertório - Admin e Padrão têm acesso (apenas visualização para Padrão)
-      if (isAdmin || isStandard)
-        _HomeDestination(
-          section: HomeSection.musics,
-          icon: Icons.music_note_rounded,
-          navLabel: 'Repertório',
-          title: 'Biblioteca de músicas',
-          subtitle: 'Organize suas músicas',
-          description:
-              'Gerencie letras, cifras e versões oficiais para cada evento.',
-          builder: (context) => MusicsSection(isAdmin: user.isAdmin),
-        ),
+      // Músicas - Todos os usuários têm acesso (apenas visualização para não Admin)
+      _HomeDestination(
+        section: HomeSection.musics,
+        icon: Icons.music_note_rounded,
+        navLabel: 'Músicas',
+        title: 'Biblioteca de músicas',
+        subtitle: 'Organize suas músicas',
+        description:
+            'Gerencie letras, cifras e versões oficiais para cada evento.',
+        builder: (context) => MusicsSection(isAdmin: user.isAdmin),
+      ),
     ];
 
     return destinations;
@@ -302,19 +310,33 @@ class _CustomBottomNavigationBar extends StatelessWidget {
     required this.destinations,
     required this.onDestinationSelected,
     required this.colorScheme,
+    required this.bottomPadding,
+    required this.hasButtonNavigation,
   });
 
   final int currentIndex;
   final List<_HomeDestination> destinations;
   final ValueChanged<int> onDestinationSelected;
   final ColorScheme colorScheme;
+  final double bottomPadding;
+  final bool hasButtonNavigation;
 
   @override
   Widget build(BuildContext context) {
+    // Ajusta a altura e padding baseado no tipo de navegação
+    // Para navegação de 3 botões, precisamos de mais espaço na parte inferior
+    final baseHeight = 100.0;
+    final bottomPaddingValue = hasButtonNavigation
+        ? bottomPadding.clamp(0.0, 48.0) // Limita o padding máximo
+        : 30.0; // Padding padrão para navegação por gestos
+
+    final totalHeight =
+        baseHeight + (hasButtonNavigation ? bottomPaddingValue : 0);
+
     return Transform.translate(
       offset: const Offset(0, 0),
       child: Container(
-        height: 100,
+        height: totalHeight,
         decoration: BoxDecoration(
           color: colorScheme.surface.withValues(alpha: 0.85),
           borderRadius: const BorderRadius.only(
@@ -323,9 +345,12 @@ class _CustomBottomNavigationBar extends StatelessWidget {
           ),
         ),
         child: OverflowBox(
-          maxHeight: 100,
+          maxHeight: totalHeight,
           child: Padding(
-            padding: const EdgeInsets.only(top: 0, bottom: 30),
+            padding: EdgeInsets.only(
+              top: 0,
+              bottom: hasButtonNavigation ? bottomPaddingValue : 30,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: List.generate(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/music.dart';
+import '../../../../shared/utils/platform_utils.dart';
 
 class MusicSelectorField extends StatelessWidget {
   const MusicSelectorField({
@@ -104,9 +105,12 @@ class _MusicSelectorSheetState extends State<_MusicSelectorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
+
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: mediaQuery.viewInsets.bottom + androidBottomPadding,
         left: 16,
         right: 16,
         top: 24,

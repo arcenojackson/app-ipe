@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../shared/utils/app_toast.dart';
+import '../../../../shared/utils/platform_utils.dart';
 
 class InvitePersonSheet extends StatefulWidget {
   const InvitePersonSheet({super.key});
@@ -67,7 +68,7 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
 
       // Formata o número para o formato internacional (assumindo Brasil +55)
       String formattedNumber = cleanWhatsapp;
-      
+
       // Se já começa com 55, mantém
       if (formattedNumber.startsWith('55')) {
         // Já está no formato internacional
@@ -81,12 +82,14 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
 
       // Mensagem padrão
       final appStoreLink = _getAppStoreLink();
-      final message = 'Olá $name! Você está sendo convidado a participar do App IPE.\n\n'
+      final message =
+          'Olá $name! Você está sendo convidado a participar do App IPE.\n\n'
           'Baixe o app na sua loja:\n'
           '$appStoreLink';
 
       // URL do WhatsApp
-      final whatsappUrl = 'https://wa.me/$formattedNumber?text=${Uri.encodeComponent(message)}';
+      final whatsappUrl =
+          'https://wa.me/$formattedNumber?text=${Uri.encodeComponent(message)}';
 
       // Tenta abrir o WhatsApp
       final uri = Uri.parse(whatsappUrl);
@@ -118,10 +121,11 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
     final safeAreaTop = mediaQuery.padding.top;
     final headerHeight = 100.0;
     final topPadding = safeAreaTop + headerHeight;
+    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: mediaQuery.viewInsets.bottom,
+        bottom: mediaQuery.viewInsets.bottom + androidBottomPadding,
         left: 16,
         right: 16,
         top: topPadding,
@@ -217,4 +221,3 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
     );
   }
 }
-

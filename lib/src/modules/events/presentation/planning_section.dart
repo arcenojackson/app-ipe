@@ -115,6 +115,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                     return _PlanningCard(
                       event: event,
                       dateLabel: _dateFormat.format(event.date),
+                      timeLabel: event.start.isNotEmpty ? event.start : '',
                       isPastEvent: isPastEvent,
                       onOpen: () => _openEvent(event),
                       onEdit: isPastEvent ? null : () => _onEditEvent(event),
@@ -247,6 +248,7 @@ class _PlanningCard extends StatelessWidget {
   const _PlanningCard({
     required this.event,
     required this.dateLabel,
+    required this.timeLabel,
     required this.isPastEvent,
     required this.onOpen,
     this.onEdit,
@@ -255,6 +257,7 @@ class _PlanningCard extends StatelessWidget {
 
   final EventModel event;
   final String dateLabel;
+  final String timeLabel;
   final bool isPastEvent;
   final VoidCallback onOpen;
   final VoidCallback? onEdit;
@@ -271,16 +274,16 @@ class _PlanningCard extends StatelessWidget {
       child: GestureDetector(
         onTap: onOpen,
         child: GlassContainer(
-          padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 22),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                height: 52,
-                width: 52,
+                height: 48,
+                width: 48,
                 decoration: BoxDecoration(
                   color: theme.colorScheme.secondary.withOpacity(0.18),
-                  borderRadius: BorderRadius.circular(18),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Icon(
                   Icons.calendar_month,
@@ -288,7 +291,7 @@ class _PlanningCard extends StatelessWidget {
                   size: 24,
                 ),
               ),
-              const SizedBox(width: 18),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -299,9 +302,11 @@ class _PlanningCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Text(
-                      'Data · $dateLabel',
+                      timeLabel.isNotEmpty
+                          ? '$dateLabel · $timeLabel'
+                          : dateLabel,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: Colors.white60,
                       ),
@@ -309,24 +314,24 @@ class _PlanningCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  IconButton(
-                    tooltip: 'Editar',
-                    icon: const Icon(Icons.edit_outlined, size: 20),
-                    onPressed: onEdit,
-                    color: onEdit == null ? Colors.white38 : null,
-                  ),
-                  IconButton(
-                    tooltip: 'Excluir',
-                    icon: const Icon(Icons.delete_outline, size: 20),
-                    onPressed: onDelete,
-                    color: onDelete == null ? Colors.white38 : null,
-                  ),
-                ],
-              ),
+              if (onEdit != null || onDelete != null)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onEdit != null)
+                      IconButton(
+                        tooltip: 'Editar',
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        onPressed: onEdit,
+                      ),
+                    if (onDelete != null)
+                      IconButton(
+                        tooltip: 'Excluir',
+                        icon: const Icon(Icons.delete_outline, size: 20),
+                        onPressed: onDelete,
+                      ),
+                  ],
+                ),
             ],
           ),
         ),

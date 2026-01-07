@@ -71,6 +71,12 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> updateUserName(String newName) async {
+    await _executeAuth(() async {
+      _currentUser = await _authRepository.updateUserName(newName);
+    });
+  }
+
   Future<void> deleteAccount() async {
     try {
       await _authRepository.deleteAccount();

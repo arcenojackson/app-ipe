@@ -7,6 +7,7 @@ import '../../models/category.dart';
 import '../../models/music.dart';
 import '../../models/youtube_search_result.dart';
 import '../../../../shared/utils/app_toast.dart';
+import '../../../../shared/utils/platform_utils.dart';
 import 'tone_selector_sheet.dart';
 
 class MusicFormSheet extends StatefulWidget {
@@ -91,10 +92,12 @@ class _MusicFormSheetState extends State<MusicFormSheet> {
     // Altura aproximada do header (nome do usuário + padding)
     final headerHeight = 100.0;
     final topPadding = safeAreaTop + headerHeight;
+    // Padding extra para Android
+    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
 
     return Padding(
       padding: EdgeInsets.only(
-        bottom: mediaQuery.viewInsets.bottom,
+        bottom: mediaQuery.viewInsets.bottom + androidBottomPadding,
         left: 16,
         right: 16,
         top: topPadding,

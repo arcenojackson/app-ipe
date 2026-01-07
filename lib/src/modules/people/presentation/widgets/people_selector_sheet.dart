@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../auth/models/user.dart';
 import '../../../events/data/events_repository.dart';
 import '../../../societies/data/societies_repository.dart';
+import '../../../../shared/utils/platform_utils.dart';
 
 class PeopleSelectorSheet extends StatefulWidget {
   const PeopleSelectorSheet({
@@ -66,6 +67,10 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
             return name.contains(_searchQuery) || email.contains(_searchQuery);
           }).toList();
         }
+        // Ordenar por nome alfabeticamente
+        _filteredPeople.sort(
+          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        );
       });
       return;
     }
@@ -103,11 +108,8 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
 
         for (final person in eloPeople) {
           try {
-            final hasAvailability =
-                await eventsRepository.hasAvailabilityForDate(
-              person.id,
-              widget.eventDate!,
-            );
+            final hasAvailability = await eventsRepository
+                .hasAvailabilityForDate(person.id, widget.eventDate!);
             if (hasAvailability) {
               availablePeople.add(person);
             }
@@ -128,6 +130,11 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
         }).toList();
       }
 
+      // Ordenar por nome alfabeticamente
+      eloPeople.sort(
+        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+      );
+
       setState(() {
         _isLoading = false;
         _filteredPeople = eloPeople;
@@ -142,9 +149,12 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
+
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        bottom: mediaQuery.viewInsets.bottom + androidBottomPadding,
         left: 16,
         right: 16,
         top: 24,
@@ -190,52 +200,47 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredPeople.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 48,
-                              color: Colors.white38,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              widget.filterByELO
-                                  ? 'Nenhum membro da ELO com disponibilidade encontrado'
-                                  : 'Nenhum resultado encontrado',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    color: Colors.white60,
-                                  ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.search_off, size: 48, color: Colors.white38),
+                        const SizedBox(height: 16),
+                        Text(
+                          widget.filterByELO
+                              ? 'Nenhum membro da ELO com disponibilidade encontrado'
+                              : 'Nenhum resultado encontrado',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.white60),
+                          textAlign: TextAlign.center,
                         ),
-                      )
-                    : ListView.separated(
-                        itemCount: _filteredPeople.length,
-                        separatorBuilder: (_, __) => const Divider(height: 1),
-                        itemBuilder: (context, index) {
-                          final person = _filteredPeople[index];
-                          final selected = _selectedIds.contains(person.id);
-                          return CheckboxListTile(
-                            value: selected,
-                            onChanged: (value) {
-                              setState(() {
-                                if (value == true) {
-                                  _selectedIds = [..._selectedIds, person.id];
-                                } else {
-                                  _selectedIds = _selectedIds
-                                      .where((id) => id != person.id)
-                                      .toList();
-                                }
-                              });
-                            },
-                            title: Text(person.name),
-                            subtitle: Text(person.email),
-                          );
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    itemCount: _filteredPeople.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final person = _filteredPeople[index];
+                      final selected = _selectedIds.contains(person.id);
+                      return CheckboxListTile(
+                        value: selected,
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedIds = [..._selectedIds, person.id];
+                            } else {
+                              _selectedIds = _selectedIds
+                                  .where((id) => id != person.id)
+                                  .toList();
+                            }
+                          });
                         },
-                      ),
+                        title: Text(person.name),
+                        subtitle: Text(person.email),
+                      );
+                    },
+                  ),
           ),
           const SizedBox(height: 16),
           SizedBox(
