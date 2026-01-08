@@ -156,20 +156,227 @@ class _EventViewerPageState extends State<EventViewerPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_event!.people.elo.isNotEmpty) ...[
-            _buildPeopleSection('Equipe de Louvor', _event!.people.elo),
+          if (_event!.people.elo.isNotEmpty || _event!.people.eloWithInstruments.isNotEmpty) ...[
+            _buildEloSection(),
             const SizedBox(height: 24),
           ],
-          if (_event!.people.preacher.isNotEmpty) ...[
-            _buildPeopleSection('Pregador', _event!.people.preacher),
+          if (_event!.people.soundImage.isNotEmpty) ...[
+            _buildPeopleSection('Som e Imagem', _event!.people.soundImage),
             const SizedBox(height: 24),
           ],
-          if (_event!.people.lead.isNotEmpty) ...[
-            _buildPeopleSection('Dirigente', _event!.people.lead),
+          if (_event!.people.lead.isNotEmpty || _event!.people.preacher.isNotEmpty) ...[
+            _buildLeadAndPreacherSection(),
           ],
         ],
       ),
     );
+  }
+  
+  Widget _buildEloSection() {
+    // Agrupar pessoas por instrumento
+    final instrumentGroups = <String, List<MapEntry<String, bool>>>{};
+    
+    // Adicionar pessoas com instrumentos
+    _event!.people.eloWithInstruments.forEach((userId, instruments) {
+      instruments.forEach((instrument, talkBack) {
+        instrumentGroups.putIfAbsent(instrument, () => []).add(
+          MapEntry(userId, talkBack),
+        );
+      });
+    });
+    
+    // Adicionar pessoas sem instrumento específico (elo antigo)
+    for (final userId in _event!.people.elo) {
+      if (!_event!.people.eloWithInstruments.containsKey(userId)) {
+        instrumentGroups.putIfAbsent('Geral', () => []).add(
+          MapEntry(userId, false),
+        );
+      }
+    }
+    
+    // Coletar todas as pessoas para exibir em duas colunas
+    final allPeople = <Widget>[];
+    instrumentGroups.forEach((instrument, people) {
+      for (final personEntry in people) {
+        final userId = personEntry.key;
+        final talkBack = personEntry.value;
+        final user = _people.firstWhere(
+          (u) => u.id == userId,
+          orElse: () => UserModel(
+            id: userId,
+            name: 'Usuário desconhecido',
+            email: '',
+            isAdmin: false,
+            isPending: false,
+          ),
+        );
+        
+        allPeople.add(_buildEloPersonChip(
+          user: user,
+          instrument: instrument != 'Geral' ? instrument : null,
+          talkBack: talkBack,
+        ));
+      }
+    });
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Equipe de Louvor',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+        ),
+        const SizedBox(height: 12),
+        _buildTwoColumnGrid(allPeople),
+      ],
+    );
+  }
+  
+  Widget _buildEloPersonChip({
+    required UserModel user,
+    String? instrument,
+    bool talkBack = false,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (instrument != null) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _getInstrumentIcon(instrument),
+                  size: 13,
+                  color: Colors.white70,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    instrument,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+          ],
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  user.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              if (talkBack) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.mic, size: 14),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTwoColumnGrid(List<Widget> chips) {
+    if (chips.isEmpty) return const SizedBox.shrink();
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - 8) / 2;
+        
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: chips.map((chip) => SizedBox(
+            width: itemWidth,
+            child: chip,
+          )).toList(),
+        );
+      },
+    );
+  }
+  
+  Widget _buildLeadAndPreacherSection() {
+    final allPeopleIds = [
+      ..._event!.people.lead,
+      ..._event!.people.preacher,
+    ];
+    
+    final people = _people.where((user) => allPeopleIds.contains(user.id)).toList();
+    
+    String title;
+    if (_event!.people.lead.isNotEmpty && _event!.people.preacher.isNotEmpty) {
+      title = 'Dirigente e Pregador';
+    } else if (_event!.people.lead.isNotEmpty) {
+      title = 'Dirigente';
+    } else {
+      title = 'Pregador';
+    }
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: people
+              .map((user) => UserChip(user: user))
+              .toList(),
+        ),
+      ],
+    );
+  }
+  
+  IconData _getInstrumentIcon(String instrument) {
+    switch (instrument) {
+      case 'Violão':
+        return Icons.music_note;
+      case 'Baixo':
+        return Icons.music_note;
+      case 'Guitarra':
+        return Icons.music_note;
+      case 'Teclado':
+        return Icons.piano;
+      case 'Bateria':
+        return Icons.radio;
+      case 'Ministrante':
+        return Icons.mic;
+      case 'Backing':
+        return Icons.people;
+      default:
+        return Icons.music_note;
+    }
   }
 
   Widget _buildPeopleSection(String title, List<String> peopleIds) {

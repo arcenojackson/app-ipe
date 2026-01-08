@@ -93,11 +93,43 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
 
       // Tenta abrir o WhatsApp
       final uri = Uri.parse(whatsappUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-        if (mounted) {
+      
+      // Verifica se pode abrir a URL
+      bool canLaunch = false;
+      try {
+        canLaunch = await canLaunchUrl(uri);
+      } catch (e) {
+        // Se canLaunchUrl falhar, no Android ainda tentamos abrir
+        if (Platform.isAndroid) {
+          canLaunch = true;
+        }
+      }
+      
+      // No Android 11+, canLaunchUrl pode retornar false mesmo com WhatsApp instalado
+      // devido a restrições de visibilidade de pacotes, então tentamos abrir mesmo assim
+      bool shouldTryLaunch = canLaunch || Platform.isAndroid;
+      
+      if (shouldTryLaunch) {
+        bool launchSuccess = false;
+        // Tenta primeiro com externalApplication
+        try {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          launchSuccess = true;
+        } catch (e) {
+          // Fallback: tenta com platformDefault
+          try {
+            await launchUrl(uri, mode: LaunchMode.platformDefault);
+            launchSuccess = true;
+          } catch (e2) {
+            launchSuccess = false;
+          }
+        }
+        
+        if (launchSuccess && mounted) {
           Navigator.of(context).pop(true);
           showSuccessToast(context, 'WhatsApp aberto com sucesso!');
+        } else if (mounted) {
+          showErrorToast(context, 'Não foi possível abrir o WhatsApp. Verifique se o aplicativo está instalado.');
         }
       } else {
         if (mounted) {

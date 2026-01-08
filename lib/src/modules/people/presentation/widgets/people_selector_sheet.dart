@@ -13,12 +13,20 @@ class PeopleSelectorSheet extends StatefulWidget {
     required this.selectedIds,
     this.eventDate,
     this.filterByELO = false,
+    this.filterBySociety,
+    this.instrument,
+    this.showTalkBack = false,
   });
 
   final List<UserModel> people;
   final List<String> selectedIds;
   final DateTime? eventDate;
   final bool filterByELO;
+  final String?
+  filterBySociety; // Nome da sociedade para filtrar (ex: "Som e Imagem")
+  final String?
+  instrument; // Instrumento selecionado (ex: "Violão", "Baixo", etc.)
+  final bool showTalkBack; // Se deve mostrar checkbox de Talk Back
 
   @override
   State<PeopleSelectorSheet> createState() => _PeopleSelectorSheetState();
@@ -30,6 +38,7 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
   String _searchQuery = '';
   List<UserModel> _filteredPeople = [];
   bool _isLoading = true;
+  final Map<String, bool> _talkBackSelections = {}; // Map<userId, isTalkBack>
 
   @override
   void initState() {
@@ -54,8 +63,8 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
   }
 
   Future<void> _filterPeople() async {
-    if (!widget.filterByELO || widget.eventDate == null) {
-      // Se não precisa filtrar por ELO, usar filtro simples
+    // Se não precisa filtrar por sociedade, usar filtro simples
+    if (!widget.filterByELO && widget.filterBySociety == null) {
       setState(() {
         _isLoading = false;
         if (_searchQuery.isEmpty) {
@@ -78,11 +87,13 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
     setState(() => _isLoading = true);
 
     try {
-      // Buscar sociedade ELO
       final societiesRepository = context.read<SocietiesRepository>();
-      final eloSociety = await societiesRepository.fetchByName('ELO');
 
-      if (eloSociety == null) {
+      // Buscar sociedade (ELO ou outra)
+      final societyName = widget.filterByELO ? 'ELO' : widget.filterBySociety!;
+      final society = await societiesRepository.fetchByName(societyName);
+
+      if (society == null) {
         setState(() {
           _isLoading = false;
           _filteredPeople = [];
@@ -90,40 +101,48 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
         return;
       }
 
-      // Obter IDs de membros e diretoria da ELO
-      final eloMemberIds = <String>{
-        ...eloSociety.membersIds,
-        ...eloSociety.boardIds,
-      };
+      // Obter IDs de membros e diretoria da sociedade
+      final memberIds = <String>{...society.membersIds, ...society.boardIds};
 
-      // Filtrar pessoas que pertencem à ELO
-      var eloPeople = widget.people
-          .where((person) => eloMemberIds.contains(person.id))
+      // Filtrar pessoas que pertencem à sociedade
+      var filteredPeople = widget.people
+          .where((person) => memberIds.contains(person.id))
           .toList();
 
-      // Filtrar por disponibilidade se houver data do evento
-      if (widget.eventDate != null) {
-        final eventsRepository = context.read<EventsRepository>();
-        final availablePeople = <UserModel>[];
+      // Se for ELO, aplicar filtro de disponibilidade apenas se o evento for de um mês diferente do atual
+      if (widget.filterByELO && widget.eventDate != null) {
+        final now = DateTime.now();
+        final eventDate = widget.eventDate!;
 
-        for (final person in eloPeople) {
-          try {
-            final hasAvailability = await eventsRepository
-                .hasAvailabilityForDate(person.id, widget.eventDate!);
-            if (hasAvailability) {
-              availablePeople.add(person);
+        // Verificar se o evento está no mesmo mês e ano do mês atual
+        final isSameMonth =
+            now.year == eventDate.year && now.month == eventDate.month;
+
+        // Aplicar filtro de disponibilidade apenas se o evento for de um mês diferente
+        if (!isSameMonth) {
+          final eventsRepository = context.read<EventsRepository>();
+          final availablePeople = <UserModel>[];
+
+          for (final person in filteredPeople) {
+            try {
+              final hasAvailability = await eventsRepository
+                  .hasAvailabilityForDate(person.id, widget.eventDate!);
+              if (hasAvailability) {
+                availablePeople.add(person);
+              }
+            } catch (e) {
+              // Se houver erro ao verificar disponibilidade, não incluir o usuário
             }
-          } catch (e) {
-            // Se houver erro ao verificar disponibilidade, não incluir o usuário
           }
-        }
 
-        eloPeople = availablePeople;
+          filteredPeople = availablePeople;
+        }
+        // Se estiver no mesmo mês, não filtrar por disponibilidade (mostrar todos)
       }
 
       // Aplicar filtro de busca se houver
       if (_searchQuery.isNotEmpty) {
-        eloPeople = eloPeople.where((person) {
+        filteredPeople = filteredPeople.where((person) {
           final name = person.name.toLowerCase();
           final email = person.email.toLowerCase();
           return name.contains(_searchQuery) || email.contains(_searchQuery);
@@ -131,13 +150,13 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
       }
 
       // Ordenar por nome alfabeticamente
-      eloPeople.sort(
+      filteredPeople.sort(
         (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
       );
 
       setState(() {
         _isLoading = false;
-        _filteredPeople = eloPeople;
+        _filteredPeople = filteredPeople;
       });
     } catch (e) {
       setState(() {
@@ -209,6 +228,8 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
                         Text(
                           widget.filterByELO
                               ? 'Nenhum membro da ELO com disponibilidade encontrado'
+                              : widget.filterBySociety != null
+                              ? 'Nenhum membro de ${widget.filterBySociety} encontrado'
                               : 'Nenhum resultado encontrado',
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: Colors.white60),
@@ -223,21 +244,56 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
                     itemBuilder: (context, index) {
                       final person = _filteredPeople[index];
                       final selected = _selectedIds.contains(person.id);
-                      return CheckboxListTile(
-                        value: selected,
-                        onChanged: (value) {
-                          setState(() {
-                            if (value == true) {
-                              _selectedIds = [..._selectedIds, person.id];
-                            } else {
-                              _selectedIds = _selectedIds
-                                  .where((id) => id != person.id)
-                                  .toList();
-                            }
-                          });
-                        },
-                        title: Text(person.name),
-                        subtitle: Text(person.email),
+                      final talkBack = _talkBackSelections[person.id] ?? false;
+
+                      return Column(
+                        children: [
+                          CheckboxListTile(
+                            value: selected,
+                            onChanged: (value) {
+                              setState(() {
+                                if (value == true) {
+                                  _selectedIds = [..._selectedIds, person.id];
+                                  if (!widget.showTalkBack) {
+                                    _talkBackSelections[person.id] = false;
+                                  }
+                                } else {
+                                  _selectedIds = _selectedIds
+                                      .where((id) => id != person.id)
+                                      .toList();
+                                  _talkBackSelections.remove(person.id);
+                                }
+                              });
+                            },
+                            title: Text(person.name),
+                            subtitle: Text(person.email),
+                          ),
+                          if (selected &&
+                              widget.showTalkBack &&
+                              widget.instrument != null)
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 72,
+                                right: 16,
+                                bottom: 8,
+                              ),
+                              child: CheckboxListTile(
+                                dense: true,
+                                contentPadding: EdgeInsets.zero,
+                                value: talkBack,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _talkBackSelections[person.id] =
+                                        value ?? false;
+                                  });
+                                },
+                                title: Text(
+                                  'Talk Back',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ),
+                            ),
+                        ],
                       );
                     },
                   ),
@@ -246,7 +302,21 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              onPressed: () => Navigator.of(context).pop(_selectedIds),
+              onPressed: () {
+                // Retornar dados apropriados baseado no contexto
+                if (widget.showTalkBack && widget.instrument != null) {
+                  // Retornar Map com userId -> Map<instrument, talkBack>
+                  final result = <String, Map<String, bool>>{};
+                  for (final userId in _selectedIds) {
+                    result[userId] = {
+                      widget.instrument!: _talkBackSelections[userId] ?? false,
+                    };
+                  }
+                  Navigator.of(context).pop(result);
+                } else {
+                  Navigator.of(context).pop(_selectedIds);
+                }
+              },
               child: const Text('Salvar'),
             ),
           ),

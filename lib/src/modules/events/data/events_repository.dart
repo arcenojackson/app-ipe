@@ -172,7 +172,7 @@ class EventsRepository {
   }
 
   /// Busca services do Firestore onde o userId está na lista de people
-  /// Suporta tanto a estrutura antiga (array simples) quanto a nova (objeto com elo, preacher, lead)
+  /// Suporta tanto a estrutura antiga (array simples) quanto a nova (objeto com elo, preacher, lead, soundImage, eloWithInstruments)
   Future<List<EventModel>> fetchServicesForUser(String userId) async {
     try {
       // Buscar todos os serviços e filtrar no código, pois Firestore não suporta
@@ -184,14 +184,29 @@ class EventsRepository {
             final data = doc.data();
             final people = data['people'];
 
-            // Nova estrutura: objeto com elo, preacher, lead
+            // Nova estrutura: objeto com elo, preacher, lead, soundImage, eloWithInstruments
             if (people is Map) {
               final elo = people['elo'] as List<dynamic>? ?? [];
               final preacher = people['preacher'] as List<dynamic>? ?? [];
               final lead = people['lead'] as List<dynamic>? ?? [];
-              return elo.contains(userId) ||
+              final soundImage = people['soundImage'] as List<dynamic>? ?? [];
+              
+              // Verificar se está em alguma lista simples
+              if (elo.contains(userId) ||
                   preacher.contains(userId) ||
-                  lead.contains(userId);
+                  lead.contains(userId) ||
+                  soundImage.contains(userId)) {
+                return true;
+              }
+              
+              // Verificar se está em eloWithInstruments (Map<userId, Map<instrument, talkBack>>)
+              final eloWithInstruments = people['eloWithInstruments'];
+              if (eloWithInstruments is Map) {
+                // Se o userId está nas chaves do Map, significa que está escalado
+                return eloWithInstruments.containsKey(userId);
+              }
+              
+              return false;
             }
 
             // Estrutura antiga: array simples (compatibilidade)

@@ -5,18 +5,41 @@ class EventPeople {
     this.elo = const [],
     this.preacher = const [],
     this.lead = const [],
+    this.soundImage = const [],
+    this.eloWithInstruments = const {},
   });
 
   final List<String> elo;
   final List<String> preacher;
   final List<String> lead;
+  final List<String> soundImage;
+  // Map<userId, Map<instrument, talkBack>>
+  final Map<String, Map<String, bool>> eloWithInstruments;
 
   factory EventPeople.fromJson(Map<String, dynamic>? json) {
     if (json == null) return const EventPeople();
+    
+    // Parse eloWithInstruments
+    Map<String, Map<String, bool>> eloWithInstruments = {};
+    if (json['eloWithInstruments'] is Map) {
+      final eloMap = json['eloWithInstruments'] as Map;
+      eloMap.forEach((userId, value) {
+        if (value is Map) {
+          final instrumentMap = <String, bool>{};
+          value.forEach((instrument, talkBack) {
+            instrumentMap[instrument.toString()] = talkBack == true;
+          });
+          eloWithInstruments[userId.toString()] = instrumentMap;
+        }
+      });
+    }
+    
     return EventPeople(
       elo: _parsePeopleList(json['elo']),
       preacher: _parsePeopleList(json['preacher']),
       lead: _parsePeopleList(json['lead']),
+      soundImage: _parsePeopleList(json['soundImage']),
+      eloWithInstruments: eloWithInstruments,
     );
   }
 
@@ -32,21 +55,33 @@ class EventPeople {
     'elo': elo,
     'preacher': preacher,
     'lead': lead,
+    'soundImage': soundImage,
+    'eloWithInstruments': eloWithInstruments,
   };
 
   EventPeople copyWith({
     List<String>? elo,
     List<String>? preacher,
     List<String>? lead,
+    List<String>? soundImage,
+    Map<String, Map<String, bool>>? eloWithInstruments,
   }) {
     return EventPeople(
       elo: elo ?? this.elo,
       preacher: preacher ?? this.preacher,
       lead: lead ?? this.lead,
+      soundImage: soundImage ?? this.soundImage,
+      eloWithInstruments: eloWithInstruments ?? this.eloWithInstruments,
     );
   }
 
-  List<String> get allPeopleIds => [...elo, ...preacher, ...lead];
+  List<String> get allPeopleIds => [
+        ...elo,
+        ...preacher,
+        ...lead,
+        ...soundImage,
+        ...eloWithInstruments.keys,
+      ];
 }
 
 class EventModel {

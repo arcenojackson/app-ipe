@@ -38,12 +38,12 @@ class _PlanningSectionState extends State<PlanningSection> {
     return eventDate.isBefore(today);
   }
 
-  /// Verifica se a data é igual ou maior que hoje
+  /// Verifica se a data é igual ou maior que hoje -1 dia
   bool _isDateTodayOrAfter(DateTime date) {
     final now = DateTime.now();
     final eventDate = DateTime(date.year, date.month, date.day);
-    final today = DateTime(now.year, now.month, now.day);
-    return !eventDate.isBefore(today);
+    final yesterday = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 1));
+    return !eventDate.isBefore(yesterday);
   }
 
   @override
@@ -144,30 +144,13 @@ class _PlanningSectionState extends State<PlanningSection> {
     try {
       final allEvents = await context.read<EventsRepository>().fetchAllServices();
       
-      // Separar eventos futuros e passados
-      final futureEvents = allEvents
+      // Filtrar apenas eventos com data >= hoje -1 dia
+      final filteredEvents = allEvents
           .where((event) => _isDateTodayOrAfter(event.date))
           .toList();
-      final pastEvents = allEvents
-          .where((event) => _isDateBeforeToday(event.date))
-          .toList();
       
-      // Ordenar eventos futuros por data crescente
-      futureEvents.sort((a, b) => a.date.compareTo(b.date));
-      
-      // Encontrar o último evento passado (mais recente)
-      EventModel? lastPastEvent;
-      if (pastEvents.isNotEmpty) {
-        pastEvents.sort((a, b) => b.date.compareTo(a.date));
-        lastPastEvent = pastEvents.first;
-      }
-      
-      // Combinar: eventos futuros + último evento passado (se existir)
-      final filteredEvents = <EventModel>[];
-      if (lastPastEvent != null) {
-        filteredEvents.add(lastPastEvent);
-      }
-      filteredEvents.addAll(futureEvents);
+      // Ordenar eventos por data crescente
+      filteredEvents.sort((a, b) => a.date.compareTo(b.date));
       
       setState(() {
         _events = filteredEvents;

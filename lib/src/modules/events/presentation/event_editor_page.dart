@@ -291,24 +291,274 @@ class _EventEditorPageState extends State<EventEditorPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_selectedPeople.elo.isNotEmpty) ...[
-            _buildPeopleSection('Equipe de Louvor', _selectedPeople.elo, 'elo'),
+          if (_selectedPeople.elo.isNotEmpty || _selectedPeople.eloWithInstruments.isNotEmpty) ...[
+            _buildEloSection(),
             const SizedBox(height: 24),
           ],
-          if (_selectedPeople.preacher.isNotEmpty) ...[
-            _buildPeopleSection('Pregador', _selectedPeople.preacher, 'preacher'),
+          if (_selectedPeople.soundImage.isNotEmpty) ...[
+            _buildPeopleSection('Som e Imagem', _selectedPeople.soundImage, 'soundImage'),
             const SizedBox(height: 24),
           ],
-          if (_selectedPeople.lead.isNotEmpty) ...[
-            _buildPeopleSection('Dirigente', _selectedPeople.lead, 'lead'),
+          if (_selectedPeople.lead.isNotEmpty || _selectedPeople.preacher.isNotEmpty) ...[
+            _buildLeadAndPreacherSection(),
           ],
         ],
       ),
     );
   }
+  
+  Widget _buildLeadAndPreacherSection() {
+    final leadChips = _selectedPeople.lead.map((userId) {
+      final user = _people.firstWhere(
+        (u) => u.id == userId,
+        orElse: () => UserModel(
+          id: userId,
+          name: 'Usuário desconhecido',
+          email: '',
+          isAdmin: false,
+          isPending: false,
+        ),
+      );
+      return _buildPersonChip(
+        user: user,
+        onDeleted: _isPastEvent
+            ? null
+            : () => _removePerson(user.id, 'lead'),
+      );
+    }).toList();
+    
+    final preacherChips = _selectedPeople.preacher.map((userId) {
+      final user = _people.firstWhere(
+        (u) => u.id == userId,
+        orElse: () => UserModel(
+          id: userId,
+          name: 'Usuário desconhecido',
+          email: '',
+          isAdmin: false,
+          isPending: false,
+        ),
+      );
+      return _buildPersonChip(
+        user: user,
+        onDeleted: _isPastEvent
+            ? null
+            : () => _removePerson(user.id, 'preacher'),
+      );
+    }).toList();
+    
+    final allChips = [...leadChips, ...preacherChips];
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_selectedPeople.lead.isNotEmpty && _selectedPeople.preacher.isNotEmpty) ...[
+          Text(
+            'Dirigente e Pregador',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+          ),
+        ] else if (_selectedPeople.lead.isNotEmpty) ...[
+          Text(
+            'Dirigente',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+          ),
+        ] else ...[
+          Text(
+            'Pregador',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white70,
+                ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        _buildTwoColumnGrid(allChips),
+      ],
+    );
+  }
+
+  Widget _buildEloSection() {
+    // Agrupar pessoas por instrumento
+    final instrumentGroups = <String, List<MapEntry<String, bool>>>{};
+    
+    // Adicionar pessoas com instrumentos
+    _selectedPeople.eloWithInstruments.forEach((userId, instruments) {
+      instruments.forEach((instrument, talkBack) {
+        instrumentGroups.putIfAbsent(instrument, () => []).add(
+          MapEntry(userId, talkBack),
+        );
+      });
+    });
+    
+    // Adicionar pessoas sem instrumento específico (elo antigo)
+    for (final userId in _selectedPeople.elo) {
+      if (!_selectedPeople.eloWithInstruments.containsKey(userId)) {
+        instrumentGroups.putIfAbsent('Geral', () => []).add(
+          MapEntry(userId, false),
+        );
+      }
+    }
+    
+    // Coletar todas as pessoas para exibir em duas colunas
+    final allPeople = <Widget>[];
+    instrumentGroups.forEach((instrument, people) {
+      for (final personEntry in people) {
+        final userId = personEntry.key;
+        final talkBack = personEntry.value;
+        final user = _people.firstWhere(
+          (u) => u.id == userId,
+          orElse: () => UserModel(
+            id: userId,
+            name: 'Usuário desconhecido',
+            email: '',
+            isAdmin: false,
+            isPending: false,
+          ),
+        );
+        
+        allPeople.add(_buildPersonChip(
+          user: user,
+          talkBack: talkBack,
+          instrument: instrument != 'Geral' ? instrument : null,
+          onDeleted: _isPastEvent
+              ? null
+              : () => _removePerson(user.id, 'elo', instrument),
+        ));
+      }
+    });
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Equipe de Louvor',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+        ),
+        const SizedBox(height: 12),
+        _buildTwoColumnGrid(allPeople),
+      ],
+    );
+  }
+  
+  Widget _buildPersonChip({
+    required UserModel user,
+    bool talkBack = false,
+    String? instrument,
+    VoidCallback? onDeleted,
+  }) {
+    return InputChip(
+      padding: EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: instrument != null ? 6 : 8,
+      ),
+      label: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (instrument != null) ...[
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _getInstrumentIcon(instrument),
+                  size: 13,
+                  color: Colors.white70,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    instrument,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 3),
+          ],
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  user.name,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13),
+                ),
+              ),
+              if (talkBack) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.mic, size: 14),
+              ],
+            ],
+          ),
+        ],
+      ),
+      onDeleted: onDeleted,
+    );
+  }
+  
+  IconData _getInstrumentIcon(String instrument) {
+    switch (instrument) {
+      case 'Violão':
+        return Icons.music_note;
+      case 'Baixo':
+        return Icons.music_note;
+      case 'Guitarra':
+        return Icons.music_note;
+      case 'Teclado':
+        return Icons.piano;
+      case 'Bateria':
+        return Icons.radio;
+      case 'Ministrante':
+        return Icons.mic;
+      case 'Backing':
+        return Icons.people;
+      default:
+        return Icons.music_note;
+    }
+  }
+  
+  Widget _buildTwoColumnGrid(List<Widget> chips) {
+    if (chips.isEmpty) return const SizedBox.shrink();
+    
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final itemWidth = (constraints.maxWidth - 8) / 2;
+        
+        return Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: chips.map((chip) => SizedBox(
+            width: itemWidth,
+            child: chip,
+          )).toList(),
+        );
+      },
+    );
+  }
 
   Widget _buildPeopleSection(String title, List<String> peopleIds, String type) {
     final people = _people.where((user) => peopleIds.contains(user.id)).toList();
+    
+    final chips = people.map((user) => _buildPersonChip(
+      user: user,
+      onDeleted: _isPastEvent
+          ? null
+          : () => _removePerson(user.id, type),
+    )).toList();
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,33 +571,44 @@ class _EventEditorPageState extends State<EventEditorPage>
               ),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: people
-              .map(
-                (user) => InputChip(
-                  label: Text(user.name),
-                  avatar: CircleAvatar(
-                    child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
-                  ),
-                  onDeleted: _isPastEvent
-                      ? null
-                      : () => _removePerson(user.id, type),
-                ),
-              )
-              .toList(),
-        ),
+        _buildTwoColumnGrid(chips),
       ],
     );
   }
 
-  void _removePerson(String userId, String type) {
+  void _removePerson(String userId, String type, [String? instrument]) {
     setState(() {
       switch (type) {
         case 'elo':
+          if (instrument != null && _selectedPeople.eloWithInstruments.containsKey(userId)) {
+            // Remover instrumento específico
+            final updatedInstruments = Map<String, Map<String, bool>>.from(
+              _selectedPeople.eloWithInstruments,
+            );
+            final userInstruments = Map<String, bool>.from(
+              updatedInstruments[userId] ?? {},
+            );
+            userInstruments.remove(instrument);
+            
+            if (userInstruments.isEmpty) {
+              updatedInstruments.remove(userId);
+            } else {
+              updatedInstruments[userId] = userInstruments;
+            }
+            
+            _selectedPeople = _selectedPeople.copyWith(
+              eloWithInstruments: updatedInstruments,
+            );
+          } else {
+            // Remover da lista elo antiga
+            _selectedPeople = _selectedPeople.copyWith(
+              elo: List.of(_selectedPeople.elo)..remove(userId),
+            );
+          }
+          break;
+        case 'soundImage':
           _selectedPeople = _selectedPeople.copyWith(
-            elo: List.of(_selectedPeople.elo)..remove(userId),
+            soundImage: List.of(_selectedPeople.soundImage)..remove(userId),
           );
           break;
         case 'preacher':
@@ -455,6 +716,20 @@ class _EventEditorPageState extends State<EventEditorPage>
 
     if (option == null) return;
 
+    // Se for ELO, mostrar submenu de instrumentos
+    if (option == 'elo') {
+      final instrument = await showModalBottomSheet<String>(
+        context: context,
+        backgroundColor: Colors.transparent,
+        builder: (context) => _InstrumentSelectorSheet(),
+      );
+      
+      if (instrument == null) return;
+      
+      await _addEloMember(instrument);
+      return;
+    }
+
     // Recarregar usuários da collection users antes de abrir a modal
     try {
       final peopleRepository = context.read<PeopleRepository>();
@@ -471,18 +746,19 @@ class _EventEditorPageState extends State<EventEditorPage>
 
     // Determinar filtros baseado na opção escolhida
     bool filterByELO = false;
+    String? filterBySociety;
     List<String> currentSelectedIds = [];
 
     switch (option) {
-      case 'elo':
-        filterByELO = true;
-        currentSelectedIds = _selectedPeople.elo;
-        break;
       case 'pregador':
         currentSelectedIds = _selectedPeople.preacher;
         break;
       case 'dirigente':
         currentSelectedIds = _selectedPeople.lead;
+        break;
+      case 'soundImage':
+        filterBySociety = 'Som e Imagem';
+        currentSelectedIds = _selectedPeople.soundImage;
         break;
     }
 
@@ -494,21 +770,92 @@ class _EventEditorPageState extends State<EventEditorPage>
         selectedIds: currentSelectedIds,
         eventDate: _event?.date,
         filterByELO: filterByELO,
+        filterBySociety: filterBySociety,
       ),
     );
     if (result != null) {
       setState(() {
         switch (option) {
-          case 'elo':
-            _selectedPeople = _selectedPeople.copyWith(elo: result);
-            break;
           case 'pregador':
             _selectedPeople = _selectedPeople.copyWith(preacher: result);
             break;
           case 'dirigente':
             _selectedPeople = _selectedPeople.copyWith(lead: result);
             break;
+          case 'soundImage':
+            _selectedPeople = _selectedPeople.copyWith(soundImage: result);
+            break;
         }
+      });
+    }
+  }
+
+  Future<void> _addEloMember(String instrument) async {
+    // Recarregar usuários da collection users antes de abrir a modal
+    try {
+      final peopleRepository = context.read<PeopleRepository>();
+      final people = await peopleRepository.fetchAll();
+      setState(() {
+        _people = people;
+      });
+    } catch (e) {
+      if (mounted) {
+        showErrorToast(context, 'Erro ao carregar usuários: ${e.toString()}');
+      }
+      return;
+    }
+
+    // Obter pessoas já selecionadas para este instrumento
+    final currentSelectedIds = <String>[];
+    _selectedPeople.eloWithInstruments.forEach((userId, instruments) {
+      if (instruments.containsKey(instrument)) {
+        currentSelectedIds.add(userId);
+      }
+    });
+
+    // Determinar se deve mostrar Talk Back
+    final showTalkBack = instrument != 'Ministrante' && instrument != 'Backing';
+
+    final result = await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => PeopleSelectorSheet(
+        people: _people,
+        selectedIds: currentSelectedIds,
+        eventDate: _event?.date,
+        filterByELO: true,
+        instrument: instrument,
+        showTalkBack: showTalkBack,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        final updatedInstruments = Map<String, Map<String, bool>>.from(
+          _selectedPeople.eloWithInstruments,
+        );
+
+        if (result is Map<String, Map<String, bool>>) {
+          // Resultado com instrumentos e talk back
+          result.forEach((userId, instruments) {
+            updatedInstruments[userId] = {
+              ...updatedInstruments[userId] ?? {},
+              ...instruments,
+            };
+          });
+        } else if (result is List<String>) {
+          // Resultado simples (sem talk back - não deveria acontecer, mas mantém compatibilidade)
+          for (final userId in result) {
+            updatedInstruments[userId] = {
+              ...updatedInstruments[userId] ?? {},
+              instrument: false,
+            };
+          }
+        }
+
+        _selectedPeople = _selectedPeople.copyWith(
+          eloWithInstruments: updatedInstruments,
+        );
       });
     }
   }
@@ -574,6 +921,12 @@ class _PeopleTypeSelectorSheet extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               _OptionTile(
+                icon: Icons.video_library,
+                title: 'Adicionar som/imagem',
+                onTap: () => Navigator.of(context).pop('soundImage'),
+              ),
+              const SizedBox(height: 12),
+              _OptionTile(
                 icon: Icons.mic,
                 title: 'Adicionar pregador',
                 onTap: () => Navigator.of(context).pop('pregador'),
@@ -590,6 +943,94 @@ class _PeopleTypeSelectorSheet extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _InstrumentSelectorSheet extends StatelessWidget {
+  static const List<String> instruments = [
+    'Violão',
+    'Baixo',
+    'Guitarra',
+    'Teclado',
+    'Bateria',
+    'Ministrante',
+    'Backing',
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1220),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(top: 12, bottom: 16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Selecionar instrumento',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Column(
+                  children: [
+                    ...instruments.map((instrument) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _OptionTile(
+                            icon: _getInstrumentIcon(instrument),
+                            title: instrument,
+                            onTap: () => Navigator.of(context).pop(instrument),
+                          ),
+                        )),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _getInstrumentIcon(String instrument) {
+    switch (instrument) {
+      case 'Violão':
+        return Icons.music_note;
+      case 'Baixo':
+        return Icons.music_note;
+      case 'Guitarra':
+        return Icons.music_note;
+      case 'Teclado':
+        return Icons.piano;
+      case 'Bateria':
+        return Icons.radio;
+      case 'Ministrante':
+        return Icons.mic;
+      case 'Backing':
+        return Icons.people;
+      default:
+        return Icons.music_note;
+    }
   }
 }
 
