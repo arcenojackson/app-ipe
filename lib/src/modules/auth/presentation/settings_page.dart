@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
@@ -20,6 +21,22 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   bool _isEditingName = false;
   final TextEditingController _nameController = TextEditingController();
+  String _appVersion = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = 'Versão ${packageInfo.version}';
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -468,6 +485,15 @@ class _SettingsPageState extends State<SettingsPage> {
                           ),
                         ),
                         onTap: () => _showSignOutDialog(context, appState),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Center(
+                      child: Text(
+                        _appVersion,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white38,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 40),

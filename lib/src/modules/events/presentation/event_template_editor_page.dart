@@ -12,10 +12,12 @@ class EventTemplateEditorPage extends StatefulWidget {
     super.key,
     this.templateId,
     this.isEditable = false,
+    this.sourceTemplate,
   });
 
   final String? templateId;
   final bool isEditable;
+  final EventTemplateModel? sourceTemplate;
 
   @override
   State<EventTemplateEditorPage> createState() =>
@@ -271,6 +273,13 @@ class _EventTemplateEditorPageState extends State<EventTemplateEditorPage> {
           _template = template;
           _steps = List.of(template.steps);
           _nameController.text = template.name;
+        });
+      } else if (widget.sourceTemplate != null) {
+        // Clone de um template existente
+        setState(() {
+          _template = null; // Tratado como novo
+          _steps = List.of(widget.sourceTemplate!.steps);
+          _nameController.text = '${widget.sourceTemplate!.name} (clone)';
         });
       } else {
         // Novo template

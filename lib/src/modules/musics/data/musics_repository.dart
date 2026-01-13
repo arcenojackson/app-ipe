@@ -163,4 +163,30 @@ class MusicsRepository {
       }
     }
   }
+
+  Future<void> addEventDate(String musicId, DateTime date) async {
+    try {
+      final music = await fetchById(musicId);
+      final dateStr = date.toIso8601String();
+      if (!music.selectedTimes.contains(dateStr)) {
+        final newTimes = List<String>.from(music.selectedTimes)..add(dateStr);
+        await update(music.copyWith(selectedTimes: newTimes));
+      }
+    } catch (e) {
+      throw AppException(message: 'Erro ao adicionar data à música: $e');
+    }
+  }
+
+  Future<void> removeEventDate(String musicId, DateTime date) async {
+    try {
+      final music = await fetchById(musicId);
+      final dateStr = date.toIso8601String();
+      if (music.selectedTimes.contains(dateStr)) {
+        final newTimes = List<String>.from(music.selectedTimes)..remove(dateStr);
+        await update(music.copyWith(selectedTimes: newTimes));
+      }
+    } catch (e) {
+      throw AppException(message: 'Erro ao remover data da música: $e');
+    }
+  }
 }

@@ -299,6 +299,10 @@ class _EventEditorPageState extends State<EventEditorPage>
             _buildPeopleSection('Som e Imagem', _selectedPeople.soundImage, 'soundImage'),
             const SizedBox(height: 24),
           ],
+          if (_selectedPeople.diaconia.isNotEmpty) ...[
+            _buildPeopleSection('Diaconia', _selectedPeople.diaconia, 'diaconia'),
+            const SizedBox(height: 24),
+          ],
           if (_selectedPeople.lead.isNotEmpty || _selectedPeople.preacher.isNotEmpty) ...[
             _buildLeadAndPreacherSection(),
           ],
@@ -621,6 +625,11 @@ class _EventEditorPageState extends State<EventEditorPage>
             lead: List.of(_selectedPeople.lead)..remove(userId),
           );
           break;
+        case 'diaconia':
+          _selectedPeople = _selectedPeople.copyWith(
+            diaconia: List.of(_selectedPeople.diaconia)..remove(userId),
+          );
+          break;
       }
     });
   }
@@ -681,6 +690,13 @@ class _EventEditorPageState extends State<EventEditorPage>
     );
     if (result != null) {
       setState(() => _steps = [..._steps, result]);
+      if (result.type == EventStepType.music &&
+          result.musicId != null &&
+          _event != null) {
+        context
+            .read<MusicsRepository>()
+            .addEventDate(result.musicId!, _event!.date);
+      }
     }
   }
 
@@ -701,36 +717,21 @@ class _EventEditorPageState extends State<EventEditorPage>
   }
 
   void _removeStep(int index) {
+    final step = _steps[index];
+    if (step.type == EventStepType.music &&
+        step.musicId != null &&
+        _event != null) {
+      context
+          .read<MusicsRepository>()
+          .removeEventDate(step.musicId!, _event!.date);
+    }
     setState(() {
       _steps = List.of(_steps)..removeAt(index);
     });
   }
 
   Future<void> _manageTeam() async {
-    // Mostrar mini modal com opções primeiro
-    final option = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _PeopleTypeSelectorSheet(),
-    );
-
-    if (option == null) return;
-
-    // Se for ELO, mostrar submenu de instrumentos
-    if (option == 'elo') {
-      final instrument = await showModalBottomSheet<String>(
-        context: context,
-        backgroundColor: Colors.transparent,
-        builder: (context) => _InstrumentSelectorSheet(),
-      );
-      
-      if (instrument == null) return;
-      
-      await _addEloMember(instrument);
-      return;
-    }
-
-    // Recarregar usuários da collection users antes de abrir a modal
+    // Recarregar usuários
     try {
       final peopleRepository = context.read<PeopleRepository>();
       final people = await peopleRepository.fetchAll();
@@ -744,119 +745,168 @@ class _EventEditorPageState extends State<EventEditorPage>
       return;
     }
 
-    // Determinar filtros baseado na opção escolhida
-    bool filterByELO = false;
-    String? filterBySociety;
-    List<String> currentSelectedIds = [];
+    String? currentStep = 'type_selector';
+    String? selectedType; // 'elo', 'soundImage', 'pregador', 'dirigente'
+    String? selectedInstrument; // Apenas se selectedType == 'elo'
 
-    switch (option) {
-      case 'pregador':
-        currentSelectedIds = _selectedPeople.preacher;
-        break;
-      case 'dirigente':
-        currentSelectedIds = _selectedPeople.lead;
-        break;
-      case 'soundImage':
-        filterBySociety = 'Som e Imagem';
-        currentSelectedIds = _selectedPeople.soundImage;
-        break;
-    }
-
-    final result = await showModalBottomSheet<List<String>>(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => PeopleSelectorSheet(
-        people: _people,
-        selectedIds: currentSelectedIds,
-        eventDate: _event?.date,
-        filterByELO: filterByELO,
-        filterBySociety: filterBySociety,
-      ),
-    );
-    if (result != null) {
-      setState(() {
-        switch (option) {
-          case 'pregador':
-            _selectedPeople = _selectedPeople.copyWith(preacher: result);
-            break;
-          case 'dirigente':
-            _selectedPeople = _selectedPeople.copyWith(lead: result);
-            break;
-          case 'soundImage':
-            _selectedPeople = _selectedPeople.copyWith(soundImage: result);
-            break;
-        }
-      });
-    }
-  }
-
-  Future<void> _addEloMember(String instrument) async {
-    // Recarregar usuários da collection users antes de abrir a modal
-    try {
-      final peopleRepository = context.read<PeopleRepository>();
-      final people = await peopleRepository.fetchAll();
-      setState(() {
-        _people = people;
-      });
-    } catch (e) {
-      if (mounted) {
-        showErrorToast(context, 'Erro ao carregar usuários: ${e.toString()}');
-      }
-      return;
-    }
-
-    // Obter pessoas já selecionadas para este instrumento
-    final currentSelectedIds = <String>[];
-    _selectedPeople.eloWithInstruments.forEach((userId, instruments) {
-      if (instruments.containsKey(instrument)) {
-        currentSelectedIds.add(userId);
-      }
-    });
-
-    // Determinar se deve mostrar Talk Back
-    final showTalkBack = instrument != 'Ministrante' && instrument != 'Backing';
-
-    final result = await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => PeopleSelectorSheet(
-        people: _people,
-        selectedIds: currentSelectedIds,
-        eventDate: _event?.date,
-        filterByELO: true,
-        instrument: instrument,
-        showTalkBack: showTalkBack,
-      ),
-    );
-
-    if (result != null) {
-      setState(() {
-        final updatedInstruments = Map<String, Map<String, bool>>.from(
-          _selectedPeople.eloWithInstruments,
+    // Loop de navegação
+    while (currentStep != null) {
+      if (currentStep == 'type_selector') {
+        final result = await showModalBottomSheet<String>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _PeopleTypeSelectorSheet(),
         );
 
-        if (result is Map<String, Map<String, bool>>) {
-          // Resultado com instrumentos e talk back
-          result.forEach((userId, instruments) {
-            updatedInstruments[userId] = {
-              ...updatedInstruments[userId] ?? {},
-              ...instruments,
-            };
+        if (result == null) break;
+        selectedType = result;
+
+        if (selectedType == 'elo') {
+          currentStep = 'instrument_selector';
+        } else {
+          currentStep = 'people_selector';
+        }
+      } else if (currentStep == 'instrument_selector') {
+        // Modal de Instrumentos (ELO)
+        final result = await showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _InstrumentSelectorSheet(),
+        );
+
+        if (result == null) break;
+        if (result == 'BACK') {
+          currentStep = 'type_selector';
+          continue;
+        }
+
+        selectedInstrument = result as String;
+        currentStep = 'people_selector_elo';
+      } else if (currentStep == 'people_selector' ||
+          currentStep == 'people_selector_elo') {
+        // Preparar dados
+        List<String> currentSelectedIds = [];
+        bool filterByELO = false;
+        String? filterBySociety;
+        String? title;
+        bool canGoBack = true;
+        String? instrumentParam;
+        bool showTalkBack = false;
+
+        if (currentStep == 'people_selector_elo') {
+          // Configuração para ELO
+          title = 'Membros de Equipe de Louvor';
+          filterByELO = true;
+          instrumentParam = selectedInstrument;
+          showTalkBack = selectedInstrument != 'Ministrante' &&
+              selectedInstrument != 'Backing';
+
+          // IDs selecionados para este instrumento
+          _selectedPeople.eloWithInstruments.forEach((userId, instruments) {
+            if (instruments.containsKey(selectedInstrument)) {
+              currentSelectedIds.add(userId);
+            }
           });
-        } else if (result is List<String>) {
-          // Resultado simples (sem talk back - não deveria acontecer, mas mantém compatibilidade)
-          for (final userId in result) {
-            updatedInstruments[userId] = {
-              ...updatedInstruments[userId] ?? {},
-              instrument: false,
-            };
+        } else {
+          // Configuração para outros
+          switch (selectedType) {
+            case 'pregador':
+              currentSelectedIds = _selectedPeople.preacher;
+              title = 'Membros da IPE';
+              // canGoBack = true; // Pode voltar para o menu principal
+              break;
+            case 'dirigente':
+              currentSelectedIds = _selectedPeople.lead;
+              title = 'Membros da IPE';
+              break;
+            case 'soundImage':
+              filterBySociety = 'Som e Imagem';
+              currentSelectedIds = _selectedPeople.soundImage;
+              title = 'Membros de Som e Imagem';
+              break;
+            case 'diaconia':
+              filterBySociety = 'DIAC';
+              currentSelectedIds = _selectedPeople.diaconia;
+              title = 'Membros de Diaconia';
+              break;
           }
         }
 
-        _selectedPeople = _selectedPeople.copyWith(
-          eloWithInstruments: updatedInstruments,
+        final result = await showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => PeopleSelectorSheet(
+            people: _people,
+            selectedIds: currentSelectedIds,
+            eventDate: _event?.date,
+            filterByELO: filterByELO,
+            filterBySociety: filterBySociety,
+            title: title,
+            canGoBack: canGoBack,
+            instrument: instrumentParam,
+            showTalkBack: showTalkBack,
+          ),
         );
-      });
+
+        if (result == null) break;
+        if (result == 'BACK') {
+          if (currentStep == 'people_selector_elo') {
+            currentStep = 'instrument_selector';
+          } else {
+            currentStep = 'type_selector';
+          }
+          continue;
+        }
+
+        // Processar resultado
+        setState(() {
+          if (currentStep == 'people_selector_elo') {
+            final updatedInstruments = Map<String, Map<String, bool>>.from(
+              _selectedPeople.eloWithInstruments,
+            );
+
+            if (result is Map<String, Map<String, bool>>) {
+              result.forEach((userId, instruments) {
+                updatedInstruments[userId] = {
+                  ...updatedInstruments[userId] ?? {},
+                  ...instruments,
+                };
+              });
+            } else if (result is List<String>) {
+              // Fallback
+              for (final userId in result) {
+                updatedInstruments[userId] = {
+                  ...updatedInstruments[userId] ?? {},
+                  selectedInstrument!: false,
+                };
+              }
+            }
+            _selectedPeople = _selectedPeople.copyWith(
+              eloWithInstruments: updatedInstruments,
+            );
+          } else {
+             // Outros tipos retornam List<String>
+             final ids = result as List<String>;
+             switch (selectedType) {
+              case 'pregador':
+                _selectedPeople = _selectedPeople.copyWith(preacher: ids);
+                break;
+              case 'dirigente':
+                _selectedPeople = _selectedPeople.copyWith(lead: ids);
+                break;
+              case 'soundImage':
+                _selectedPeople = _selectedPeople.copyWith(soundImage: ids);
+                break;
+              case 'diaconia':
+                _selectedPeople = _selectedPeople.copyWith(diaconia: ids);
+                break;
+            }
+          }
+        });
+
+        // Após salvar, fecha o fluxo (ou poderia voltar para o menu anterior? Geralmente salvar fecha tudo)
+        break;
+      }
     }
   }
 
@@ -894,52 +944,66 @@ class _PeopleTypeSelectorSheet extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(2),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              Text(
-                'Adicionar pessoa',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                Text(
+                  'Adicionar pessoa',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                ),
+                const SizedBox(height: 24),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        _OptionTile(
+                          icon: Icons.music_note,
+                          title: 'Equipe de louvor',
+                          onTap: () => Navigator.of(context).pop('elo'),
+                        ),
+                        const SizedBox(height: 12),
+                        _OptionTile(
+                          icon: Icons.video_library,
+                          title: 'Som e imagem',
+                          onTap: () => Navigator.of(context).pop('soundImage'),
+                        ),
+                        const SizedBox(height: 12),
+                        _OptionTile(
+                          icon: Icons.volunteer_activism,
+                          title: 'Diaconia',
+                          onTap: () => Navigator.of(context).pop('diaconia'),
+                        ),
+                        const SizedBox(height: 12),
+                        _OptionTile(
+                          icon: Icons.mic,
+                          title: 'Pregador',
+                          onTap: () => Navigator.of(context).pop('pregador'),
+                        ),
+                        const SizedBox(height: 12),
+                        _OptionTile(
+                          icon: Icons.person,
+                          title: 'Dirigente',
+                          onTap: () => Navigator.of(context).pop('dirigente'),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
                     ),
-              ),
-              const SizedBox(height: 24),
-              _OptionTile(
-                icon: Icons.music_note,
-                title: 'Adicionar Equipe de louvor',
-                onTap: () => Navigator.of(context).pop('elo'),
-              ),
-              const SizedBox(height: 12),
-              _OptionTile(
-                icon: Icons.video_library,
-                title: 'Adicionar som/imagem',
-                onTap: () => Navigator.of(context).pop('soundImage'),
-              ),
-              const SizedBox(height: 12),
-              _OptionTile(
-                icon: Icons.mic,
-                title: 'Adicionar pregador',
-                onTap: () => Navigator.of(context).pop('pregador'),
-              ),
-              const SizedBox(height: 12),
-              _OptionTile(
-                icon: Icons.person,
-                title: 'Adicionar dirigente',
-                onTap: () => Navigator.of(context).pop('dirigente'),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
+                  ),
+                ),
+              ],
+            ),
         ),
       ),
     );
@@ -979,12 +1043,25 @@ class _InstrumentSelectorSheet extends StatelessWidget {
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Selecionar instrumento',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop('BACK'),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      'Selecionar instrumento',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
                     ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 24),

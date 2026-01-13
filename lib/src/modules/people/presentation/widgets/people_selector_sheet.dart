@@ -16,23 +16,26 @@ class PeopleSelectorSheet extends StatefulWidget {
     this.filterBySociety,
     this.instrument,
     this.showTalkBack = false,
+    this.title,
+    this.canGoBack = false,
   });
 
   final List<UserModel> people;
   final List<String> selectedIds;
   final DateTime? eventDate;
   final bool filterByELO;
-  final String?
-  filterBySociety; // Nome da sociedade para filtrar (ex: "Som e Imagem")
-  final String?
-  instrument; // Instrumento selecionado (ex: "Violão", "Baixo", etc.)
+  final String? filterBySociety; // Nome da sociedade para filtrar (ex: "Som e Imagem")
+  final String? instrument; // Instrumento selecionado (ex: "Violão", "Baixo", etc.)
   final bool showTalkBack; // Se deve mostrar checkbox de Talk Back
+  final String? title;
+  final bool canGoBack;
 
   @override
   State<PeopleSelectorSheet> createState() => _PeopleSelectorSheetState();
 }
 
 class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
+  // ... (unchanged)
   late List<String> _selectedIds;
   final _searchController = TextEditingController();
   String _searchQuery = '';
@@ -168,8 +171,8 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
+    var mediaQuery = MediaQuery.of(context);
+    var androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
 
     return Padding(
       padding: EdgeInsets.only(
@@ -190,9 +193,25 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          Text(
-            'Selecionar pessoas',
-            style: Theme.of(context).textTheme.titleLarge,
+          Row(
+            children: [
+              if (widget.canGoBack)
+                Padding(
+                  padding: const EdgeInsets.only(right: 16),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: () => Navigator.of(context).pop('BACK'),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ),
+              Expanded(
+                child: Text(
+                  widget.title ?? 'Selecionar pessoas',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 16),
           TextField(

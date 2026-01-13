@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:upgrader/upgrader.dart';
 
 import '../../auth/models/user.dart';
 import '../../auth/presentation/settings_page.dart';
@@ -25,6 +26,28 @@ class _HomeShellState extends State<HomeShell> {
   int _currentIndex = 0;
   bool _planningHasEvents = false;
   bool _agendaHasEvents = false;
+  bool _isUpdateAvailable = false;
+  late final Upgrader _upgrader;
+
+  @override
+  void initState() {
+    super.initState();
+    _upgrader = Upgrader(debugLogging: true);
+    _checkForUpdates();
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      await _upgrader.initialize();
+      if (mounted && _upgrader.isUpdateAvailable()) {
+        setState(() {
+          _isUpdateAvailable = true;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking for updates: $e');
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -118,6 +141,90 @@ class _HomeShellState extends State<HomeShell> {
                   ],
                 ),
               ),
+              if (_isUpdateAvailable)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
+                  child: GestureDetector(
+                    onTap: () {
+                      _upgrader.sendUserToAppStore();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            colorScheme.primary,
+                            colorScheme.secondary,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: colorScheme.primary.withOpacity(0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                            spreadRadius: -5,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              Icons.rocket_launch_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Nova versão disponível!',
+                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    height: 1.2,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Toque para instalar as novidades',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white.withOpacity(0.9),
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.arrow_forward_rounded,
+                              size: 20,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               if (current.section != HomeSection.musics &&
                   current.section != HomeSection.calendar &&
                   !(current.section == HomeSection.planning &&

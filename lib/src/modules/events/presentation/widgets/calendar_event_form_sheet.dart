@@ -226,6 +226,7 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
                         value: _selectedCategory.isEmpty
                             ? 'Geral'
                             : _selectedCategory,
+                        menuMaxHeight: 300,
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
                           labelText: 'Categoria',

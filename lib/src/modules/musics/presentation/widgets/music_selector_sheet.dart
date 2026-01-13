@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:intl/intl.dart';
+
 import '../../models/music.dart';
 import '../../../../shared/utils/platform_utils.dart';
 
@@ -91,7 +93,8 @@ class _MusicSelectorSheetState extends State<_MusicSelectorSheet> {
   @override
   void initState() {
     super.initState();
-    _filtered = widget.musics;
+    _filtered = List.of(widget.musics)
+      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
     _searchController.addListener(_onSearchChanged);
   }
 
@@ -152,11 +155,36 @@ class _MusicSelectorSheetState extends State<_MusicSelectorSheet> {
                       final music = _filtered[index];
                       final selected = widget.selectedId == music.id;
                       return ListTile(
-                        leading: Icon(
-                          Icons.music_note,
-                          color: selected
-                              ? Theme.of(context).colorScheme.primary
-                              : null,
+                        leading: GestureDetector(
+                          onTap: () {
+                            if (music.selectedTimes.isNotEmpty) {
+                              _showHistory(music);
+                            }
+                          },
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: music.selectedTimes.isNotEmpty
+                                  ? Theme.of(context).colorScheme.primary.withOpacity(0.1)
+                                  : Colors.white10,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: music.selectedTimes.isNotEmpty
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Colors.white30,
+                              ),
+                            ),
+                            child: Text(
+                              music.selectedTimes.length.toString(),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
                         ),
                         title: Text(music.title),
                         subtitle: Text(music.artist),
@@ -176,7 +204,9 @@ class _MusicSelectorSheetState extends State<_MusicSelectorSheet> {
     final query = _searchController.text.toLowerCase();
     setState(() {
       if (query.isEmpty) {
-        _filtered = widget.musics;
+        _filtered = List.of(widget.musics)
+          ..sort(
+              (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
       } else {
         _filtered = widget.musics
             .where(
@@ -184,8 +214,72 @@ class _MusicSelectorSheetState extends State<_MusicSelectorSheet> {
                   music.title.toLowerCase().contains(query) ||
                   music.artist.toLowerCase().contains(query),
             )
-            .toList();
+            .toList()
+          ..sort(
+              (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
       }
     });
+  }
+
+  void _showHistory(MusicModel music) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        final androidBottomPadding = PlatformUtils.getModalBottomPadding(context);
+        return Container(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: 24 + androidBottomPadding,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Histórico: ${music.title}',
+                      style: Theme.of(context).textTheme.titleLarge,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 250,
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: music.selectedTimes.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final dateStr = music.selectedTimes[index];
+                    final date = DateTime.tryParse(dateStr);
+                    final formatted = date != null
+                        ? DateFormat('dd/MM/yyyy').format(date)
+                        : dateStr;
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      leading: const Icon(Icons.event, size: 20),
+                      title: Text(formatted),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

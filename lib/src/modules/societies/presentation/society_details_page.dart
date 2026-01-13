@@ -153,8 +153,9 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     }
     final members = _people
         .where((user) => _selectedMembers.contains(user.id))
-        .toList();
-    return Padding(
+        .toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Wrap(
         spacing: 8,
@@ -198,7 +199,8 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     }
     final board = _people
         .where((user) => _selectedBoard.contains(user.id))
-        .toList();
+        .toList()
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Wrap(

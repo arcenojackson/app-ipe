@@ -6,6 +6,7 @@ class EventPeople {
     this.preacher = const [],
     this.lead = const [],
     this.soundImage = const [],
+    this.diaconia = const [],
     this.eloWithInstruments = const {},
   });
 
@@ -13,6 +14,7 @@ class EventPeople {
   final List<String> preacher;
   final List<String> lead;
   final List<String> soundImage;
+  final List<String> diaconia;
   // Map<userId, Map<instrument, talkBack>>
   final Map<String, Map<String, bool>> eloWithInstruments;
 
@@ -39,6 +41,7 @@ class EventPeople {
       preacher: _parsePeopleList(json['preacher']),
       lead: _parsePeopleList(json['lead']),
       soundImage: _parsePeopleList(json['soundImage']),
+      diaconia: _parsePeopleList(json['diaconia']),
       eloWithInstruments: eloWithInstruments,
     );
   }
@@ -56,6 +59,7 @@ class EventPeople {
     'preacher': preacher,
     'lead': lead,
     'soundImage': soundImage,
+    'diaconia': diaconia,
     'eloWithInstruments': eloWithInstruments,
   };
 
@@ -64,6 +68,7 @@ class EventPeople {
     List<String>? preacher,
     List<String>? lead,
     List<String>? soundImage,
+    List<String>? diaconia,
     Map<String, Map<String, bool>>? eloWithInstruments,
   }) {
     return EventPeople(
@@ -71,6 +76,7 @@ class EventPeople {
       preacher: preacher ?? this.preacher,
       lead: lead ?? this.lead,
       soundImage: soundImage ?? this.soundImage,
+      diaconia: diaconia ?? this.diaconia,
       eloWithInstruments: eloWithInstruments ?? this.eloWithInstruments,
     );
   }
@@ -80,6 +86,7 @@ class EventPeople {
         ...preacher,
         ...lead,
         ...soundImage,
+        ...diaconia,
         ...eloWithInstruments.keys,
       ];
 }
