@@ -66,9 +66,20 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await _authRepository.signOut();
-    _currentUser = null;
-    notifyListeners();
+    try {
+      // Fazer logout do Firebase primeiro
+      await _authRepository.signOut();
+      
+      // Limpar o usuário atual
+      _currentUser = null;
+      
+      // Notificar imediatamente para atualizar a UI
+      notifyListeners();
+    } catch (e) {
+      _error = 'Erro ao fazer logout: ${e.toString()}';
+      notifyListeners();
+      rethrow;
+    }
   }
 
   Future<void> updateUserName(String newName) async {
@@ -97,8 +108,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       await action();
-      // Após sucesso, o _currentUser já foi atualizado, então notificamos
+      // Após sucesso, o _currentUser já foi atualizado
       _isLoading = false;
+      // Notificar imediatamente para atualizar a UI
       notifyListeners();
     } on AppException catch (error) {
       _error = error.message;

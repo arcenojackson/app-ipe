@@ -11,11 +11,19 @@ import '../../musics/presentation/musics_section.dart';
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/platform_utils.dart';
 import '../../../shared/widgets/glass_container.dart';
+import '../../../shared/widgets/highlighted_button_wrapper.dart';
 
 enum HomeSection { agenda, planning, calendar, musics }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({
+    super.key,
+    this.initialSection,
+    this.highlightAvailabilityButton = false,
+  });
+
+  final HomeSection? initialSection;
+  final bool highlightAvailabilityButton;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -55,6 +63,17 @@ class _HomeShellState extends State<HomeShell> {
     final user = context.read<AppState>().currentUser;
     if (user == null) return;
     _destinations = _buildDestinations(user);
+
+    // Configurar índice inicial se especificado
+    if (widget.initialSection != null) {
+      final sectionIndex = _destinations.indexWhere(
+        (dest) => dest.section == widget.initialSection,
+      );
+      if (sectionIndex != -1) {
+        _currentIndex = sectionIndex;
+      }
+    }
+
     if (_currentIndex >= _destinations.length) {
       _currentIndex = 0;
     }
@@ -144,83 +163,91 @@ class _HomeShellState extends State<HomeShell> {
               if (_isUpdateAvailable)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
-                  child: GestureDetector(
-                    onTap: () {
-                      _upgrader.sendUserToAppStore();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            colorScheme.primary,
-                            colorScheme.secondary,
+                  child: HighlightedButtonWrapper(
+                    highlighted: true,
+                    highlightColor: const Color(0xFF2196F3),
+                    child: GestureDetector(
+                      onTap: () {
+                        _upgrader.sendUserToAppStore();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [
+                              Color(0xFF2196F3), // Azul mais claro
+                              Color(0xFF1976D2), // Azul mais escuro
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF2196F3).withOpacity(0.3),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                              spreadRadius: -5,
+                            ),
                           ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
                         ),
-                        borderRadius: BorderRadius.circular(24),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.primary.withOpacity(0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                            spreadRadius: -5,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(
+                                Icons.rocket_launch_rounded,
+                                color: Colors.white,
+                                size: 28,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.rocket_launch_rounded,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Nova versão disponível!',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: Colors.white,
-                                    height: 1.2,
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Nova versão disponível!',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.w800,
+                                          color: Colors.white,
+                                          height: 1.2,
+                                        ),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Toque para instalar as novidades',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white.withOpacity(0.9),
-                                    fontWeight: FontWeight.w500,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Toque para instalar as novidades',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: Colors.white.withOpacity(0.9),
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(12),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 20,
+                                color: Colors.white,
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.arrow_forward_rounded,
-                              size: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -341,6 +368,7 @@ class _HomeShellState extends State<HomeShell> {
               });
             }
           },
+          highlightAvailabilityButton: widget.highlightAvailabilityButton,
         ),
       ),
       // Planejamento - Apenas Admin

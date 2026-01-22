@@ -5,16 +5,23 @@ import 'package:provider/provider.dart';
 import '../../auth/models/user.dart';
 import '../../societies/data/societies_repository.dart';
 import '../../../shared/widgets/glass_container.dart';
+import '../../../shared/widgets/highlighted_button_wrapper.dart';
 import '../data/events_repository.dart';
 import '../models/event.dart';
 import 'event_viewer_page.dart';
 import 'worship_team_availability_modal.dart';
 
 class AgendaSection extends StatefulWidget {
-  const AgendaSection({super.key, required this.user, this.onEventsChanged});
+  const AgendaSection({
+    super.key,
+    required this.user,
+    this.onEventsChanged,
+    this.highlightAvailabilityButton = false,
+  });
 
   final UserModel user;
   final ValueChanged<bool>? onEventsChanged;
+  final bool highlightAvailabilityButton;
 
   @override
   State<AgendaSection> createState() => _AgendaSectionState();
@@ -26,10 +33,12 @@ class _AgendaSectionState extends State<AgendaSection> {
   List<EventModel> _events = const [];
   String? _error;
   bool _isELOMember = false;
+  bool _shouldHighlightAvailability = false;
 
   @override
   void initState() {
     super.initState();
+    _shouldHighlightAvailability = widget.highlightAvailabilityButton;
     _loadEvents();
     _checkELOMembership();
   }
@@ -54,6 +63,7 @@ class _AgendaSectionState extends State<AgendaSection> {
                   const SizedBox(height: 20),
                   _AvailabilityButton(
                     onTap: () => _openAvailabilityModal(context),
+                    highlighted: _shouldHighlightAvailability,
                   ),
                   const SizedBox(height: 20),
                 ] else
@@ -78,6 +88,7 @@ class _AgendaSectionState extends State<AgendaSection> {
                   const SizedBox(height: 20),
                   _AvailabilityButton(
                     onTap: () => _openAvailabilityModal(context),
+                    highlighted: _shouldHighlightAvailability,
                   ),
                   const SizedBox(height: 20),
                 ] else
@@ -100,6 +111,7 @@ class _AgendaSectionState extends State<AgendaSection> {
                   const SizedBox(height: 20),
                   _AvailabilityButton(
                     onTap: () => _openAvailabilityModal(context),
+                    highlighted: _shouldHighlightAvailability,
                   ),
                   const SizedBox(height: 20),
                 ],
@@ -158,6 +170,13 @@ class _AgendaSectionState extends State<AgendaSection> {
   }
 
   Future<void> _openAvailabilityModal(BuildContext context) async {
+    // Remover destaque após abrir o modal
+    if (_shouldHighlightAvailability) {
+      setState(() {
+        _shouldHighlightAvailability = false;
+      });
+    }
+
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -281,33 +300,101 @@ class _EventCard extends StatelessWidget {
   }
 }
 
-class _AvailabilityButton extends StatelessWidget {
-  const _AvailabilityButton({required this.onTap});
+class _AvailabilityButton extends StatefulWidget {
+  const _AvailabilityButton({required this.onTap, this.highlighted = false});
 
   final VoidCallback onTap;
+  final bool highlighted;
 
   @override
+  State<_AvailabilityButton> createState() => _AvailabilityButtonState();
+}
+
+class _AvailabilityButtonState extends State<_AvailabilityButton> {
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return GestureDetector(
-      onTap: onTap,
-      child: GlassContainer(
-        padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final button = GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [colorScheme.primary, colorScheme.secondary],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.primary.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+              spreadRadius: -5,
+            ),
+          ],
+        ),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.music_note, color: theme.colorScheme.primary, size: 24),
-            const SizedBox(width: 12),
-            Text(
-              'Informar disponibilidade',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.music_note,
+                color: Colors.white,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Informar disponibilidade',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      height: 1.2,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Defina sua disponibilidade para o próximo mês',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withOpacity(0.9),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.arrow_forward_rounded,
+                size: 20,
                 color: Colors.white,
               ),
             ),
           ],
         ),
       ),
+    );
+
+    return HighlightedButtonWrapper(
+      highlighted: widget.highlighted,
+      highlightColor: colorScheme.primary,
+      child: button,
     );
   }
 }

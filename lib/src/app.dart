@@ -11,29 +11,42 @@ import 'shared/widgets/splash_page.dart';
 class IpeApp extends StatelessWidget {
   const IpeApp({super.key});
 
+  // GlobalKey para permitir navegação de qualquer lugar do app
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: AppConfig.appName,
+      debugShowCheckedModeBanner: false,
+      theme: buildAppTheme(),
+      home: const _AppHome(),
+    );
+  }
+}
+
+// Widget que gerencia a navegação baseada no estado de autenticação
+class _AppHome extends StatelessWidget {
+  const _AppHome();
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppState>(
       builder: (context, appState, _) {
-        return MaterialApp(
-          title: AppConfig.appName,
-          debugShowCheckedModeBanner: false,
-          theme: buildAppTheme(),
-          // Usar key baseado no estado de autenticação para forçar reconstrução
-          key: ValueKey('app-${appState.isAuthenticated}'),
-          home: _buildHome(appState),
-        );
+        // Construir a tela baseada no estado com uma key única
+        // Isso força o Flutter a destruir e recriar o widget quando o estado muda
+        final authKey = '${appState.isBootstrapping}-${appState.isAuthenticated}';
+        
+        if (appState.isBootstrapping) {
+          return SplashPage(key: ValueKey('splash-$authKey'));
+        }
+        if (!appState.isAuthenticated) {
+          return LoginPage(key: ValueKey('login-$authKey'));
+        }
+        return HomeShell(key: ValueKey('home-$authKey'));
       },
     );
-  }
-
-  Widget _buildHome(AppState state) {
-    if (state.isBootstrapping) {
-      return const SplashPage();
-    }
-    if (!state.isAuthenticated) {
-      return const LoginPage();
-    }
-    return const HomeShell();
   }
 }

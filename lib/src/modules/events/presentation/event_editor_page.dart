@@ -8,7 +8,10 @@ import '../../musics/models/music.dart';
 import '../../people/data/people_repository.dart';
 import '../data/events_repository.dart';
 import '../models/event.dart';
+import '../models/event_template.dart';
 import '../../people/presentation/widgets/people_selector_sheet.dart';
+import '../../societies/data/societies_repository.dart';
+import '../../societies/models/society.dart';
 import '../../../shared/utils/app_toast.dart';
 import 'widgets/step_editor_sheet.dart';
 
@@ -44,13 +47,15 @@ class _EventEditorPageState extends State<EventEditorPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   bool _isLoading = true;
-  bool _isSaving = false;
   int _currentTabIndex = 0;
   EventModel? _event;
   List<EventStepModel> _steps = const [];
   List<MusicModel> _musics = const [];
   List<UserModel> _people = const [];
   EventPeople _selectedPeople = const EventPeople();
+  EventTeams _selectedTeams = const EventTeams();
+  List<SocietyModel> _societies = const [];
+  EventTemplateModel? _template;
 
   /// Compara apenas a data (sem hora) de dois DateTime
   bool _isDateBeforeToday(DateTime date) {
@@ -65,7 +70,7 @@ class _EventEditorPageState extends State<EventEditorPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_onTabChanged);
     _loadData();
   }
@@ -95,13 +100,7 @@ class _EventEditorPageState extends State<EventEditorPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        actions: [
-          TextButton.icon(
-            icon: const Icon(Icons.save),
-            label: const Text('Salvar'),
-            onPressed: (_isSaving || _isPastEvent) ? null : _save,
-          ),
-        ],
+        actions: [],
         bottom: TabBar(
           controller: _tabController,
           indicatorSize: TabBarIndicatorSize.tab,
@@ -113,6 +112,7 @@ class _EventEditorPageState extends State<EventEditorPage>
           tabs: const [
             Tab(text: 'Etapas'),
             Tab(text: 'Pessoas'),
+            Tab(text: 'Equipes'),
           ],
         ),
       ),
@@ -122,7 +122,7 @@ class _EventEditorPageState extends State<EventEditorPage>
           ? const Center(child: Text('Evento não encontrado.'))
           : TabBarView(
               controller: _tabController,
-              children: [_buildStepsTab(), _buildTeamTab()],
+              children: [_buildStepsTab(), _buildTeamTab(), _buildTeamsTab()],
             ),
       floatingActionButton: _isPastEvent
           ? null
@@ -131,10 +131,12 @@ class _EventEditorPageState extends State<EventEditorPage>
                   onPressed: _addStep,
                   child: const Icon(Icons.add),
                 )
-              : FloatingActionButton(
-                  onPressed: _manageTeam,
-                  child: const Icon(Icons.group_add),
-                )),
+              : _currentTabIndex == 1
+                  ? FloatingActionButton(
+                      onPressed: _manageTeam,
+                      child: const Icon(Icons.group_add),
+                    )
+                  : null),
       floatingActionButtonLocation: const _CustomFABLocation(offset: 80),
     );
   }
@@ -173,6 +175,7 @@ class _EventEditorPageState extends State<EventEditorPage>
                 final item = _steps.removeAt(oldIndex);
                 _steps.insert(newIndex, item);
               });
+              _autoSave();
             },
       proxyDecorator: (child, index, animation) {
         return AnimatedBuilder(
@@ -632,6 +635,7 @@ class _EventEditorPageState extends State<EventEditorPage>
           break;
       }
     });
+    _autoSave();
   }
 
   Future<void> _loadData() async {
@@ -661,12 +665,34 @@ class _EventEditorPageState extends State<EventEditorPage>
         // A aba Pessoas já mostra mensagem apropriada quando não há pessoas
       }
 
+      // Carregar sociedades
+      List<SocietyModel> societies = const [];
+      try {
+        final societiesRepository = context.read<SocietiesRepository>();
+        societies = await societiesRepository.fetchAll();
+      } catch (e) {
+        // Não mostrar erro ao usuário - apenas usar lista vazia
+      }
+
+      // Carregar template se houver templateId
+      EventTemplateModel? template;
+      if (event.templateId != null && event.templateId!.isNotEmpty) {
+        try {
+          template = await eventsRepository.fetchTemplateById(event.templateId!);
+        } catch (e) {
+          // Se não conseguir carregar o template, continua sem ele
+        }
+      }
+
       setState(() {
         _event = event;
         _steps = List.of(event.steps);
         _selectedPeople = event.people;
+        _selectedTeams = event.teams;
         _musics = musics;
         _people = people;
+        _societies = societies;
+        _template = template;
       });
     } catch (e) {
       setState(() {
@@ -697,6 +723,7 @@ class _EventEditorPageState extends State<EventEditorPage>
             .read<MusicsRepository>()
             .addEventDate(result.musicId!, _event!.date);
       }
+      _autoSave();
     }
   }
 
@@ -713,6 +740,7 @@ class _EventEditorPageState extends State<EventEditorPage>
         updated[index] = result;
         _steps = updated;
       });
+      _autoSave();
     }
   }
 
@@ -728,6 +756,7 @@ class _EventEditorPageState extends State<EventEditorPage>
     setState(() {
       _steps = List.of(_steps)..removeAt(index);
     });
+    _autoSave();
   }
 
   Future<void> _manageTeam() async {
@@ -903,6 +932,7 @@ class _EventEditorPageState extends State<EventEditorPage>
             }
           }
         });
+        _autoSave();
 
         // Após salvar, fecha o fluxo (ou poderia voltar para o menu anterior? Geralmente salvar fecha tudo)
         break;
@@ -910,27 +940,237 @@ class _EventEditorPageState extends State<EventEditorPage>
     }
   }
 
-  Future<void> _save() async {
-    if (_isPastEvent) {
-      showErrorToast(context, 'Não é possível salvar alterações em eventos passados.');
-      return;
-    }
-    setState(() => _isSaving = true);
+  Future<void> _autoSave() async {
+    if (_isPastEvent) return;
+
     try {
       await context.read<EventsRepository>().updateEventDetails(
         id: widget.eventId,
         steps: _steps,
         people: _selectedPeople,
+        teams: _selectedTeams,
       );
-      if (!mounted) return;
-      showSuccessToast(context, 'Evento atualizado com sucesso!');
-      Navigator.of(context).pop();
-    } finally {
+    } catch (e) {
       if (mounted) {
-        setState(() => _isSaving = false);
+        showErrorToast(context, 'Erro ao salvar alterações: ${e.toString()}');
       }
     }
   }
+
+  Widget _buildTeamsTab() {
+    final templateName = _template?.name ?? '';
+    
+    // Determinar quais itens mostrar baseado no template
+    final shouldShowLiturgia = _shouldShowLiturgia(templateName);
+    final shouldShowLanche = _shouldShowLanche(templateName);
+    final shouldShowAberturaEbd = _shouldShowAberturaEbd(templateName);
+    final shouldShowReuniaoOracao = _shouldShowReuniaoOracao(templateName);
+    
+    final items = <Widget>[];
+    
+    if (shouldShowLiturgia) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Montar liturgia',
+        icon: Icons.menu_book,
+        societyId: _selectedTeams.liturgia,
+      ));
+      if (shouldShowLanche || shouldShowAberturaEbd || shouldShowReuniaoOracao) {
+        items.add(const SizedBox(height: 16));
+      }
+    }
+    
+    if (shouldShowLanche) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Lanche pós-culto',
+        icon: Icons.restaurant,
+        societyId: _selectedTeams.lanche,
+      ));
+      if (shouldShowAberturaEbd || shouldShowReuniaoOracao) {
+        items.add(const SizedBox(height: 16));
+      }
+    }
+    
+    if (shouldShowAberturaEbd) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Abertura EBD',
+        icon: Icons.school,
+        societyId: _selectedTeams.aberturaEbd,
+      ));
+      if (shouldShowReuniaoOracao) {
+        items.add(const SizedBox(height: 16));
+      }
+    }
+    
+    if (shouldShowReuniaoOracao) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Reunião de oração',
+        icon: Icons.favorite,
+        societyId: _selectedTeams.reuniaoOracao,
+      ));
+    }
+    
+    if (items.isEmpty) {
+      return const Center(child: Text('Nenhuma equipe atribuída para este tipo de evento.'));
+    }
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: items,
+      ),
+    );
+  }
+
+  bool _shouldShowLiturgia(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('culto à noite') || 
+           name.contains('culto de ceia');
+  }
+
+  bool _shouldShowLanche(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('culto à noite') || 
+           name.contains('culto de ceia');
+  }
+
+  bool _shouldShowAberturaEbd(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('escola bíblica') || 
+           name.contains('escola biblica');
+  }
+
+  bool _shouldShowReuniaoOracao(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('reunião de oração') || 
+           name.contains('reuniao de oracao');
+  }
+
+  Widget _buildTeamResponsibilityCard({
+    required String title,
+    required IconData icon,
+    String? societyId,
+  }) {
+    final society = societyId != null
+        ? _societies.firstWhere(
+            (s) => s.id == societyId,
+            orElse: () => SocietyModel(
+              id: '',
+              name: 'Sociedade não encontrada',
+              description: '',
+              color: 0xFF2F4F2F,
+              userId: '',
+            ),
+          )
+        : null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (society != null)
+                    Text(
+                      society.name,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white70,
+                          ),
+                    )
+                  else
+                    Text(
+                      'Nenhuma sociedade atribuída',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white54,
+                            fontStyle: FontStyle.italic,
+                          ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _selectSocietyForResponsibility(String responsibility) async {
+    final result = await showModalBottomSheet<String?>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => _SocietySelectorSheet(
+        societies: _societies,
+        currentSocietyId: _getCurrentSocietyId(responsibility),
+      ),
+    );
+
+    if (result == null) return;
+
+    setState(() {
+      switch (responsibility) {
+        case 'liturgia':
+          _selectedTeams = _selectedTeams.copyWith(
+            liturgia: result.isEmpty ? null : result,
+          );
+          break;
+        case 'lanche':
+          _selectedTeams = _selectedTeams.copyWith(
+            lanche: result.isEmpty ? null : result,
+          );
+          break;
+        case 'aberturaEbd':
+          _selectedTeams = _selectedTeams.copyWith(
+            aberturaEbd: result.isEmpty ? null : result,
+          );
+          break;
+        case 'reuniaoOracao':
+          _selectedTeams = _selectedTeams.copyWith(
+            reuniaoOracao: result.isEmpty ? null : result,
+          );
+          break;
+      }
+    });
+    _autoSave();
+  }
+
+  String? _getCurrentSocietyId(String responsibility) {
+    switch (responsibility) {
+      case 'liturgia':
+        return _selectedTeams.liturgia;
+      case 'lanche':
+        return _selectedTeams.lanche;
+      case 'aberturaEbd':
+        return _selectedTeams.aberturaEbd;
+      case 'reuniaoOracao':
+        return _selectedTeams.reuniaoOracao;
+      default:
+        return null;
+    }
+  }
+
 }
 
 class _PeopleTypeSelectorSheet extends StatelessWidget {
@@ -1156,6 +1396,210 @@ class _OptionTile extends StatelessWidget {
               size: 20,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SocietySelectorSheet extends StatelessWidget {
+  const _SocietySelectorSheet({
+    required this.societies,
+    this.currentSocietyId,
+  });
+
+  final List<SocietyModel> societies;
+  final String? currentSocietyId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1220),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Selecionar sociedade',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+              ),
+              const SizedBox(height: 24),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      // Opção para remover sociedade (apenas se houver uma selecionada)
+                      if (currentSocietyId != null && currentSocietyId!.isNotEmpty)
+                        InkWell(
+                          onTap: () => Navigator.of(context).pop(''),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.05),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.1),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.remove_circle_outline,
+                                color: Colors.red.withOpacity(0.8),
+                                size: 24,
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Text(
+                                  'Remover sociedade',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodyLarge
+                                      ?.copyWith(
+                                        color: Colors.red.withOpacity(0.8),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        ),
+                      if (societies.isNotEmpty && 
+                          (currentSocietyId == null || currentSocietyId!.isEmpty))
+                        const SizedBox(height: 12),
+                      if (currentSocietyId != null && 
+                          currentSocietyId!.isNotEmpty && 
+                          societies.isNotEmpty)
+                        const SizedBox(height: 12),
+                      // Lista de sociedades
+                      ...societies.map((society) {
+                        final isSelected = society.id == currentSocietyId;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: InkWell(
+                            onTap: () =>
+                                Navigator.of(context).pop(society.id),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? Theme.of(context)
+                                        .colorScheme
+                                        .primary
+                                        .withOpacity(0.2)
+                                    : Colors.white.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? Theme.of(context).colorScheme.primary
+                                      : Colors.white.withOpacity(0.1),
+                                  width: isSelected ? 2 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: Color(society.color)
+                                          .withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        society.name.isNotEmpty
+                                            ? society.name[0].toUpperCase()
+                                            : '?',
+                                        style: TextStyle(
+                                          color: Color(society.color),
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          society.name,
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyLarge
+                                              ?.copyWith(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                        ),
+                                        if (society.description.isNotEmpty) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            society.description,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color: Colors.white70,
+                                                ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  if (isSelected)
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary,
+                                      size: 24,
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

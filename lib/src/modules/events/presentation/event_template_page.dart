@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../../../shared/utils/platform_utils.dart';
 import '../../../shared/widgets/glass_container.dart';
@@ -28,6 +29,9 @@ class _EventTemplatePageState extends State<EventTemplatePage> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = context.watch<AppState>().currentUser;
+    final isAdmin = currentUser?.isAdmin ?? false;
+
     return Scaffold(
       body: Container(
         decoration: const BoxDecoration(
@@ -117,8 +121,8 @@ class _EventTemplatePageState extends State<EventTemplatePage> {
                             return _TemplateCard(
                               template: template,
                               onOpen: () => _openTemplate(template),
-                              onEdit: () => _editTemplate(template),
-                              onDelete: () => _deleteTemplate(template),
+                              onEdit: isAdmin ? () => _editTemplate(template) : null,
+                              onDelete: isAdmin ? () => _deleteTemplate(template) : null,
                             );
                           },
                         ),
@@ -128,10 +132,12 @@ class _EventTemplatePageState extends State<EventTemplatePage> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _createTemplate,
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton(
+              onPressed: _createTemplate,
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 
@@ -384,14 +390,14 @@ class _TemplateCard extends StatelessWidget {
   const _TemplateCard({
     required this.template,
     required this.onOpen,
-    required this.onEdit,
-    required this.onDelete,
+    this.onEdit,
+    this.onDelete,
   });
 
   final EventTemplateModel template;
   final VoidCallback onOpen;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -438,21 +444,24 @@ class _TemplateCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: 'Editar',
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  onPressed: onEdit,
-                ),
-                IconButton(
-                  tooltip: 'Excluir',
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  onPressed: onDelete,
-                ),
-              ],
-            ),
+            if (onEdit != null || onDelete != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (onEdit != null)
+                    IconButton(
+                      tooltip: 'Editar',
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      onPressed: onEdit,
+                    ),
+                  if (onDelete != null)
+                    IconButton(
+                      tooltip: 'Excluir',
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      onPressed: onDelete,
+                    ),
+                ],
+              ),
           ],
         ),
       ),

@@ -10,8 +10,10 @@ import 'src/modules/events/data/events_repository.dart';
 import 'src/modules/musics/data/musics_repository.dart';
 import 'src/modules/people/data/people_repository.dart';
 import 'src/modules/societies/data/societies_repository.dart';
+import 'src/modules/events/data/weekly_team_assignments_repository.dart';
 import 'src/shared/services/session_storage.dart';
 import 'src/shared/state/app_state.dart';
+import 'src/modules/notifications/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,6 +31,9 @@ void main() async {
   final appState = AppState(authRepository: authRepository);
 
   await appState.bootstrap();
+
+  // Inicializar serviço de notificações
+  await NotificationService().initialize();
 
   runApp(
     MultiProvider(
@@ -48,7 +53,14 @@ void main() async {
         Provider<SocietiesRepository>.value(
           value: SocietiesRepository(),
         ),
-        ChangeNotifierProvider<AppState>.value(value: appState),
+        Provider<WeeklyTeamAssignmentsRepository>.value(
+          value: WeeklyTeamAssignmentsRepository(),
+        ),
+        // Usar ChangeNotifierProvider.value mas garantir que as notificações funcionem
+        ChangeNotifierProvider<AppState>.value(
+          value: appState,
+          // Não usar lazy: false pois já temos a instância criada
+        ),
       ],
       child: const IpeApp(),
     ),

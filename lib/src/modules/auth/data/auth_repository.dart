@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
@@ -9,6 +10,7 @@ import '../../../core/config/firebase_config.dart';
 import '../../../core/utils/app_exception.dart';
 import '../../auth/models/user.dart';
 import '../../../shared/services/session_storage.dart';
+import '../../../modules/notifications/services/notification_service.dart';
 
 class AuthRepository {
   AuthRepository({required SessionStorage sessionStorage})
@@ -56,10 +58,12 @@ class AuthRepository {
         );
         await _createUserInFirestore(newUser);
         await _sessionStorage.saveUser(newUser);
+        await _saveFcmToken(credential.user!.uid);
         return newUser;
       }
 
       await _sessionStorage.saveUser(userModel);
+      await _saveFcmToken(credential.user!.uid);
       return userModel;
     } on FirebaseAuthException catch (e) {
       throw AppException(message: _handleAuthException(e));
@@ -93,6 +97,7 @@ class AuthRepository {
 
       await _createUserInFirestore(userModel);
       await _sessionStorage.saveUser(userModel);
+      await _saveFcmToken(credential.user!.uid);
 
       return userModel;
     } on FirebaseAuthException catch (e) {
@@ -147,6 +152,7 @@ class AuthRepository {
       }
 
       await _sessionStorage.saveUser(userModel);
+      await _saveFcmToken(userCredential.user!.uid);
       return userModel;
     } on FirebaseAuthException catch (e) {
       throw AppException(message: _handleAuthException(e));
@@ -226,6 +232,7 @@ class AuthRepository {
       }
 
       await _sessionStorage.saveUser(userModel);
+      await _saveFcmToken(userCredential.user!.uid);
       return userModel;
     } on SignInWithAppleAuthorizationException catch (e) {
       // Tratar exceções específicas do Sign In with Apple
@@ -344,6 +351,23 @@ class AuthRepository {
       await _firestore.collection('users').doc(user.id).set(user.toJson());
     } catch (e) {
       rethrow;
+    }
+  }
+
+  // Salvar FCM token do usuário
+  Future<void> _saveFcmToken(String userId) async {
+    try {
+      final notificationService = NotificationService();
+      final fcmToken = notificationService.fcmToken;
+
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        await _firestore.collection('users').doc(userId).update({
+          'fcmToken': fcmToken,
+        });
+      }
+    } catch (e) {
+      // Não lançar erro se falhar ao salvar token - não é crítico
+      debugPrint('Aviso: Não foi possível salvar FCM token: $e');
     }
   }
 

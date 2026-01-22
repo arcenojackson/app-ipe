@@ -28,6 +28,7 @@ class _EventFormSheetState extends State<EventFormSheet> {
   bool _isSubmitting = false;
   List<EventTemplateModel> _templates = const [];
   String? _selectedTemplateId;
+  String? _originalTemplateId; // Template original do evento (para comparar mudanças)
   bool _isLoadingTemplates = true;
 
   @override
@@ -38,6 +39,8 @@ class _EventFormSheetState extends State<EventFormSheet> {
     if (event != null) {
       _nameController.text = event.name;
       _startController.text = event.start.isEmpty ? '19:30' : event.start;
+      _originalTemplateId = event.templateId; // Armazenar template original
+      _selectedTemplateId = event.templateId; // Inicializar com template do evento
     }
     _dateController.text = _dateFormat.format(_selectedDate);
     _loadTemplates();
@@ -135,41 +138,42 @@ class _EventFormSheetState extends State<EventFormSheet> {
                   ),
                 ),
               ),
-              if (widget.event == null) ...[
-                const SizedBox(height: 16),
-                _isLoadingTemplates
-                    ? const SizedBox(
-                        height: 56,
-                        child: Center(child: CircularProgressIndicator()),
-                      )
-                    : DropdownButtonFormField<String?>(
-                        value: _selectedTemplateId,
-                        decoration: const InputDecoration(
-                          labelText: 'Template (opcional)',
-                          hintText: 'Selecione um template',
-                          suffixIcon: Icon(Icons.description),
-                        ),
-                        items: [
-                          const DropdownMenuItem<String?>(
-                            value: null,
-                            child: Text('Nenhum template'),
-                          ),
-                          ..._templates.map((template) {
-                            return DropdownMenuItem<String?>(
-                              value: template.id,
-                              child: Text(template.name),
-                            );
-                          }),
-                        ],
-                        onChanged: _isSubmitting
-                            ? null
-                            : (value) {
-                                setState(() {
-                                  _selectedTemplateId = value;
-                                });
-                              },
+              const SizedBox(height: 16),
+              _isLoadingTemplates
+                  ? const SizedBox(
+                      height: 56,
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : DropdownButtonFormField<String?>(
+                      value: _selectedTemplateId,
+                      decoration: InputDecoration(
+                        labelText: widget.event == null 
+                            ? 'Template (opcional)' 
+                            : 'Alterar template (opcional)',
+                        hintText: 'Selecione um template',
+                        suffixIcon: const Icon(Icons.description),
                       ),
-              ],
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('Nenhum template'),
+                        ),
+                        ..._templates.map((template) {
+                          return DropdownMenuItem<String?>(
+                            value: template.id,
+                            child: Text(template.name),
+                          );
+                        }),
+                      ],
+                      onChanged: _isSubmitting
+                          ? null
+                          : (value) {
+                              // Apenas atualizar o estado - a confirmação será feita no Salvar
+                              setState(() {
+                                _selectedTemplateId = value;
+                              });
+                            },
+                    ),
               const SizedBox(height: 24),
               SizedBox(
                 width: double.infinity,
@@ -246,8 +250,6 @@ class _EventFormSheetState extends State<EventFormSheet> {
   }
 
   Future<void> _loadTemplates() async {
-    if (widget.event != null) return; // Não carregar templates ao editar
-
     try {
       final repository = context.read<EventsRepository>();
       final templates = await repository.fetchAllTemplates();
@@ -263,8 +265,46 @@ class _EventFormSheetState extends State<EventFormSheet> {
     }
   }
 
+  Future<bool> _confirmTemplateChange() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Alterar template?'),
+        content: const Text(
+          'Ao alterar o template, todas as etapas (exceto músicas) serão substituídas pelas etapas do novo template. Deseja continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    // Se estiver editando e o template foi alterado, mostrar confirmação
+    if (widget.event != null && 
+        _selectedTemplateId != null && 
+        _selectedTemplateId != _originalTemplateId) {
+      final confirmed = await _confirmTemplateChange();
+      if (!confirmed) {
+        // Se cancelou, reverter para o template original
+        setState(() {
+          _selectedTemplateId = _originalTemplateId;
+        });
+        return;
+      }
+    }
+    
     setState(() => _isSubmitting = true);
     try {
       final repository = context.read<EventsRepository>();
@@ -280,12 +320,23 @@ class _EventFormSheetState extends State<EventFormSheet> {
           showSuccessToast(context, 'Evento criado com sucesso!');
         }
       } else {
+        // Atualizar dados do evento (incluindo templateId)
         await repository.updateEvent(
           id: widget.event!.id,
           name: _nameController.text.trim(),
           date: _selectedDate,
           start: _startController.text.trim(),
+          templateId: _selectedTemplateId, // Sempre passar o templateId (pode ser null)
         );
+        
+        // Se o template foi alterado e não é null, atualizar também as etapas do template
+        if (_selectedTemplateId != null && _selectedTemplateId != _originalTemplateId) {
+          await repository.updateEventTemplate(
+            eventId: widget.event!.id,
+            templateId: _selectedTemplateId!,
+          );
+        }
+        
         if (mounted) {
           Navigator.of(context).pop(true);
           showSuccessToast(context, 'Evento atualizado com sucesso!');

@@ -7,15 +7,26 @@ import '../../musics/data/musics_repository.dart';
 import '../../musics/models/music.dart';
 import '../../people/data/people_repository.dart';
 import '../../people/presentation/widgets/user_chip.dart';
+import '../../societies/data/societies_repository.dart';
+import '../../societies/models/society.dart';
 import '../data/events_repository.dart';
 import '../models/event.dart';
+import '../models/event_template.dart';
 import 'widgets/music_view_dialog.dart';
 import '../../../shared/utils/tone_utils.dart';
+import 'event_chat_tab.dart';
 
 class EventViewerPage extends StatefulWidget {
-  const EventViewerPage({super.key, required this.eventId});
+  const EventViewerPage({
+    super.key,
+    required this.eventId,
+    this.initialTabIndex = 0,
+    this.initialMessageId,
+  });
 
   final String eventId;
+  final int initialTabIndex; // 0: Etapas, 1: Pessoas, 2: Equipes, 3: Chat
+  final String? initialMessageId; // ID da mensagem para scrollar (usado no chat)
 
   @override
   State<EventViewerPage> createState() => _EventViewerPageState();
@@ -28,11 +39,17 @@ class _EventViewerPageState extends State<EventViewerPage>
   EventModel? _event;
   List<MusicModel> _musics = const [];
   List<UserModel> _people = const [];
+  List<SocietyModel> _societies = const [];
+  EventTemplateModel? _template;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTabIndex.clamp(0, 3),
+    );
     _loadData();
   }
 
@@ -55,8 +72,9 @@ class _EventViewerPageState extends State<EventViewerPage>
           controller: _tabController,
           tabs: const [
             Tab(text: 'Etapas'),
-            Tab(text: 'Músicas'),
-            Tab(text: 'Equipe'),
+            Tab(text: 'Pessoas'),
+            Tab(text: 'Equipes'),
+            Tab(text: 'Chat'),
           ],
         ),
       ),
@@ -66,7 +84,19 @@ class _EventViewerPageState extends State<EventViewerPage>
           ? const Center(child: Text('Evento não encontrado.'))
           : TabBarView(
               controller: _tabController,
-              children: [_buildStepsTab(), _buildMusicsTab(), _buildTeamTab()],
+              children: [
+                _buildStepsTab(),
+                _buildTeamTab(),
+                _buildTeamsTab(),
+                if (_event != null)
+                  EventChatTab(
+                    eventId: widget.eventId,
+                    event: _event!,
+                    initialMessageId: widget.initialMessageId,
+                  )
+                else
+                  const Center(child: Text('Carregando...')),
+              ],
             ),
     );
   }
@@ -106,39 +136,6 @@ class _EventViewerPageState extends State<EventViewerPage>
               ],
             ),
             trailing: isMusic ? const Icon(Icons.play_circle) : null,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMusicsTab() {
-    final steps = _event!.steps
-        .where((step) => step.type == EventStepType.music)
-        .toList();
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: steps.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final step = steps[index];
-        final music = _musics.firstWhere(
-          (m) => m.id == step.musicId,
-          orElse: () => MusicModel(
-            id: step.musicId ?? '',
-            title: step.title,
-            artist: '',
-            cipher: '',
-            tone: step.musicTone ?? '',
-          ),
-        );
-        return Card(
-          child: ListTile(
-            onTap: () => _openMusic(step.musicId!, customTone: step.musicTone),
-            leading: const CircleAvatar(child: Icon(Icons.music_video)),
-            title: Text(music.title),
-            subtitle: Text(music.artist),
-            trailing: Chip(label: Text(toneLabel(step.musicTone ?? '0'))),
           ),
         );
       },
@@ -404,21 +401,196 @@ class _EventViewerPageState extends State<EventViewerPage>
     );
   }
 
+  Widget _buildTeamsTab() {
+    final teams = _event!.teams;
+    final templateName = _template?.name ?? '';
+    
+    // Determinar quais itens mostrar baseado no template
+    final shouldShowLiturgia = _shouldShowLiturgia(templateName);
+    final shouldShowLanche = _shouldShowLanche(templateName);
+    final shouldShowAberturaEbd = _shouldShowAberturaEbd(templateName);
+    final shouldShowReuniaoOracao = _shouldShowReuniaoOracao(templateName);
+    
+    final items = <Widget>[];
+    
+    if (shouldShowLiturgia) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Montar liturgia',
+        icon: Icons.menu_book,
+        societyId: teams.liturgia,
+      ));
+      if (shouldShowLanche || shouldShowAberturaEbd || shouldShowReuniaoOracao) {
+        items.add(const SizedBox(height: 16));
+      }
+    }
+    
+    if (shouldShowLanche) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Lanche pós-culto',
+        icon: Icons.restaurant,
+        societyId: teams.lanche,
+      ));
+      if (shouldShowAberturaEbd || shouldShowReuniaoOracao) {
+        items.add(const SizedBox(height: 16));
+      }
+    }
+    
+    if (shouldShowAberturaEbd) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Abertura EBD',
+        icon: Icons.school,
+        societyId: teams.aberturaEbd,
+      ));
+      if (shouldShowReuniaoOracao) {
+        items.add(const SizedBox(height: 16));
+      }
+    }
+    
+    if (shouldShowReuniaoOracao) {
+      items.add(_buildTeamResponsibilityCard(
+        title: 'Reunião de oração',
+        icon: Icons.favorite,
+        societyId: teams.reuniaoOracao,
+      ));
+    }
+    
+    if (items.isEmpty) {
+      return const Center(child: Text('Nenhuma equipe atribuída para este tipo de evento.'));
+    }
+    
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: items,
+      ),
+    );
+  }
+
+  bool _shouldShowLiturgia(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('culto à noite') || 
+           name.contains('culto de ceia');
+  }
+
+  bool _shouldShowLanche(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('culto à noite') || 
+           name.contains('culto de ceia');
+  }
+
+  bool _shouldShowAberturaEbd(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('escola bíblica') || 
+           name.contains('escola biblica');
+  }
+
+  bool _shouldShowReuniaoOracao(String templateName) {
+    final name = templateName.toLowerCase();
+    return name.contains('reunião de oração') || 
+           name.contains('reuniao de oracao');
+  }
+
+  Widget _buildTeamResponsibilityCard({
+    required String title,
+    required IconData icon,
+    String? societyId,
+  }) {
+    final society = societyId != null
+        ? _societies.firstWhere(
+            (s) => s.id == societyId,
+            orElse: () => SocietyModel(
+              id: '',
+              name: 'Sociedade não encontrada',
+              description: '',
+              color: 0xFF2F4F2F,
+              userId: '',
+            ),
+          )
+        : null;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: Theme.of(context).colorScheme.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  if (society != null)
+                    Text(
+                      society.name,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white70,
+                          ),
+                    )
+                  else
+                    Text(
+                      'Nenhuma sociedade atribuída',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.white54,
+                            fontStyle: FontStyle.italic,
+                          ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
       final eventsRepository = context.read<EventsRepository>();
       final musicsRepository = context.read<MusicsRepository>();
       final peopleRepository = context.read<PeopleRepository>();
+      final societiesRepository = context.read<SocietiesRepository>();
 
       final event = await eventsRepository.fetchById(widget.eventId);
       final musics = await musicsRepository.fetchAll();
       final people = await peopleRepository.fetchAll();
+      final societies = await societiesRepository.fetchAll();
+
+      // Carregar template se houver templateId
+      EventTemplateModel? template;
+      if (event.templateId != null && event.templateId!.isNotEmpty) {
+        try {
+          template = await eventsRepository.fetchTemplateById(event.templateId!);
+        } catch (_) {
+          // Se não conseguir carregar o template, continua sem ele
+        }
+      }
 
       setState(() {
         _event = event;
         _musics = musics;
         _people = people;
+        _societies = societies;
+        _template = template;
       });
     } catch (_) {
       setState(() {

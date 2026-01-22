@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import '../../../app.dart';
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../events/presentation/event_history_page.dart';
 import '../../events/presentation/event_template_page.dart';
 import '../../events/presentation/calendar_page.dart';
+import '../../events/presentation/weekly_team_assignments_page.dart';
 import '../../people/presentation/people_section.dart';
 import '../../people/presentation/widgets/invite_person_sheet.dart';
 import '../../societies/presentation/societies_page.dart';
+import '../../notifications/presentation/notification_settings_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -352,6 +355,33 @@ class _SettingsPageState extends State<SettingsPage> {
                             ),
                             onTap: () => _navigateToCalendar(context),
                           ),
+                          if (user?.isAdmin == true) ...[
+                            const Divider(height: 1, color: Colors.white12),
+                            ListTile(
+                              leading: const Icon(
+                                Icons.assignment,
+                                color: Colors.white70,
+                              ),
+                              title: const Text(
+                                'Responsáveis semanais',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Gerenciar responsabilidades de cada semana',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white60,
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right,
+                                color: Colors.white54,
+                              ),
+                              onTap: () => _navigateToWeeklyAssignments(context),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -437,6 +467,31 @@ class _SettingsPageState extends State<SettingsPage> {
                       padding: EdgeInsets.zero,
                       child: Column(
                         children: [
+                          ListTile(
+                            leading: const Icon(
+                              Icons.notifications_outlined,
+                              color: Colors.white70,
+                            ),
+                            title: const Text(
+                              'Gerenciar notificações',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Configure quais notificações você deseja receber',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: Colors.white60,
+                              ),
+                            ),
+                            trailing: const Icon(
+                              Icons.chevron_right,
+                              color: Colors.white54,
+                            ),
+                            onTap: () => _navigateToNotificationSettings(context),
+                          ),
+                          const Divider(height: 1, color: Colors.white12),
                           ListTile(
                             leading: Icon(
                               Icons.delete_outline,
@@ -565,11 +620,20 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _signOut(BuildContext context, AppState appState) async {
     try {
+      // Fazer logout primeiro
       await appState.signOut();
-      // O IpeApp automaticamente redirecionará para login quando isAuthenticated for false
-      // Apenas fechar a tela de configurações
+      
+      // Fechar a tela de configurações antes de navegar
       if (context.mounted) {
         Navigator.of(context).pop();
+      }
+      
+      // Usar o navigatorKey global para limpar toda a pilha de navegação
+      // Isso garante que voltemos para a tela inicial (LoginPage)
+      final navigator = IpeApp.navigatorKey.currentState;
+      if (navigator != null) {
+        // Limpar toda a pilha de navegação
+        navigator.popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (context.mounted) {
@@ -712,6 +776,22 @@ class _SettingsPageState extends State<SettingsPage> {
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => const SocietiesPage(),
+      ),
+    );
+  }
+
+  void _navigateToNotificationSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const NotificationSettingsPage(),
+      ),
+    );
+  }
+
+  void _navigateToWeeklyAssignments(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const WeeklyTeamAssignmentsPage(),
       ),
     );
   }

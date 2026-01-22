@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+const _sentinel = Object();
+
 class EventPeople {
   const EventPeople({
     this.elo = const [],
@@ -91,6 +93,55 @@ class EventPeople {
       ];
 }
 
+class EventTeams {
+  const EventTeams({
+    this.liturgia,
+    this.lanche,
+    this.aberturaEbd,
+    this.reuniaoOracao,
+  });
+
+  // ID da sociedade responsável por cada tarefa
+  final String? liturgia; // "Montar liturgia"
+  final String? lanche; // "Lanche pós-culto"
+  final String? aberturaEbd; // "Abertura EBD"
+  final String? reuniaoOracao; // "Reunião de oração"
+
+  factory EventTeams.fromJson(Map<String, dynamic>? json) {
+    if (json == null) return const EventTeams();
+    
+    return EventTeams(
+      liturgia: json['liturgia']?.toString(),
+      lanche: json['lanche']?.toString(),
+      aberturaEbd: json['aberturaEbd']?.toString(),
+      reuniaoOracao: json['reuniaoOracao']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{};
+    if (liturgia != null) map['liturgia'] = liturgia;
+    if (lanche != null) map['lanche'] = lanche;
+    if (aberturaEbd != null) map['aberturaEbd'] = aberturaEbd;
+    if (reuniaoOracao != null) map['reuniaoOracao'] = reuniaoOracao;
+    return map;
+  }
+
+  EventTeams copyWith({
+    Object? liturgia = _sentinel,
+    Object? lanche = _sentinel,
+    Object? aberturaEbd = _sentinel,
+    Object? reuniaoOracao = _sentinel,
+  }) {
+    return EventTeams(
+      liturgia: liturgia == _sentinel ? this.liturgia : liturgia as String?,
+      lanche: lanche == _sentinel ? this.lanche : lanche as String?,
+      aberturaEbd: aberturaEbd == _sentinel ? this.aberturaEbd : aberturaEbd as String?,
+      reuniaoOracao: reuniaoOracao == _sentinel ? this.reuniaoOracao : reuniaoOracao as String?,
+    );
+  }
+}
+
 class EventModel {
   const EventModel({
     required this.id,
@@ -99,6 +150,8 @@ class EventModel {
     required this.start,
     this.steps = const [],
     this.people = const EventPeople(),
+    this.teams = const EventTeams(),
+    this.templateId,
   });
 
   final String id;
@@ -107,6 +160,8 @@ class EventModel {
   final String start;
   final List<EventStepModel> steps;
   final EventPeople people;
+  final EventTeams teams;
+  final String? templateId; // ID do template usado (null se não usou template)
 
   // Mantido para compatibilidade com código antigo
   List<String> get peopleIds => people.allPeopleIds;
@@ -121,6 +176,8 @@ class EventModel {
         start: json['start']?.toString() ?? '',
         steps: _parseSteps(json['steps']),
         people: EventPeople.fromJson(json['people'] as Map<String, dynamic>),
+        teams: EventTeams.fromJson(json['teams'] as Map<String, dynamic>?),
+        templateId: json['templateId']?.toString(),
       );
     }
     // Fallback para estrutura antiga (people como array)
@@ -134,6 +191,8 @@ class EventModel {
       people: EventPeople(
         elo: oldPeopleIds, // Migração: coloca todos no elo por padrão
       ),
+      teams: EventTeams.fromJson(json['teams'] as Map<String, dynamic>?),
+      templateId: json['templateId']?.toString(),
     );
   }
 
@@ -183,6 +242,8 @@ class EventModel {
     'start': start,
     'steps': steps.map((e) => e.toJson()).toList(),
     'people': people.toJson(),
+    'teams': teams.toJson(),
+    'templateId': templateId,
   };
 
   EventModel copyWith({
@@ -192,6 +253,8 @@ class EventModel {
     String? start,
     List<EventStepModel>? steps,
     EventPeople? people,
+    EventTeams? teams,
+    String? templateId,
   }) {
     return EventModel(
       id: id ?? this.id,
@@ -200,6 +263,8 @@ class EventModel {
       start: start ?? this.start,
       steps: steps ?? this.steps,
       people: people ?? this.people,
+      teams: teams ?? this.teams,
+      templateId: templateId ?? this.templateId,
     );
   }
 }

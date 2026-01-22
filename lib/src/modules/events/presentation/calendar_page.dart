@@ -3,12 +3,18 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import 'dart:math';
+
+import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../societies/data/societies_repository.dart';
 import '../../societies/models/society.dart';
 import '../data/events_repository.dart';
+import '../data/weekly_team_assignments_repository.dart';
 import '../models/calendar_event.dart';
+import '../models/event.dart';
+import '../models/weekly_team_assignment.dart';
 import 'widgets/calendar_event_form_sheet.dart';
 
 enum CalendarViewMode { day, week, month }
@@ -119,9 +125,33 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   void _onPageChanged(DateTime focusedDay) {
+    // Ajustar o dia selecionado para o novo mês
+    final newSelectedDay = _adjustSelectedDayForNewMonth(_selectedDay, focusedDay);
+    
     setState(() {
       _focusedDay = focusedDay;
+      _selectedDay = newSelectedDay;
     });
+  }
+
+  /// Ajusta o dia selecionado quando o mês muda.
+  /// Se o dia existe no novo mês, mantém o mesmo dia.
+  /// Caso contrário, seleciona o último dia do novo mês.
+  DateTime _adjustSelectedDayForNewMonth(DateTime currentSelectedDay, DateTime newMonth) {
+    final selectedDay = currentSelectedDay.day;
+    final newYear = newMonth.year;
+    final newMonthValue = newMonth.month;
+    
+    // Calcular o último dia do novo mês
+    final lastDayOfNewMonth = DateTime(newYear, newMonthValue + 1, 0).day;
+    
+    // Se o dia selecionado existe no novo mês, usar o mesmo dia
+    if (selectedDay <= lastDayOfNewMonth) {
+      return DateTime(newYear, newMonthValue, selectedDay);
+    } else {
+      // Caso contrário, usar o último dia do novo mês
+      return DateTime(newYear, newMonthValue, lastDayOfNewMonth);
+    }
   }
 
   Future<void> _showAddEventDialog() async {
@@ -141,6 +171,443 @@ class _CalendarPageState extends State<CalendarPage> {
     if (result == true) {
       await _loadEvents();
     }
+  }
+
+  /// Obtém todos os domingos do mês
+  List<DateTime> _getSundaysInMonth(DateTime month) {
+    final monthStart = DateTime(month.year, month.month, 1);
+    final sundays = <DateTime>[];
+
+    // Encontrar o primeiro domingo do mês
+    // weekday: 1=segunda, 2=terça, ..., 7=domingo
+    final firstSundayOffset = monthStart.weekday == 7 ? 0 : 7 - monthStart.weekday;
+    
+    DateTime currentSunday = monthStart.add(Duration(days: firstSundayOffset));
+
+    // Adicionar todos os domingos do mês
+    while (currentSunday.year == monthStart.year && 
+           currentSunday.month == monthStart.month) {
+      sundays.add(DateTime(currentSunday.year, currentSunday.month, currentSunday.day));
+      currentSunday = currentSunday.add(const Duration(days: 7));
+    }
+
+    return sundays;
+  }
+
+  /// Obtém todas as quartas-feiras do mês
+  List<DateTime> _getWednesdaysInMonth(DateTime month) {
+    final monthStart = DateTime(month.year, month.month, 1);
+    final wednesdays = <DateTime>[];
+
+    // Encontrar a primeira quarta-feira do mês
+    int firstWednesdayOffset = 3 - monthStart.weekday;
+    if (firstWednesdayOffset < 0) {
+      firstWednesdayOffset += 7;
+    }
+
+    DateTime currentWednesday = monthStart.add(Duration(days: firstWednesdayOffset));
+
+    // Adicionar todas as quartas-feiras do mês
+    while (currentWednesday.year == monthStart.year && 
+           currentWednesday.month == monthStart.month) {
+      wednesdays.add(DateTime(currentWednesday.year, currentWednesday.month, currentWednesday.day));
+      currentWednesday = currentWednesday.add(const Duration(days: 7));
+    }
+
+    return wednesdays;
+  }
+
+  /// Busca o ID de um template pelo nome
+  Future<String?> _findTemplateIdByName(String name) async {
+    try {
+      final repository = context.read<EventsRepository>();
+      final templates = await repository.fetchAllTemplates();
+      final template = templates.firstWhere(
+        (t) => t.name == name,
+        orElse: () => throw Exception('Template não encontrado'),
+      );
+      return template.id;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Determina qual semana do mês uma data pertence (1-5)
+  /// Baseado no primeiro domingo/quarta do mês, independente de quando o mês começou
+  int _getWeekOfMonthForSunday(DateTime date, DateTime month) {
+    final firstSunday = _getSundaysInMonth(month).first;
+    final daysDifference = date.difference(firstSunday).inDays;
+    return (daysDifference ~/ 7) + 1;
+  }
+
+  int _getWeekOfMonthForWednesday(DateTime date, DateTime month) {
+    final firstWednesday = _getWednesdaysInMonth(month).first;
+    final daysDifference = date.difference(firstWednesday).inDays;
+    return (daysDifference ~/ 7) + 1;
+  }
+
+  /// Seleciona aleatoriamente uma sociedade das 4 semanas configuradas
+  String? _selectRandomSocietyForWeek5(
+    List<WeeklyTeamAssignment> assignments,
+    String responsibility,
+  ) {
+    final societies = <String>[];
+    
+    for (final assignment in assignments) {
+      String? societyId;
+      switch (responsibility) {
+        case 'liturgia':
+          societyId = assignment.liturgia;
+          break;
+        case 'lanche':
+          societyId = assignment.lanche;
+          break;
+        case 'aberturaEbd':
+          societyId = assignment.aberturaEbd;
+          break;
+        case 'reuniaoOracao':
+          societyId = assignment.reuniaoOracao;
+          break;
+      }
+      
+      if (societyId != null && societyId.isNotEmpty) {
+        societies.add(societyId);
+      }
+    }
+    
+    if (societies.isEmpty) return null;
+    
+    final random = Random();
+    return societies[random.nextInt(societies.length)];
+  }
+
+  /// Obtém a sociedade responsável para uma semana específica e responsabilidade
+  String? _getSocietyForWeek(
+    List<WeeklyTeamAssignment> assignments,
+    int weekNumber,
+    String responsibility,
+  ) {
+    // Se for semana 5, usar seleção aleatória
+    if (weekNumber > 4) {
+      return _selectRandomSocietyForWeek5(assignments, responsibility);
+    }
+    
+    final assignment = assignments.firstWhere(
+      (a) => a.weekNumber == weekNumber,
+      orElse: () => WeeklyTeamAssignment(weekNumber: weekNumber),
+    );
+    
+    String? societyId;
+    switch (responsibility) {
+      case 'liturgia':
+        societyId = assignment.liturgia;
+        break;
+      case 'lanche':
+        societyId = assignment.lanche;
+        break;
+      case 'aberturaEbd':
+        societyId = assignment.aberturaEbd;
+        break;
+      case 'reuniaoOracao':
+        societyId = assignment.reuniaoOracao;
+        break;
+      default:
+        return null;
+    }
+    
+    // Retornar null se for string vazia ou null
+    if (societyId == null || societyId.isEmpty) {
+      return null;
+    }
+    
+    return societyId;
+  }
+
+  /// Cria todos os eventos fixos do mês (Cultos, EBDs e Reuniões de Oração)
+  Future<void> _createAllMonthlyEvents(DateTime month) async {
+    final repository = context.read<EventsRepository>();
+    final assignmentsRepository = context.read<WeeklyTeamAssignmentsRepository>();
+    
+    // Buscar IDs dos templates e configurações semanais
+    final results = await Future.wait([
+      _findTemplateIdByName('Culto à noite'),
+      _findTemplateIdByName('Culto de Ceia'),
+      _findTemplateIdByName('Escola Bíblica'),
+      _findTemplateIdByName('Reunião de Oração'),
+      assignmentsRepository.fetchAll(),
+    ]);
+    
+    final cultoNoiteId = results[0] as String?;
+    final cultoCeiId = results[1] as String?;
+    final ebdId = results[2] as String?;
+    final reuniaoOracaoId = results[3] as String?;
+    final weeklyAssignments = results[4] as List<WeeklyTeamAssignment>;
+
+    int totalCreated = 0;
+    int totalSkipped = 0;
+
+    // Criar eventos de Reunião de Oração (quartas às 19h30)
+    if (reuniaoOracaoId != null) {
+      final wednesdays = _getWednesdaysInMonth(month);
+      for (final date in wednesdays) {
+        try {
+          final event = await repository.createEvent(
+            name: 'Reunião de Oração',
+            date: date,
+            start: '19:30',
+            templateId: reuniaoOracaoId,
+          );
+          
+          // Aplicar equipe responsável
+          final weekNumber = _getWeekOfMonthForWednesday(date, month);
+          final societyId = _getSocietyForWeek(
+            weeklyAssignments,
+            weekNumber,
+            'reuniaoOracao',
+          );
+          
+          if (societyId != null && societyId.isNotEmpty) {
+            await repository.updateEventDetails(
+              id: event.id,
+              steps: event.steps,
+              people: event.people,
+              teams: EventTeams(
+                reuniaoOracao: societyId,
+              ),
+            );
+          }
+          
+          totalCreated++;
+        } catch (e) {
+          totalSkipped++;
+        }
+      }
+    }
+
+    // Criar eventos de Escola Bíblica (domingos às 10h)
+    if (ebdId != null) {
+      final sundays = _getSundaysInMonth(month);
+      for (final date in sundays) {
+        try {
+          final event = await repository.createEvent(
+            name: 'Escola Bíblica',
+            date: date,
+            start: '10:00',
+            templateId: ebdId,
+          );
+          
+          // Aplicar equipe responsável (Abertura EBD)
+          final weekNumber = _getWeekOfMonthForSunday(date, month);
+          final societyId = _getSocietyForWeek(
+            weeklyAssignments,
+            weekNumber,
+            'aberturaEbd',
+          );
+          
+          if (societyId != null && societyId.isNotEmpty) {
+            await repository.updateEventDetails(
+              id: event.id,
+              steps: event.steps,
+              people: event.people,
+              teams: EventTeams(
+                aberturaEbd: societyId,
+              ),
+            );
+          }
+          
+          totalCreated++;
+        } catch (e) {
+          totalSkipped++;
+        }
+      }
+    }
+
+    // Criar eventos de Culto à noite (domingos às 19h30)
+    // Primeiro domingo: Culto de Ceia, demais: Culto à noite
+    if (cultoNoiteId != null) {
+      final sundays = _getSundaysInMonth(month);
+      for (int i = 0; i < sundays.length; i++) {
+        final date = sundays[i];
+        final isFirstSunday = i == 0;
+        final templateId = isFirstSunday && cultoCeiId != null ? cultoCeiId : cultoNoiteId;
+        final eventName = isFirstSunday && cultoCeiId != null ? 'Culto de Ceia' : 'Culto à noite';
+
+        try {
+          final event = await repository.createEvent(
+            name: eventName,
+            date: date,
+            start: '19:30',
+            templateId: templateId,
+          );
+          
+          // Aplicar equipes responsáveis (Liturgia e Lanche)
+          final weekNumber = _getWeekOfMonthForSunday(date, month);
+          final liturgiaId = _getSocietyForWeek(
+            weeklyAssignments,
+            weekNumber,
+            'liturgia',
+          );
+          final lancheId = _getSocietyForWeek(
+            weeklyAssignments,
+            weekNumber,
+            'lanche',
+          );
+          
+          // Sempre criar EventTeams (mesmo que alguns valores sejam null)
+          // O repository só atualiza os campos não-null
+          final liturgiaFinal = (liturgiaId != null && liturgiaId.isNotEmpty) ? liturgiaId : null;
+          final lancheFinal = (lancheId != null && lancheId.isNotEmpty) ? lancheId : null;
+          
+          if (liturgiaFinal != null || lancheFinal != null) {
+            await repository.updateEventDetails(
+              id: event.id,
+              steps: event.steps,
+              people: event.people,
+              teams: EventTeams(
+                liturgia: liturgiaFinal,
+                lanche: lancheFinal,
+              ),
+            );
+          }
+          
+          totalCreated++;
+        } catch (e) {
+          totalSkipped++;
+        }
+      }
+    }
+
+    if (mounted) {
+      if (totalCreated > 0) {
+        showSuccessToast(
+          context,
+          '$totalCreated evento(s) criado(s) com sucesso${totalSkipped > 0 ? " ($totalSkipped ignorado(s))" : ""}!',
+        );
+      } else {
+        showErrorToast(context, 'Nenhum evento foi criado.');
+      }
+    }
+  }
+
+  Future<void> _showBatchEventCreator() async {
+    // Obter o nome do mês em português
+    final monthName = DateFormat('MMMM', 'pt_BR').format(_focusedDay);
+    final capitalizedMonthName = monthName[0].toUpperCase() + monthName.substring(1);
+
+    // Mostrar diálogo de confirmação
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1A1F2E),
+        title: const Text(
+          'Criar compromissos fixos',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Você quer mesmo criar os eventos para todos os cultos, EBDs e reuniões de oração para o mês de $capitalizedMonthName?',
+          style: const TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // Mostrar loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          color: Color(0xFF1A1F2E),
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text(
+                  'Criando eventos...',
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Aguardar um pouco para garantir que o loading seja visível
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Criar todos os eventos
+      await _createAllMonthlyEvents(_focusedDay);
+      
+      // Manter o loading por pelo menos 2-3 segundos no total
+      await Future.delayed(const Duration(milliseconds: 2000));
+    } catch (error) {
+      if (mounted) {
+        showErrorToast(
+          context,
+          'Erro ao criar eventos: ${error.toString()}',
+        );
+      }
+    } finally {
+      if (mounted) {
+        Navigator.of(context).pop(); // Fechar o loading
+        await _loadEvents();
+      }
+    }
+  }
+
+  void _showAddEventMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF1A1F2E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.event, color: Colors.white70),
+                  title: const Text('Novo Evento'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showAddEventDialog();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.event_note, color: Colors.white70),
+                  title: const Text('Criar compromissos fixos para o mês selecionado'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    _showBatchEventCreator();
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _editEvent(CalendarEventModel event) async {
@@ -202,6 +669,8 @@ class _CalendarPageState extends State<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final currentUser = context.watch<AppState>().currentUser;
+    final isAdmin = currentUser?.isAdmin ?? false;
 
     final content = Column(
       children: [
@@ -387,15 +856,20 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
           // Botão de adicionar (mesma posição que Planejar e Músicas)
-          Positioned(
-            bottom: 130,
-            right: 0,
-            child: FloatingActionButton(
-              heroTag: 'add',
-              onPressed: _showAddEventDialog,
-              child: const Icon(Icons.add),
+          // Quando na visualização Mês, exibir menu com opções
+          // Só exibir se o usuário for admin
+          if (isAdmin)
+            Positioned(
+              bottom: 130,
+              right: 0,
+              child: FloatingActionButton(
+                heroTag: 'add',
+                onPressed: (_viewMode == CalendarViewMode.month)
+                    ? _showAddEventMenu
+                    : _showAddEventDialog,
+                child: const Icon(Icons.add),
+              ),
             ),
-          ),
         ],
       );
     }
@@ -425,15 +899,19 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
           // Botão de adicionar (posição padrão do Flutter: bottom: 16, right: 16)
-          Positioned(
-            bottom: 16,
-            right: 16,
-            child: FloatingActionButton(
-              heroTag: 'add',
-              onPressed: _showAddEventDialog,
-              child: const Icon(Icons.add),
+          // Só exibir se o usuário for admin
+          if (isAdmin)
+            Positioned(
+              bottom: 16,
+              right: 16,
+              child: FloatingActionButton(
+                heroTag: 'add',
+                onPressed: (_viewMode == CalendarViewMode.month)
+                    ? _showAddEventMenu
+                    : _showAddEventDialog,
+                child: const Icon(Icons.add),
+              ),
             ),
-          ),
         ],
       ),
     );

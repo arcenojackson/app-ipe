@@ -148,17 +148,15 @@ class _SocietiesPageState extends State<SocietiesPage> {
                                       const SizedBox(height: 16),
                                   itemBuilder: (context, index) {
                                     final society = _societies[index];
-                                    final isCreator = user?.id == society.userId;
                                     final isAdmin = user?.isAdmin ?? false;
-                                    final canEdit = isCreator || isAdmin;
 
                                     return _SocietyCard(
                                       society: society,
                                       onOpen: () => _openSociety(society),
-                                      onEdit: canEdit
+                                      onEdit: isAdmin
                                           ? () => _onEditSociety(society)
                                           : null,
-                                      onDelete: canEdit
+                                      onDelete: isAdmin
                                           ? () => _onDeleteSociety(society)
                                           : null,
                                     );
@@ -308,23 +306,24 @@ class _SocietyCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                IconButton(
-                  tooltip: 'Editar',
-                  icon: const Icon(Icons.edit_outlined, size: 20),
-                  onPressed: onEdit,
-                  color: onEdit == null ? Colors.white38 : null,
-                ),
-                IconButton(
-                  tooltip: 'Excluir',
-                  icon: const Icon(Icons.delete_outline, size: 20),
-                  onPressed: onDelete,
-                  color: onDelete == null ? Colors.white38 : null,
-                ),
-              ],
-            ),
+            if (onEdit != null || onDelete != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (onEdit != null)
+                    IconButton(
+                      tooltip: 'Editar',
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      onPressed: onEdit,
+                    ),
+                  if (onDelete != null)
+                    IconButton(
+                      tooltip: 'Excluir',
+                      icon: const Icon(Icons.delete_outline, size: 20),
+                      onPressed: onDelete,
+                    ),
+                ],
+              ),
           ],
         ),
       ),

@@ -106,6 +106,7 @@ class EventsRepository {
         'userId': userId,
         'people': <String>[],
         'steps': steps.map((step) => step.toJson()).toList(),
+        'templateId': templateId, // Salvar o ID do template (pode ser null)
       };
 
       await docRef.set(eventData);
@@ -130,19 +131,62 @@ class EventsRepository {
     required String name,
     required DateTime date,
     required String start,
+    String? templateId,
   }) async {
     try {
-      await _firestore.collection('services').doc(id).update({
+      final updateData = <String, dynamic>{
         'name': name,
         'date': Timestamp.fromDate(date),
         'start': start,
-      });
+      };
+      
+      // Incluir templateId no update (pode ser null para remover o template)
+      updateData['templateId'] = templateId;
+      
+      await _firestore.collection('services').doc(id).update(updateData);
 
       // Buscar o documento atualizado
       return await fetchById(id);
     } catch (e) {
       if (e is AppException) rethrow;
       throw AppException(message: 'Erro ao atualizar serviço: ${e.toString()}');
+    }
+  }
+
+  /// Atualiza o template de um evento
+  /// Remove todos os steps do tipo "step" e adiciona os steps do novo template
+  /// Mantém todos os steps do tipo "music"
+  Future<EventModel> updateEventTemplate({
+    required String eventId,
+    required String templateId,
+  }) async {
+    try {
+      // Buscar o evento atual
+      final event = await fetchById(eventId);
+      
+      // Buscar o novo template
+      final template = await fetchTemplateById(templateId);
+      
+      // Filtrar apenas as músicas do evento atual
+      final musicSteps = event.steps
+          .where((step) => step.type == EventStepType.music)
+          .toList();
+      
+      // Combinar: steps do template + músicas existentes
+      final newSteps = [...template.steps, ...musicSteps];
+      
+      // Atualizar o evento com os novos steps
+      await _firestore.collection('services').doc(eventId).update({
+        'steps': newSteps.map((step) => step.toJson()).toList(),
+      });
+      
+      // Retornar o evento atualizado
+      return await fetchById(eventId);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException(
+        message: 'Erro ao atualizar template do evento: ${e.toString()}',
+      );
     }
   }
 
@@ -158,12 +202,78 @@ class EventsRepository {
     required String id,
     required List<EventStepModel> steps,
     required EventPeople people,
+    EventTeams? teams,
   }) async {
     try {
-      await _firestore.collection('services').doc(id).update({
+      final updateData = <String, dynamic>{
         'steps': steps.map((step) => step.toJson()).toList(),
         'people': people.toJson(),
-      });
+      };
+      
+      // Para teams, incluir todos os campos (null ou não) para que campos null sejam removidos
+      final teamsData = <String, dynamic>{};
+      if (teams != null) {
+        // Incluir todos os campos, mesmo os null, para que sejam removidos do Firestore
+        teamsData['liturgia'] = teams.liturgia;
+        teamsData['lanche'] = teams.lanche;
+        teamsData['aberturaEbd'] = teams.aberturaEbd;
+        teamsData['reuniaoOracao'] = teams.reuniaoOracao;
+        
+        // Remover campos null antes de salvar (para não enviar null ao Firestore)
+        // Em vez disso, vamos usar FieldValue.delete() para campos null
+        final teamsToUpdate = <String, dynamic>{};
+        if (teams.liturgia != null) {
+          teamsToUpdate['liturgia'] = teams.liturgia;
+        }
+        if (teams.lanche != null) {
+          teamsToUpdate['lanche'] = teams.lanche;
+        }
+        if (teams.aberturaEbd != null) {
+          teamsToUpdate['aberturaEbd'] = teams.aberturaEbd;
+        }
+        if (teams.reuniaoOracao != null) {
+          teamsToUpdate['reuniaoOracao'] = teams.reuniaoOracao;
+        }
+        
+        // Adicionar campos não-null ao updateData
+        updateData['teams'] = teamsToUpdate;
+      } else {
+        // Se teams é null, não incluir no update
+      }
+      
+      // Processar teams: incluir apenas campos não-null
+      // Quando atualizamos o objeto teams completo, campos que não estão incluídos são removidos
+      if (teams != null) {
+        final teamsToUpdate = <String, dynamic>{};
+        if (teams.liturgia != null) {
+          teamsToUpdate['liturgia'] = teams.liturgia!;
+        }
+        if (teams.lanche != null) {
+          teamsToUpdate['lanche'] = teams.lanche!;
+        }
+        if (teams.aberturaEbd != null) {
+          teamsToUpdate['aberturaEbd'] = teams.aberturaEbd!;
+        }
+        if (teams.reuniaoOracao != null) {
+          teamsToUpdate['reuniaoOracao'] = teams.reuniaoOracao!;
+        }
+        
+        // Verificar se há equipes existentes para decidir se remove o objeto ou atualiza
+        final doc = await _firestore.collection('services').doc(id).get();
+        final currentData = doc.data();
+        final hasExistingTeams = currentData?['teams'] != null;
+        
+        if (teamsToUpdate.isEmpty && hasExistingTeams) {
+          // Se não há equipes e havia antes, remover o objeto teams completamente
+          updateData['teams'] = FieldValue.delete();
+        } else if (teamsToUpdate.isNotEmpty) {
+          // Incluir apenas campos não-null - substitui o objeto teams completo
+          // Campos que não estão no teamsToUpdate serão removidos automaticamente
+          updateData['teams'] = teamsToUpdate;
+        }
+      }
+      
+      await _firestore.collection('services').doc(id).update(updateData);
     } catch (e) {
       throw AppException(
         message: 'Erro ao atualizar detalhes do serviço: ${e.toString()}',
@@ -245,6 +355,42 @@ class EventsRepository {
         }
         return EventModel.fromJson(data);
       }).toList();
+    } catch (e) {
+      throw AppException(message: 'Erro ao carregar serviços: ${e.toString()}');
+    }
+  }
+
+  /// Busca services filtrados por templates
+  /// Se templateIds contém 'NO_TEMPLATE', inclui eventos sem template
+  Future<List<EventModel>> fetchServicesByTemplates(
+    List<String> templateIds,
+  ) async {
+    try {
+      final snapshot = await _firestore.collection('services').get();
+
+      return snapshot.docs
+          .where((doc) {
+            final data = doc.data();
+            final eventTemplateId = data['templateId']?.toString();
+            
+            // Se a lista contém 'NO_TEMPLATE', incluir eventos sem template
+            if (templateIds.contains('NO_TEMPLATE') && eventTemplateId == null) {
+              return true;
+            }
+            
+            // Verificar se o templateId do evento está na lista de filtros
+            return eventTemplateId != null && templateIds.contains(eventTemplateId);
+          })
+          .map((doc) {
+            final data = doc.data();
+            data['id'] = doc.id;
+            // Converter Timestamp do Firestore para DateTime se necessário
+            if (data['date'] != null && data['date'] is Timestamp) {
+              data['date'] = (data['date'] as Timestamp).toDate();
+            }
+            return EventModel.fromJson(data);
+          })
+          .toList();
     } catch (e) {
       throw AppException(message: 'Erro ao carregar serviços: ${e.toString()}');
     }
