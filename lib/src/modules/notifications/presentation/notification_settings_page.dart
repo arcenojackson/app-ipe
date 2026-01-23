@@ -10,7 +10,8 @@ class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
 
   @override
-  State<NotificationSettingsPage> createState() => _NotificationSettingsPageState();
+  State<NotificationSettingsPage> createState() =>
+      _NotificationSettingsPageState();
 }
 
 class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
@@ -143,9 +144,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               Expanded(
                 child: _isLoading
                     ? const Center(
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                        ),
+                        child: CircularProgressIndicator(color: Colors.white),
                       )
                     : ListView(
                         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -158,7 +157,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                                 Container(
                                   padding: const EdgeInsets.all(12),
                                   decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary.withOpacity(0.15),
+                                    color: theme.colorScheme.primary
+                                        .withOpacity(0.15),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Icon(
@@ -195,11 +195,36 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                             padding: EdgeInsets.zero,
                             child: Column(
                               children: [
-                                for (int i = 0; i < NotificationType.values.length; i++) ...[
-                                  _buildNotificationTile(NotificationType.values[i]),
-                                  if (i < NotificationType.values.length - 1)
-                                    const Divider(height: 1, color: Colors.white12),
-                                ],
+                                // Filtrar notificações, removendo eventUpdate
+                                Builder(
+                                  builder: (context) {
+                                    final visibleTypes = NotificationType.values
+                                        .where(
+                                          (type) =>
+                                              type !=
+                                              NotificationType.eventUpdate,
+                                        )
+                                        .toList();
+                                    return Column(
+                                      children: [
+                                        for (
+                                          int i = 0;
+                                          i < visibleTypes.length;
+                                          i++
+                                        ) ...[
+                                          _buildNotificationTile(
+                                            visibleTypes[i],
+                                          ),
+                                          if (i < visibleTypes.length - 1)
+                                            const Divider(
+                                              height: 1,
+                                              color: Colors.white12,
+                                            ),
+                                        ],
+                                      ],
+                                    );
+                                  },
+                                ),
                               ],
                             ),
                           ),
@@ -231,14 +256,9 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       ),
       subtitle: Text(
         type.description,
-        style: theme.textTheme.bodySmall?.copyWith(
-          color: Colors.white60,
-        ),
+        style: theme.textTheme.bodySmall?.copyWith(color: Colors.white60),
       ),
-      contentPadding: const EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 8,
-      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
     );
   }
 }

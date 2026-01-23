@@ -5,6 +5,7 @@ import '../../../auth/models/user.dart';
 import '../../../events/data/events_repository.dart';
 import '../../../societies/data/societies_repository.dart';
 import '../../../../shared/utils/platform_utils.dart';
+import '../../../../shared/utils/sort_utils.dart';
 
 class PeopleSelectorSheet extends StatefulWidget {
   const PeopleSelectorSheet({
@@ -79,9 +80,9 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
             return name.contains(_searchQuery) || email.contains(_searchQuery);
           }).toList();
         }
-        // Ordenar por nome alfabeticamente
+        // Ordenar por nome alfabeticamente (ignorando acentos)
         _filteredPeople.sort(
-          (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          (a, b) => compareNamesIgnoreAccents(a.name, b.name),
         );
       });
       return;
@@ -152,9 +153,9 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
         }).toList();
       }
 
-      // Ordenar por nome alfabeticamente
+      // Ordenar por nome alfabeticamente (ignorando acentos)
       filteredPeople.sort(
-        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        (a, b) => compareNamesIgnoreAccents(a.name, b.name),
       );
 
       setState(() {

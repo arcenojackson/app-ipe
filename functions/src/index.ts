@@ -1197,3 +1197,415 @@ export const eloAvailabilityReminder = functions
       return null;
     }
   });
+
+// Interface para dados de pessoas em eventos
+interface PeopleData {
+  elo?: string[];
+  preacher?: string[];
+  lead?: string[];
+  soundImage?: string[];
+  diaconia?: string[];
+  eloWithInstruments?: Record<string, unknown>;
+}
+
+/**
+ * Função que detecta quando um usuário é adicionado à escala de um evento
+ * e envia notificação push para o usuário escalado
+ */
+export const onServicePeopleUpdated = functions.firestore
+  .document("services/{eventId}")
+  .onUpdate(async (change, context) => {
+    const {eventId} = context.params;
+    const beforeData = change.before.data();
+    const afterData = change.after.data();
+
+    try {
+      // Comparar pessoas antes e depois
+      const beforePeople = beforeData.people || {};
+      const afterPeople = afterData.people || {};
+
+      // Buscar informações do evento
+      const eventName = afterData.name || "Evento";
+      const eventDate = afterData.date;
+
+      // Formatar data do evento
+      let formattedDate = "";
+      if (eventDate) {
+        const date = eventDate.toDate ?
+          eventDate.toDate() :
+          new Date(eventDate);
+        formattedDate = date.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+        });
+      }
+
+      // Função auxiliar para coletar todos os IDs de pessoas
+
+      const getAllPeopleIds = (people: PeopleData): Set<string> => {
+        const ids = new Set<string>();
+
+        if (Array.isArray(people.elo)) {
+          people.elo.forEach((id: string) => ids.add(id));
+        }
+        if (Array.isArray(people.preacher)) {
+          people.preacher.forEach((id: string) => ids.add(id));
+        }
+        if (Array.isArray(people.lead)) {
+          people.lead.forEach((id: string) => ids.add(id));
+        }
+        if (Array.isArray(people.soundImage)) {
+          people.soundImage.forEach((id: string) => ids.add(id));
+        }
+        if (Array.isArray(people.diaconia)) {
+          people.diaconia.forEach((id: string) => ids.add(id));
+        }
+        if (people.eloWithInstruments &&
+          typeof people.eloWithInstruments === "object") {
+          Object.keys(people.eloWithInstruments)
+            .forEach((id: string) => ids.add(id));
+        }
+
+        return ids;
+      };
+
+      const beforeIds = getAllPeopleIds(beforePeople as PeopleData);
+      const afterIds = getAllPeopleIds(afterPeople as PeopleData);
+
+      // Encontrar usuários recém-adicionados
+      const newlyAddedIds = Array.from(afterIds)
+        .filter((id) => !beforeIds.has(id));
+
+      if (newlyAddedIds.length === 0) {
+        return null; // Nenhum usuário foi adicionado
+      }
+
+      // Buscar dados dos usuários recém-adicionados
+      const userDocs = await Promise.all(
+        newlyAddedIds.map((userId) =>
+          admin.firestore().collection("users").doc(userId).get()
+        )
+      );
+
+      const messages: admin.messaging.Message[] = [];
+
+      for (let i = 0; i < userDocs.length; i++) {
+        const userDoc = userDocs[i];
+        const userId = newlyAddedIds[i];
+
+        if (!userDoc.exists) continue;
+
+        const userData = userDoc.data();
+        const fcmToken = userData?.fcmToken;
+
+        if (!fcmToken) continue;
+
+        // Verificar se a notificação de inclusão em escala está habilitada
+        const disabledNotifications =
+          userData?.disabled_notifications || [];
+        const isScaleInclusionEnabled =
+          !disabledNotifications.includes("scale_inclusion");
+
+        if (!isScaleInclusionEnabled) continue;
+
+        // Determinar o papel/função do usuário na escala
+        const peopleData = afterPeople as PeopleData;
+        let roleText = "";
+
+        // Verificar se é dirigente
+        if (Array.isArray(peopleData.lead) &&
+          peopleData.lead.includes(userId)) {
+          roleText = "Dirigente da liturgia";
+        } else if (Array.isArray(peopleData.preacher) &&
+          peopleData.preacher.includes(userId)) {
+          // Verificar se é pregador
+          roleText = "Pregador";
+        } else if (peopleData.eloWithInstruments &&
+          typeof peopleData.eloWithInstruments === "object" &&
+          peopleData.eloWithInstruments[userId]) {
+          // Verificar se é ELO com instrumento
+          const instruments = peopleData.eloWithInstruments[userId];
+          const instrumentNames = Object.keys(instruments);
+          if (instrumentNames.length > 0) {
+            // Pegar o primeiro instrumento
+            const instrument = instrumentNames[0];
+            roleText = `Equipe de louvor - ${instrument}`;
+          }
+        } else if (Array.isArray(peopleData.elo) &&
+          peopleData.elo.includes(userId)) {
+          // Verificar se é ELO antigo (sem instrumento específico)
+          roleText = "Equipe de louvor";
+        } else if (Array.isArray(peopleData.soundImage) &&
+          peopleData.soundImage.includes(userId)) {
+          // Verificar outros tipos
+          roleText = "Som e Imagem";
+        } else if (Array.isArray(peopleData.diaconia) &&
+          peopleData.diaconia.includes(userId)) {
+          roleText = "Diaconia";
+        }
+
+        if (!roleText) continue; // Se não encontrou o papel, pular
+
+        // Criar mensagem da notificação
+        const notificationBody =
+          `Você foi escalado para o ${eventName}, ` +
+          `${formattedDate}: ${roleText}`;
+
+        messages.push({
+          notification: {
+            title: "Você foi escalado",
+            body: notificationBody,
+          },
+          data: {
+            type: "scale_inclusion",
+            eventId: eventId,
+            eventName: eventName,
+            role: roleText,
+          },
+          token: fcmToken,
+          android: {
+            priority: "high",
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+                badge: 1,
+              },
+            },
+          },
+        });
+      }
+
+      // Enviar notificações
+      if (messages.length > 0) {
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (const message of messages) {
+          try {
+            await admin.messaging().send(message);
+            successCount++;
+          } catch (sendError) {
+            failureCount++;
+            console.error(
+              "Erro ao enviar notificação de escalação:",
+              sendError
+            );
+          }
+        }
+
+        console.log(
+          "Notificações de escalação enviadas: " +
+          `${successCount}/${messages.length} ` +
+          `(${failureCount} falhas)`
+        );
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Erro ao processar atualização de escala:", error);
+      return null;
+    }
+  });
+
+/**
+ * Função que detecta quando músicas são adicionadas ou alteradas
+ * nas etapas de um evento e envia notificação push para todos os
+ * usuários escalados no evento
+ */
+export const onServiceStepsUpdated = functions.firestore
+  .document("services/{eventId}")
+  .onUpdate(async (change, context) => {
+    const {eventId} = context.params;
+    const beforeData = change.before.data();
+    const afterData = change.after.data();
+
+    try {
+      // Comparar steps antes e depois
+      const beforeSteps = beforeData.steps || [];
+      const afterSteps = afterData.steps || [];
+
+      // Verificar se há mudanças em músicas (steps do tipo "music")
+      interface StepData {
+        type?: string;
+        musicId?: string;
+        title?: string;
+        musicTone?: string;
+      }
+
+      const beforeMusicSteps = beforeSteps
+        .filter((step: StepData) => step.type === "music");
+      const afterMusicSteps = afterSteps
+        .filter((step: StepData) => step.type === "music");
+
+      // Verificar se houve adição ou alteração de músicas
+      // Comparar quantidade e conteúdo (título, musicId, musicTone)
+      const beforeMusicIds = new Set(
+        beforeMusicSteps.map((step: StepData) =>
+          `${step.musicId || ""}_${step.title || ""}_${step.musicTone || ""}`
+        )
+      );
+      const afterMusicIds = new Set(
+        afterMusicSteps.map((step: StepData) =>
+          `${step.musicId || ""}_${step.title || ""}_${step.musicTone || ""}`
+        )
+      );
+
+      // Verificar se houve mudança (adição, remoção ou alteração)
+      const musicChanged =
+        beforeMusicSteps.length !== afterMusicSteps.length ||
+        beforeMusicIds.size !== afterMusicIds.size ||
+        Array.from(beforeMusicIds).some((id) => !afterMusicIds.has(id)) ||
+        Array.from(afterMusicIds).some((id) => !beforeMusicIds.has(id));
+
+      if (!musicChanged) {
+        return null; // Nenhuma mudança em músicas
+      }
+
+      // Buscar informações do evento
+      const eventName = afterData.name || "Evento";
+      const eventDate = afterData.date;
+
+      // Formatar data do evento
+      let formattedDate = "";
+      if (eventDate) {
+        const date = eventDate.toDate ?
+          eventDate.toDate() :
+          new Date(eventDate);
+        formattedDate = date.toLocaleDateString("pt-BR", {
+          day: "2-digit",
+          month: "2-digit",
+        });
+      }
+
+      // Coletar todos os IDs de usuários escalados no evento
+      const people = (afterData.people || {}) as PeopleData;
+      const scaledUserIds = new Set<string>();
+
+      if (Array.isArray(people.elo)) {
+        people.elo.forEach((id: string) => scaledUserIds.add(id));
+      }
+      if (Array.isArray(people.preacher)) {
+        people.preacher.forEach((id: string) => scaledUserIds.add(id));
+      }
+      if (Array.isArray(people.lead)) {
+        people.lead.forEach((id: string) => scaledUserIds.add(id));
+      }
+      if (Array.isArray(people.soundImage)) {
+        people.soundImage.forEach((id: string) => scaledUserIds.add(id));
+      }
+      if (Array.isArray(people.diaconia)) {
+        people.diaconia.forEach((id: string) => scaledUserIds.add(id));
+      }
+      if (people.eloWithInstruments &&
+        typeof people.eloWithInstruments === "object") {
+        Object.keys(people.eloWithInstruments)
+          .forEach((id: string) => scaledUserIds.add(id));
+      }
+
+      if (scaledUserIds.size === 0) {
+        return null; // Nenhum usuário escalado
+      }
+
+      // Buscar dados dos usuários escalados
+      const userDocs = await Promise.all(
+        Array.from(scaledUserIds).map((userId) =>
+          admin.firestore().collection("users").doc(userId).get()
+        )
+      );
+
+      const messages: admin.messaging.Message[] = [];
+
+      for (const userDoc of userDocs) {
+        if (!userDoc.exists) continue;
+
+        const userData = userDoc.data();
+        const fcmToken = userData?.fcmToken;
+
+        if (!fcmToken) continue;
+
+        // Verificar se a notificação de atualização de música está habilitada
+        const disabledNotifications =
+          userData?.disabled_notifications || [];
+        const isMusicUpdateEnabled =
+          !disabledNotifications.includes("music_update");
+
+        if (!isMusicUpdateEnabled) continue;
+
+        // Determinar se foi adição ou alteração
+        // Se há mais músicas depois, foi adição; se a quantidade é igual
+        // mas o conteúdo mudou, foi alteração
+        const wasAdded = afterMusicSteps.length > beforeMusicSteps.length;
+        const wasRemoved = afterMusicSteps.length < beforeMusicSteps.length;
+        let actionText = "alterada";
+        if (wasAdded) {
+          actionText = "adicionada";
+        } else if (wasRemoved) {
+          actionText = "removida";
+        } else {
+          // Quantidade igual mas conteúdo mudou
+          actionText = "alterada";
+        }
+
+        // Criar mensagem da notificação
+        const notificationBody =
+          `Música ${actionText} no ${eventName}, ${formattedDate}`;
+
+        messages.push({
+          notification: {
+            title: "Música atualizada",
+            body: notificationBody,
+          },
+          data: {
+            type: "music_update",
+            eventId: eventId,
+            eventName: eventName,
+            action: actionText,
+          },
+          token: fcmToken,
+          android: {
+            priority: "high",
+          },
+          apns: {
+            payload: {
+              aps: {
+                sound: "default",
+                badge: 1,
+              },
+            },
+          },
+        });
+      }
+
+      // Enviar notificações
+      if (messages.length > 0) {
+        let successCount = 0;
+        let failureCount = 0;
+
+        for (const message of messages) {
+          try {
+            await admin.messaging().send(message);
+            successCount++;
+          } catch (sendError) {
+            failureCount++;
+            console.error(
+              "Erro ao enviar notificação de música:",
+              sendError
+            );
+          }
+        }
+
+        console.log(
+          "Notificações de música enviadas: " +
+          `${successCount}/${messages.length} ` +
+          `(${failureCount} falhas)`
+        );
+      }
+
+      return null;
+    } catch (error) {
+      console.error("Erro ao processar atualização de músicas:", error);
+      return null;
+    }
+  });

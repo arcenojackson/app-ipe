@@ -126,8 +126,11 @@ class _CalendarPageState extends State<CalendarPage> {
 
   void _onPageChanged(DateTime focusedDay) {
     // Ajustar o dia selecionado para o novo mês
-    final newSelectedDay = _adjustSelectedDayForNewMonth(_selectedDay, focusedDay);
-    
+    final newSelectedDay = _adjustSelectedDayForNewMonth(
+      _selectedDay,
+      focusedDay,
+    );
+
     setState(() {
       _focusedDay = focusedDay;
       _selectedDay = newSelectedDay;
@@ -137,14 +140,17 @@ class _CalendarPageState extends State<CalendarPage> {
   /// Ajusta o dia selecionado quando o mês muda.
   /// Se o dia existe no novo mês, mantém o mesmo dia.
   /// Caso contrário, seleciona o último dia do novo mês.
-  DateTime _adjustSelectedDayForNewMonth(DateTime currentSelectedDay, DateTime newMonth) {
+  DateTime _adjustSelectedDayForNewMonth(
+    DateTime currentSelectedDay,
+    DateTime newMonth,
+  ) {
     final selectedDay = currentSelectedDay.day;
     final newYear = newMonth.year;
     final newMonthValue = newMonth.month;
-    
+
     // Calcular o último dia do novo mês
     final lastDayOfNewMonth = DateTime(newYear, newMonthValue + 1, 0).day;
-    
+
     // Se o dia selecionado existe no novo mês, usar o mesmo dia
     if (selectedDay <= lastDayOfNewMonth) {
       return DateTime(newYear, newMonthValue, selectedDay);
@@ -180,14 +186,18 @@ class _CalendarPageState extends State<CalendarPage> {
 
     // Encontrar o primeiro domingo do mês
     // weekday: 1=segunda, 2=terça, ..., 7=domingo
-    final firstSundayOffset = monthStart.weekday == 7 ? 0 : 7 - monthStart.weekday;
-    
+    final firstSundayOffset = monthStart.weekday == 7
+        ? 0
+        : 7 - monthStart.weekday;
+
     DateTime currentSunday = monthStart.add(Duration(days: firstSundayOffset));
 
     // Adicionar todos os domingos do mês
-    while (currentSunday.year == monthStart.year && 
-           currentSunday.month == monthStart.month) {
-      sundays.add(DateTime(currentSunday.year, currentSunday.month, currentSunday.day));
+    while (currentSunday.year == monthStart.year &&
+        currentSunday.month == monthStart.month) {
+      sundays.add(
+        DateTime(currentSunday.year, currentSunday.month, currentSunday.day),
+      );
       currentSunday = currentSunday.add(const Duration(days: 7));
     }
 
@@ -205,12 +215,20 @@ class _CalendarPageState extends State<CalendarPage> {
       firstWednesdayOffset += 7;
     }
 
-    DateTime currentWednesday = monthStart.add(Duration(days: firstWednesdayOffset));
+    DateTime currentWednesday = monthStart.add(
+      Duration(days: firstWednesdayOffset),
+    );
 
     // Adicionar todas as quartas-feiras do mês
-    while (currentWednesday.year == monthStart.year && 
-           currentWednesday.month == monthStart.month) {
-      wednesdays.add(DateTime(currentWednesday.year, currentWednesday.month, currentWednesday.day));
+    while (currentWednesday.year == monthStart.year &&
+        currentWednesday.month == monthStart.month) {
+      wednesdays.add(
+        DateTime(
+          currentWednesday.year,
+          currentWednesday.month,
+          currentWednesday.day,
+        ),
+      );
       currentWednesday = currentWednesday.add(const Duration(days: 7));
     }
 
@@ -252,7 +270,7 @@ class _CalendarPageState extends State<CalendarPage> {
     String responsibility,
   ) {
     final societies = <String>[];
-    
+
     for (final assignment in assignments) {
       String? societyId;
       switch (responsibility) {
@@ -269,14 +287,14 @@ class _CalendarPageState extends State<CalendarPage> {
           societyId = assignment.reuniaoOracao;
           break;
       }
-      
+
       if (societyId != null && societyId.isNotEmpty) {
         societies.add(societyId);
       }
     }
-    
+
     if (societies.isEmpty) return null;
-    
+
     final random = Random();
     return societies[random.nextInt(societies.length)];
   }
@@ -291,12 +309,12 @@ class _CalendarPageState extends State<CalendarPage> {
     if (weekNumber > 4) {
       return _selectRandomSocietyForWeek5(assignments, responsibility);
     }
-    
+
     final assignment = assignments.firstWhere(
       (a) => a.weekNumber == weekNumber,
       orElse: () => WeeklyTeamAssignment(weekNumber: weekNumber),
     );
-    
+
     String? societyId;
     switch (responsibility) {
       case 'liturgia':
@@ -314,20 +332,21 @@ class _CalendarPageState extends State<CalendarPage> {
       default:
         return null;
     }
-    
+
     // Retornar null se for string vazia ou null
     if (societyId == null || societyId.isEmpty) {
       return null;
     }
-    
+
     return societyId;
   }
 
   /// Cria todos os eventos fixos do mês (Cultos, EBDs e Reuniões de Oração)
   Future<void> _createAllMonthlyEvents(DateTime month) async {
     final repository = context.read<EventsRepository>();
-    final assignmentsRepository = context.read<WeeklyTeamAssignmentsRepository>();
-    
+    final assignmentsRepository = context
+        .read<WeeklyTeamAssignmentsRepository>();
+
     // Buscar IDs dos templates e configurações semanais
     final results = await Future.wait([
       _findTemplateIdByName('Culto à noite'),
@@ -336,7 +355,7 @@ class _CalendarPageState extends State<CalendarPage> {
       _findTemplateIdByName('Reunião de Oração'),
       assignmentsRepository.fetchAll(),
     ]);
-    
+
     final cultoNoiteId = results[0] as String?;
     final cultoCeiId = results[1] as String?;
     final ebdId = results[2] as String?;
@@ -357,7 +376,7 @@ class _CalendarPageState extends State<CalendarPage> {
             start: '19:30',
             templateId: reuniaoOracaoId,
           );
-          
+
           // Aplicar equipe responsável
           final weekNumber = _getWeekOfMonthForWednesday(date, month);
           final societyId = _getSocietyForWeek(
@@ -365,18 +384,16 @@ class _CalendarPageState extends State<CalendarPage> {
             weekNumber,
             'reuniaoOracao',
           );
-          
+
           if (societyId != null && societyId.isNotEmpty) {
             await repository.updateEventDetails(
               id: event.id,
               steps: event.steps,
               people: event.people,
-              teams: EventTeams(
-                reuniaoOracao: societyId,
-              ),
+              teams: EventTeams(reuniaoOracao: societyId),
             );
           }
-          
+
           totalCreated++;
         } catch (e) {
           totalSkipped++;
@@ -395,7 +412,7 @@ class _CalendarPageState extends State<CalendarPage> {
             start: '10:00',
             templateId: ebdId,
           );
-          
+
           // Aplicar equipe responsável (Abertura EBD)
           final weekNumber = _getWeekOfMonthForSunday(date, month);
           final societyId = _getSocietyForWeek(
@@ -403,18 +420,16 @@ class _CalendarPageState extends State<CalendarPage> {
             weekNumber,
             'aberturaEbd',
           );
-          
+
           if (societyId != null && societyId.isNotEmpty) {
             await repository.updateEventDetails(
               id: event.id,
               steps: event.steps,
               people: event.people,
-              teams: EventTeams(
-                aberturaEbd: societyId,
-              ),
+              teams: EventTeams(aberturaEbd: societyId),
             );
           }
-          
+
           totalCreated++;
         } catch (e) {
           totalSkipped++;
@@ -429,8 +444,12 @@ class _CalendarPageState extends State<CalendarPage> {
       for (int i = 0; i < sundays.length; i++) {
         final date = sundays[i];
         final isFirstSunday = i == 0;
-        final templateId = isFirstSunday && cultoCeiId != null ? cultoCeiId : cultoNoiteId;
-        final eventName = isFirstSunday && cultoCeiId != null ? 'Culto de Ceia' : 'Culto à noite';
+        final templateId = isFirstSunday && cultoCeiId != null
+            ? cultoCeiId
+            : cultoNoiteId;
+        final eventName = isFirstSunday && cultoCeiId != null
+            ? 'Culto de Ceia'
+            : 'Culto à noite';
 
         try {
           final event = await repository.createEvent(
@@ -439,7 +458,7 @@ class _CalendarPageState extends State<CalendarPage> {
             start: '19:30',
             templateId: templateId,
           );
-          
+
           // Aplicar equipes responsáveis (Liturgia e Lanche)
           final weekNumber = _getWeekOfMonthForSunday(date, month);
           final liturgiaId = _getSocietyForWeek(
@@ -452,24 +471,25 @@ class _CalendarPageState extends State<CalendarPage> {
             weekNumber,
             'lanche',
           );
-          
+
           // Sempre criar EventTeams (mesmo que alguns valores sejam null)
           // O repository só atualiza os campos não-null
-          final liturgiaFinal = (liturgiaId != null && liturgiaId.isNotEmpty) ? liturgiaId : null;
-          final lancheFinal = (lancheId != null && lancheId.isNotEmpty) ? lancheId : null;
-          
+          final liturgiaFinal = (liturgiaId != null && liturgiaId.isNotEmpty)
+              ? liturgiaId
+              : null;
+          final lancheFinal = (lancheId != null && lancheId.isNotEmpty)
+              ? lancheId
+              : null;
+
           if (liturgiaFinal != null || lancheFinal != null) {
             await repository.updateEventDetails(
               id: event.id,
               steps: event.steps,
               people: event.people,
-              teams: EventTeams(
-                liturgia: liturgiaFinal,
-                lanche: lancheFinal,
-              ),
+              teams: EventTeams(liturgia: liturgiaFinal, lanche: lancheFinal),
             );
           }
-          
+
           totalCreated++;
         } catch (e) {
           totalSkipped++;
@@ -492,7 +512,8 @@ class _CalendarPageState extends State<CalendarPage> {
   Future<void> _showBatchEventCreator() async {
     // Obter o nome do mês em português
     final monthName = DateFormat('MMMM', 'pt_BR').format(_focusedDay);
-    final capitalizedMonthName = monthName[0].toUpperCase() + monthName.substring(1);
+    final capitalizedMonthName =
+        monthName[0].toUpperCase() + monthName.substring(1);
 
     // Mostrar diálogo de confirmação
     final confirmed = await showDialog<bool>(
@@ -550,18 +571,15 @@ class _CalendarPageState extends State<CalendarPage> {
     try {
       // Aguardar um pouco para garantir que o loading seja visível
       await Future.delayed(const Duration(milliseconds: 500));
-      
+
       // Criar todos os eventos
       await _createAllMonthlyEvents(_focusedDay);
-      
+
       // Manter o loading por pelo menos 2-3 segundos no total
       await Future.delayed(const Duration(milliseconds: 2000));
     } catch (error) {
       if (mounted) {
-        showErrorToast(
-          context,
-          'Erro ao criar eventos: ${error.toString()}',
-        );
+        showErrorToast(context, 'Erro ao criar eventos: ${error.toString()}');
       }
     } finally {
       if (mounted) {
@@ -596,7 +614,9 @@ class _CalendarPageState extends State<CalendarPage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.event_note, color: Colors.white70),
-                  title: const Text('Criar compromissos fixos para o mês selecionado'),
+                  title: const Text(
+                    'Criar compromissos fixos para o mês selecionado',
+                  ),
                   onTap: () {
                     Navigator.of(context).pop();
                     _showBatchEventCreator();
@@ -699,96 +719,84 @@ class _CalendarPageState extends State<CalendarPage> {
             ),
           ),
 
-        // Filtro de categoria
-        if (_selectedCategories.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: GlassContainer(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  Icon(Icons.label, size: 16, color: theme.colorScheme.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Wrap(
-                      spacing: 8,
-                      runSpacing: 4,
-                      children: _selectedCategories.map((category) {
-                        // Obter a cor da categoria (society ou verde para "Geral")
-                        final categoryColor = category == 'Geral'
-                            ? theme.colorScheme.primary
-                            : (_categoryColors[category] ??
-                                  theme.colorScheme.primary);
-
-                        return Chip(
-                          label: Text(category),
-                          backgroundColor: categoryColor.withOpacity(0.2),
-                          labelStyle: theme.textTheme.bodySmall?.copyWith(
-                            color: categoryColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          deleteIcon: Icon(
-                            Icons.close,
-                            size: 16,
-                            color: categoryColor,
-                          ),
-                          onDeleted: () {
-                            setState(() {
-                              _selectedCategories.remove(category);
-                            });
-                            _loadEvents();
-                          },
-                        );
-                      }).toList(),
-                    ),
-                  ),
-                  if (_selectedCategories.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedCategories.clear();
-                        });
-                        _loadEvents();
-                      },
-                      child: const Text('Limpar'),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-
         // Modo de visualização
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: SegmentedButtonTheme(
-            data: SegmentedButtonThemeData(style: SegmentedButton.styleFrom()),
-            child: SegmentedButton<CalendarViewMode>(
-              segments: [
-                ButtonSegment(
-                  value: CalendarViewMode.day,
-                  label: const Text('Dia'),
-                  icon: const SizedBox.shrink(),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Stack(
+            children: [
+              // Balão informativo (nuvem) - posicionado à esquerda
+              Positioned(
+                left: 0,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return CustomPaint(
+                      painter: _CloudBubblePainter(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Edite',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            Text(
+                              'eventos aqui',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
-                ButtonSegment(
-                  value: CalendarViewMode.week,
-                  label: const Text('Semana'),
-                  icon: const SizedBox.shrink(),
+              ),
+              // Botões de visualização - centralizados com pequeno offset à esquerda
+              Center(
+                child: Transform.translate(
+                  offset: const Offset(0, 0),
+                  child: SegmentedButtonTheme(
+                    data: SegmentedButtonThemeData(
+                      style: SegmentedButton.styleFrom(),
+                    ),
+                    child: SegmentedButton<CalendarViewMode>(
+                      segments: [
+                        ButtonSegment(
+                          value: CalendarViewMode.day,
+                          label: const Text('Dia'),
+                          icon: const SizedBox.shrink(),
+                        ),
+                        ButtonSegment(
+                          value: CalendarViewMode.month,
+                          label: const Text('Mês'),
+                          icon: const SizedBox.shrink(),
+                        ),
+                      ],
+                      selected: {_viewMode},
+                      onSelectionChanged: (Set<CalendarViewMode> newSelection) {
+                        setState(() {
+                          _viewMode = newSelection.first;
+                        });
+                      },
+                    ),
+                  ),
                 ),
-                ButtonSegment(
-                  value: CalendarViewMode.month,
-                  label: const Text('Mês'),
-                  icon: const SizedBox.shrink(),
-                ),
-              ],
-              selected: {_viewMode},
-              onSelectionChanged: (Set<CalendarViewMode> newSelection) {
-                setState(() {
-                  _viewMode = newSelection.first;
-                });
-              },
-            ),
+              ),
+            ],
           ),
         ),
 
@@ -822,18 +830,26 @@ class _CalendarPageState extends State<CalendarPage> {
                 )
               : LayoutBuilder(
                   builder: (context, constraints) {
-                    return Column(
-                      children: [
-                        Expanded(
-                          flex: _viewMode == CalendarViewMode.day ? 1 : 4,
-                          child: _buildCalendarView(),
-                        ),
-                        // Lista de eventos do dia selecionado
-                        if (_viewMode == CalendarViewMode.month ||
-                            _viewMode == CalendarViewMode.week)
-                          Flexible(flex: 2, child: _buildEventList()),
-                      ],
-                    );
+                    if (_viewMode == CalendarViewMode.month) {
+                      return Column(
+                        children: [
+                          // Calendário com altura limitada
+                          Flexible(
+                            flex: 1,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxHeight: constraints.maxHeight * 0.42,
+                              ),
+                              child: _buildCalendarView(),
+                            ),
+                          ),
+                          // Lista de eventos - ocupa o restante do espaço
+                          Expanded(flex: 1, child: _buildEventList()),
+                        ],
+                      );
+                    } else {
+                      return Expanded(child: _buildCalendarView());
+                    }
                   },
                 ),
         ),
@@ -921,9 +937,10 @@ class _CalendarPageState extends State<CalendarPage> {
     switch (_viewMode) {
       case CalendarViewMode.day:
         return _buildDayView();
-      case CalendarViewMode.week:
-        return _buildWeekView();
       case CalendarViewMode.month:
+        return _buildMonthView();
+      case CalendarViewMode.week:
+        // Semana removida - usar Mês como fallback
         return _buildMonthView();
     }
   }
@@ -937,6 +954,7 @@ class _CalendarPageState extends State<CalendarPage> {
       eventLoader: _getEventsForDay,
       startingDayOfWeek: StartingDayOfWeek.sunday,
       locale: 'pt_BR',
+      rowHeight: 36,
       calendarBuilders: CalendarBuilders(
         markerBuilder: (context, date, events) {
           if (events.isEmpty) return null;
@@ -945,57 +963,9 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
       calendarStyle: CalendarStyle(
         outsideDaysVisible: false,
-        weekendTextStyle: const TextStyle(color: Colors.white70),
-        defaultTextStyle: const TextStyle(color: Colors.white),
-        selectedDecoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          shape: BoxShape.circle,
-        ),
-        todayDecoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-          shape: BoxShape.circle,
-        ),
-      ),
-      headerStyle: HeaderStyle(
-        formatButtonVisible: false,
-        titleCentered: true,
-        leftChevronIcon: const Icon(Icons.chevron_left, color: Colors.white),
-        rightChevronIcon: const Icon(Icons.chevron_right, color: Colors.white),
-        titleTextStyle: const TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-      daysOfWeekStyle: const DaysOfWeekStyle(
-        weekdayStyle: TextStyle(color: Colors.white70),
-        weekendStyle: TextStyle(color: Colors.white70),
-      ),
-      onDaySelected: _onDaySelected,
-      onPageChanged: _onPageChanged,
-    );
-  }
-
-  Widget _buildWeekView() {
-    return TableCalendar<CalendarEventModel>(
-      firstDay: DateTime.utc(2020, 1, 1),
-      lastDay: DateTime.utc(2030, 12, 31),
-      focusedDay: _focusedDay,
-      selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-      eventLoader: _getEventsForDay,
-      startingDayOfWeek: StartingDayOfWeek.monday,
-      calendarFormat: CalendarFormat.week,
-      locale: 'pt_BR',
-      calendarBuilders: CalendarBuilders(
-        markerBuilder: (context, date, events) {
-          if (events.isEmpty) return null;
-          return Positioned(bottom: 1, child: _buildEventMarkers(events));
-        },
-      ),
-      calendarStyle: CalendarStyle(
-        outsideDaysVisible: false,
-        weekendTextStyle: const TextStyle(color: Colors.white70),
-        defaultTextStyle: const TextStyle(color: Colors.white),
+        weekendTextStyle: const TextStyle(color: Colors.white70, fontSize: 12),
+        defaultTextStyle: const TextStyle(color: Colors.white, fontSize: 12),
+        cellMargin: EdgeInsets.zero,
         selectedDecoration: BoxDecoration(
           color: Theme.of(context).colorScheme.primary,
           shape: BoxShape.circle,
@@ -1103,62 +1073,70 @@ class _CalendarPageState extends State<CalendarPage> {
       itemCount: events.length,
       itemBuilder: (context, index) {
         final event = events[index];
+        // Obter a cor da categoria (society ou verde para "Geral")
+        final categoryColor = event.category == 'Geral'
+            ? Theme.of(context).colorScheme.primary
+            : (_categoryColors[event.category] ??
+                  Theme.of(context).colorScheme.primary);
+
         return Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: GlassContainer(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Container(
-                  width: 4,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary,
-                    borderRadius: BorderRadius.circular(2),
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Container(
+                    width: 4,
+                    decoration: BoxDecoration(
+                      color: categoryColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event.name,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          event.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
+                        const SizedBox(height: 4),
+                        Text(
+                          event.category,
+                          style: TextStyle(color: Colors.white70, fontSize: 14),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          event.start,
+                          style: TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit, size: 20),
+                        color: Colors.white70,
+                        onPressed: () => _editEvent(event),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        event.category,
-                        style: TextStyle(color: Colors.white70, fontSize: 14),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        event.start,
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 20),
+                        color: Colors.red.shade300,
+                        onPressed: () => _deleteEvent(event),
                       ),
                     ],
                   ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      color: Colors.white70,
-                      onPressed: () => _editEvent(event),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 20),
-                      color: Colors.red.shade300,
-                      onPressed: () => _deleteEvent(event),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         );
@@ -1174,7 +1152,6 @@ class _CalendarPageState extends State<CalendarPage> {
     }
 
     return Container(
-      margin: const EdgeInsets.only(top: 4),
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.2),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -1199,67 +1176,60 @@ class _CalendarPageState extends State<CalendarPage> {
               itemCount: events.length,
               itemBuilder: (context, index) {
                 final event = events[index];
+                // Obter a cor da categoria (society ou verde para "Geral")
+                final categoryColor = event.category == 'Geral'
+                    ? Theme.of(context).colorScheme.primary
+                    : (_categoryColors[event.category] ??
+                          Theme.of(context).colorScheme.primary);
+
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: GlassContainer(
                     padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 4,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.primary,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                event.name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              Text(
-                                event.category,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                event.start,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              icon: const Icon(Icons.edit, size: 18),
-                              color: Colors.white70,
-                              onPressed: () => _editEvent(event),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            width: 4,
+                            decoration: BoxDecoration(
+                              color: categoryColor,
+                              borderRadius: BorderRadius.circular(2),
                             ),
-                            IconButton(
-                              icon: const Icon(Icons.delete, size: 18),
-                              color: Colors.red.shade300,
-                              onPressed: () => _deleteEvent(event),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  event.name,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                Text(
+                                  event.category,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  event.start,
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -1312,21 +1282,54 @@ class _CalendarPageState extends State<CalendarPage> {
                         2 + _societies.length, // Todos + Geral + societies
                     itemBuilder: (context, index) {
                       String category;
+                      Color? categoryColor;
                       if (index == 0) {
                         category = 'Todos';
                       } else if (index == 1) {
                         category = 'Geral';
+                        categoryColor = Theme.of(context).colorScheme.primary;
                       } else {
                         final society = _societies[index - 2];
                         category = society.name;
+                        categoryColor = Color(society.color);
                       }
 
                       final isSelected = category == 'Todos'
                           ? tempSelectedCategories.isEmpty
                           : tempSelectedCategories.contains(category);
 
-                      return CheckboxListTile(
-                        value: isSelected,
+                      // Se nenhuma categoria estiver selecionada, mostrar todas as cores
+                      // Se pelo menos uma estiver selecionada, mostrar cor apenas nas selecionadas
+                      final hasAnySelection = tempSelectedCategories.isNotEmpty;
+                      final shouldShowColor = category == 'Todos'
+                          ? false
+                          : (!hasAnySelection || isSelected);
+
+                      return ListTile(
+                        leading: category == 'Todos'
+                            ? null
+                            : Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: shouldShowColor
+                                      ? (categoryColor ??
+                                            Theme.of(
+                                              context,
+                                            ).colorScheme.primary)
+                                      : Colors.transparent,
+                                  border: Border.all(
+                                    color: shouldShowColor
+                                        ? (categoryColor ??
+                                              Theme.of(
+                                                context,
+                                              ).colorScheme.primary)
+                                        : Colors.white38,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
                         title: Text(
                           category,
                           style: TextStyle(
@@ -1336,19 +1339,39 @@ class _CalendarPageState extends State<CalendarPage> {
                                 : FontWeight.normal,
                           ),
                         ),
-                        activeColor: Theme.of(context).colorScheme.primary,
-                        onChanged: category == 'Todos'
-                            ? null // "Todos" não pode ser selecionado manualmente (é o estado padrão quando nada está selecionado)
-                            : (bool? value) {
+                        trailing: category == 'Todos'
+                            ? null
+                            : Checkbox(
+                                value: isSelected,
+                                activeColor: Theme.of(
+                                  context,
+                                ).colorScheme.primary,
+                                onChanged: (bool? value) {
+                                  setModalState(() {
+                                    if (value == true) {
+                                      if (!tempSelectedCategories.contains(
+                                        category,
+                                      )) {
+                                        tempSelectedCategories.add(category);
+                                      }
+                                    } else {
+                                      tempSelectedCategories.remove(category);
+                                    }
+                                  });
+                                },
+                              ),
+                        onTap: category == 'Todos'
+                            ? null
+                            : () {
                                 setModalState(() {
-                                  if (value == true) {
+                                  if (isSelected) {
+                                    tempSelectedCategories.remove(category);
+                                  } else {
                                     if (!tempSelectedCategories.contains(
                                       category,
                                     )) {
                                       tempSelectedCategories.add(category);
                                     }
-                                  } else {
-                                    tempSelectedCategories.remove(category);
                                   }
                                 });
                               },
@@ -1397,4 +1420,74 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
     );
   }
+}
+
+// Classe para desenhar o balão de fala em formato de nuvem
+class _CloudBubblePainter extends CustomPainter {
+  final Color color;
+
+  _CloudBubblePainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final path = Path();
+    final width = size.width;
+    final height = size.height;
+
+    // Desenha o corpo do balão com bordas arredondadas em formato de nuvem
+    // Começando do canto superior esquerdo (mais arredondado)
+    path.moveTo(12, 0);
+    path.quadraticBezierTo(6, 0, 6, 6);
+
+    // Lado esquerdo com bolha arredondada
+    path.lineTo(6, height / 2 - 8);
+    path.quadraticBezierTo(3, height / 2 - 5, 3, height / 2);
+
+    // Lado inferior esquerdo com bolha arredondada
+    path.quadraticBezierTo(3, height / 2 + 5, 6, height / 2 + 8);
+    path.lineTo(6, height - 6);
+
+    // Canto inferior esquerdo (mais arredondado)
+    path.quadraticBezierTo(6, height, 12, height);
+
+    // Lado inferior com bolhas arredondadas
+    path.lineTo(width - 24, height);
+    path.quadraticBezierTo(width - 20, height, width - 20, height - 4);
+    path.quadraticBezierTo(width - 18, height - 6, width - 16, height - 6);
+    path.quadraticBezierTo(width - 14, height - 6, width - 12, height - 4);
+    path.quadraticBezierTo(width - 10, height - 2, width - 8, height - 2);
+
+    // Cauda apontando para a direita (mais arredondada)
+    final tailStartX = width - 6;
+    final tailEndX = width + 3;
+    final tailY = height / 2;
+
+    path.lineTo(tailStartX, tailY - 5);
+    path.quadraticBezierTo(tailStartX + 3, tailY - 3, tailEndX, tailY - 1);
+    path.quadraticBezierTo(tailEndX + 1, tailY, tailEndX, tailY + 1);
+    path.quadraticBezierTo(tailStartX + 3, tailY + 3, tailStartX, tailY + 5);
+    path.lineTo(tailStartX - 2, tailY + 2);
+    path.quadraticBezierTo(tailStartX - 2, tailY, tailStartX - 2, tailY - 2);
+    path.lineTo(width - 10, 4);
+
+    // Lado superior com bolhas arredondadas
+    path.quadraticBezierTo(width - 14, 6, width - 16, 6);
+    path.quadraticBezierTo(width - 18, 6, width - 20, 4);
+    path.quadraticBezierTo(width - 22, 2, width - 24, 2);
+    path.quadraticBezierTo(width - 24, 0, width - 22, 0);
+
+    // Volta ao início (canto superior esquerdo)
+    path.lineTo(12, 0);
+    path.close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

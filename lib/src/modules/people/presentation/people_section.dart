@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../auth/models/user.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/utils/app_toast.dart';
+import '../../../shared/utils/sort_utils.dart';
 import '../../../shared/state/app_state.dart';
 import '../data/people_repository.dart';
 import 'widgets/invite_person_sheet.dart';
@@ -333,9 +334,9 @@ class _PeopleSectionState extends State<PeopleSection> {
       final people = await context.read<PeopleRepository>().fetchAll(
         currentUser: widget.currentUser,
       );
-      // Ordenar lista em ordem alfabética por nome
+      // Ordenar lista em ordem alfabética por nome (ignorando acentos)
       people.sort(
-        (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+        (a, b) => compareNamesIgnoreAccents(a.name, b.name),
       );
       setState(() => _people = people);
     } catch (error) {

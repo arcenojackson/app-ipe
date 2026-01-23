@@ -169,5 +169,21 @@ class SocietiesRepository {
       );
     }
   }
+
+  /// Atualiza a diretoria de uma sociedade com cargos
+  Future<void> updateBoardWithPositions({
+    required String id,
+    required Map<String, List<String>> boardWithPositions,
+  }) async {
+    try {
+      await _firestore.collection('societies').doc(id).update({
+        'board': boardWithPositions,
+      });
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao atualizar diretoria: ${e.toString()}',
+      );
+    }
+  }
 }
 

@@ -243,6 +243,54 @@ class NotificationService {
         // Navegar para HomeShell na aba Agenda
         _navigateToHomeShellWithSection(HomeSection.agenda, highlightAvailability: true);
       }
+
+      // Tipo 5: Inclusão em escala - abrir o evento na tela Agenda
+      if (type == 'scale_inclusion') {
+        final eventId = data['eventId'];
+        if (eventId != null && eventId.isNotEmpty) {
+          // Navegar para HomeShell na aba Agenda primeiro
+          _navigateToHomeShellWithSection(HomeSection.agenda);
+          
+          // Depois abrir o evento
+          Future.delayed(const Duration(milliseconds: 800), () {
+            final navState = IpeApp.navigatorKey.currentState;
+            if (navState != null && navState.canPop()) {
+              navState.push(
+                MaterialPageRoute(
+                  builder: (_) => EventViewerPage(eventId: eventId),
+                ),
+              );
+            }
+          });
+        } else {
+          // Sem eventId, apenas navegar para Agenda
+          _navigateToHomeShellWithSection(HomeSection.agenda);
+        }
+      }
+
+      // Tipo 6: Atualização de música - abrir o evento na tela Agenda
+      if (type == 'music_update') {
+        final eventId = data['eventId'];
+        if (eventId != null && eventId.isNotEmpty) {
+          // Navegar para HomeShell na aba Agenda primeiro
+          _navigateToHomeShellWithSection(HomeSection.agenda);
+          
+          // Depois abrir o evento
+          Future.delayed(const Duration(milliseconds: 800), () {
+            final navState = IpeApp.navigatorKey.currentState;
+            if (navState != null && navState.canPop()) {
+              navState.push(
+                MaterialPageRoute(
+                  builder: (_) => EventViewerPage(eventId: eventId),
+                ),
+              );
+            }
+          });
+        } else {
+          // Sem eventId, apenas navegar para Agenda
+          _navigateToHomeShellWithSection(HomeSection.agenda);
+        }
+      }
     });
   }
 

@@ -5,6 +5,7 @@ import '../../auth/models/user.dart';
 import '../../people/data/people_repository.dart';
 import '../../people/presentation/widgets/people_selector_sheet.dart';
 import '../../../shared/utils/app_toast.dart';
+import '../../../shared/utils/sort_utils.dart';
 import '../../../shared/state/app_state.dart';
 import '../data/societies_repository.dart';
 import '../models/society.dart';
@@ -47,6 +48,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
   List<UserModel> _people = const [];
   List<String> _selectedMembers = const [];
   List<String> _selectedBoard = const [];
+  Map<String, List<String>> _boardWithPositions = const {}; // Map<position, List<userId>>
 
   @override
   void initState() {
@@ -154,34 +156,59 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     final members = _people
         .where((user) => _selectedMembers.contains(user.id))
         .toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: members
-            .map(
-              (user) => InputChip(
-                label: Text(user.name),
-                avatar: CircleAvatar(
-                  child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
-                ),
-                onDeleted: _canEdit
-                    ? () => setState(() {
-                          _selectedMembers =
-                              List.of(_selectedMembers)..remove(user.id);
-                        })
-                    : null,
-              ),
-            )
-            .toList(),
+      ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
+    
+    return ListView.separated(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: members.length,
+      separatorBuilder: (context, index) => Divider(
+        height: 1,
+        color: Colors.white.withOpacity(0.1),
       ),
+      itemBuilder: (context, index) {
+        final user = members[index];
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                child: Text(
+                  user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(
+                  user.name,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: Colors.white,
+                      ),
+                ),
+              ),
+              if (_canEdit)
+                IconButton(
+                  icon: const Icon(Icons.close, color: Colors.white54),
+                  onPressed: () => setState(() {
+                    _selectedMembers = List.of(_selectedMembers)..remove(user.id);
+                  }),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   Widget _buildBoardTab() {
-    if (_selectedBoard.isEmpty) {
+    // Se não tiver posições e não tiver boardIds, mostrar mensagem vazia
+    if (_boardWithPositions.isEmpty && _selectedBoard.isEmpty) {
       return const Center(
         child: Padding(
           padding: EdgeInsets.all(32.0),
@@ -197,31 +224,88 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         ),
       );
     }
-    final board = _people
-        .where((user) => _selectedBoard.contains(user.id))
-        .toList()
-      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return Padding(
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: board
-            .map(
-              (user) => InputChip(
-                label: Text(user.name),
-                avatar: CircleAvatar(
-                  child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
-                ),
-                onDeleted: _canEdit
-                    ? () => setState(() {
-                          _selectedBoard = List.of(_selectedBoard)..remove(user.id);
-                        })
-                    : null,
-              ),
-            )
-            .toList(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Exibir seções por cargo (formato novo)
+          if (_boardWithPositions.isNotEmpty) ...[
+            ...BoardPosition.values.map((position) {
+              // Buscar por label em minúsculo (formato esperado)
+              final positionKey = position.label.toLowerCase();
+              final userIds = _boardWithPositions[positionKey] ?? 
+                             _boardWithPositions[position.name] ?? 
+                             _boardWithPositions[position.label] ?? 
+                             [];
+              if (userIds.isEmpty) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: _buildPositionSection(position.label, userIds),
+              );
+            }),
+          ],
+          // Exibir usuários sem cargo (formato antigo - compatibilidade)
+          if (_boardWithPositions.isEmpty && _selectedBoard.isNotEmpty) ...[
+            _buildPositionSection('Diretoria', _selectedBoard),
+          ],
+        ],
       ),
+    );
+  }
+
+  Widget _buildPositionSection(String title, List<String> userIds) {
+    final people = _people
+        .where((user) => userIds.contains(user.id))
+        .toList()
+      ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
+
+    if (people.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: people
+              .map(
+                (user) => InputChip(
+                  label: Text(user.name),
+                  avatar: CircleAvatar(
+                    child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
+                  ),
+                  onDeleted: _canEdit
+                      ? () {
+                          setState(() {
+                            // Remover do boardIds
+                            _selectedBoard = List.of(_selectedBoard)..remove(user.id);
+                            // Remover do boardWithPositions
+                            _boardWithPositions = Map<String, List<String>>.from(
+                              _boardWithPositions.map(
+                                (key, value) => MapEntry(
+                                  key,
+                                  List<String>.from(value)..remove(user.id),
+                                ),
+                              ),
+                            )..removeWhere((key, value) => value.isEmpty);
+                          });
+                        }
+                      : null,
+                ),
+              )
+              .toList(),
+        ),
+      ],
     );
   }
 
@@ -245,7 +329,16 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
       setState(() {
         _society = society;
         _selectedMembers = List.of(society.membersIds);
-        _selectedBoard = List.of(society.boardIds);
+        // Usar allBoardIds para compatibilidade com formato antigo
+        _selectedBoard = List.of(society.allBoardIds);
+        // Se tiver posições, usar; senão, criar mapa vazio
+        _boardWithPositions = society.boardWithPositions.isNotEmpty
+            ? Map<String, List<String>>.from(
+                society.boardWithPositions.map(
+                  (key, value) => MapEntry(key, List<String>.from(value)),
+                ),
+              )
+            : {};
         _people = people;
       });
     } catch (e) {
@@ -305,16 +398,54 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
       return;
     }
 
+    // Primeiro, mostrar modal para selecionar o cargo
+    final selectedPosition = await showModalBottomSheet<BoardPosition?>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _BoardPositionSelectorSheet(),
+    );
+
+    if (selectedPosition == null) {
+      return; // Usuário cancelou
+    }
+
+    // Depois, mostrar modal para selecionar o usuário
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
       builder: (_) => PeopleSelectorSheet(
         people: _people,
-        selectedIds: _selectedBoard,
+        selectedIds: const [], // Não pré-selecionar ninguém
       ),
     );
-    if (result != null) {
-      setState(() => _selectedBoard = result);
+    
+    if (result != null && result.isNotEmpty) {
+      // Adicionar o usuário selecionado na lista do cargo escolhido
+      setState(() {
+        final userId = result.first;
+        // Remover o usuário de outros cargos se já estiver em algum
+        _boardWithPositions = Map<String, List<String>>.from(
+          _boardWithPositions.map(
+            (key, value) => MapEntry(key, List<String>.from(value)..remove(userId)),
+          ),
+        )..removeWhere((key, value) => value.isEmpty);
+        
+        // Adicionar o usuário ao cargo selecionado
+        // Usar o label do cargo em minúsculo como chave (ex: 'presidente', 'vice', 'secretario(a)', 'tesoureiro(a)')
+        final positionKey = selectedPosition.label.toLowerCase();
+        final currentList = _boardWithPositions[positionKey] ?? [];
+        if (!currentList.contains(userId)) {
+          final newList = List<String>.from(currentList)..add(userId);
+          _boardWithPositions = Map<String, List<String>>.from(_boardWithPositions)
+            ..[positionKey] = newList;
+        }
+        
+        // Atualizar _selectedBoard para compatibilidade
+        if (!_selectedBoard.contains(userId)) {
+          _selectedBoard = List.of(_selectedBoard)..add(userId);
+        }
+      });
     }
   }
 
@@ -330,10 +461,20 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         id: widget.societyId,
         membersIds: _selectedMembers,
       );
-      await repository.updateBoard(
-        id: widget.societyId,
-        boardIds: _selectedBoard,
-      );
+      
+      // Se tiver posições, salvar no formato novo; senão, usar formato antigo
+      if (_boardWithPositions.isNotEmpty) {
+        await repository.updateBoardWithPositions(
+          id: widget.societyId,
+          boardWithPositions: _boardWithPositions,
+        );
+      } else if (_selectedBoard.isNotEmpty) {
+        await repository.updateBoard(
+          id: widget.societyId,
+          boardIds: _selectedBoard,
+        );
+      }
+      
       if (mounted) {
         showSuccessToast(context, 'Sociedade atualizada com sucesso!');
         await _loadData();
@@ -347,6 +488,87 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         setState(() => _isSaving = false);
       }
     }
+  }
+}
+
+class _BoardPositionSelectorSheet extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D1220),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Text(
+                'Selecionar cargo',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+              ),
+              const SizedBox(height: 24),
+              ...BoardPosition.values.map((position) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: InkWell(
+                    onTap: () => Navigator.of(context).pop(position),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 16,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.1),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              position.label,
+                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                            color: Colors.white54,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
