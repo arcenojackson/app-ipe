@@ -1,12 +1,3 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * import {onCall} from "firebase-functions/v2/https";
- * import {onDocumentWritten} from "firebase-functions/v2/firestore";
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
-
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 
@@ -22,118 +13,147 @@ interface ChatMessage {
   quotedMessageUserName?: string;
 }
 
+type ChatSource = "event" | "society";
+
+interface SendChatMentionNotificationsParams {
+  source: ChatSource;
+  entityId: string;
+  messageId: string;
+  message: ChatMessage;
+}
+
+/**
+ * Função compartilhada que envia notificações push para usuários mencionados
+ * em chats (eventos ou sociedades). Usada pelos triggers onMessageCreated e
+ * onSocietyMessageCreated.
+ * @param {SendChatMentionNotificationsParams} params - Parâmetros contendo
+ * source, entityId, messageId e message
+ */
+async function sendChatMentionNotifications(
+  params: SendChatMentionNotificationsParams
+): Promise<null> {
+  const {source, entityId, messageId, message} = params;
+
+  if (!message.mentionedUserIds || message.mentionedUserIds.length === 0) {
+    return null;
+  }
+
+  const firestore = admin.firestore();
+  const collection = source === "event" ? "services" : "societies";
+  const defaultName = source === "event" ? "Evento" : "Sociedade";
+
+  const entityDoc = await firestore
+    .collection(collection)
+    .doc(entityId)
+    .get();
+
+  const entityName = entityDoc.data()?.name || defaultName;
+
+  const userDocs = await Promise.all(
+    message.mentionedUserIds.map((userId) =>
+      firestore.collection("users").doc(userId).get()
+    )
+  );
+
+  const tokens: string[] = [];
+  userDocs.forEach((userDoc) => {
+    if (!userDoc.exists) return;
+    const userData = userDoc.data();
+    const fcmToken = userData?.fcmToken;
+    const userDocId = userDoc.id;
+
+    if (userDocId === message.userId || !fcmToken) return;
+
+    const disabledNotifications = userData?.disabled_notifications || [];
+    const isMentionEnabled = !disabledNotifications.includes("chat_mention");
+
+    if (isMentionEnabled) tokens.push(fcmToken);
+  });
+
+  if (tokens.length === 0) {
+    console.log("Nenhum token FCM encontrado para usuários mencionados");
+    return null;
+  }
+
+  const previewText =
+    message.text.length > 50 ?
+      message.text.substring(0, 50) + "..." :
+      message.text;
+
+  const data: Record<string, string> = {
+    type: "chat_mention",
+    messageId,
+    senderId: message.userId,
+    senderName: message.userName,
+  };
+
+  if (source === "event") {
+    data.eventId = entityId;
+  } else {
+    data.societyId = entityId;
+  }
+
+  const payload: admin.messaging.MulticastMessage = {
+    notification: {
+      title: `@${message.userName} te mencionou`,
+      body: `${entityName}: ${previewText}`,
+    },
+    data,
+    tokens,
+    android: {priority: "high"},
+    apns: {
+      payload: {
+        aps: {sound: "default", badge: 1},
+      },
+    },
+  };
+
+  const response = await admin.messaging().sendEachForMulticast(payload);
+  const label = source === "event" ? "evento" : "sociedade";
+  console.log(
+    `Notificações (${label}) enviadas: ` +
+    `${response.successCount}/${tokens.length}`
+  );
+
+  if (response.failureCount > 0) {
+    console.error("Alguns envios falharam:", response.responses);
+  }
+
+  return null;
+}
+
 export const onMessageCreated = functions.firestore
   .document("services/{eventId}/messages/{messageId}")
   .onCreate(async (snapshot, context) => {
     const message = snapshot.data() as ChatMessage;
     const {eventId, messageId} = context.params;
-
-    // Se não há menções, não fazer nada
-    if (!message.mentionedUserIds || message.mentionedUserIds.length === 0) {
+    try {
+      return await sendChatMentionNotifications({
+        source: "event",
+        entityId: eventId,
+        messageId,
+        message,
+      });
+    } catch (error) {
+      console.error("Erro ao enviar notificações de chat (evento):", error);
       return null;
     }
+  });
 
+export const onSocietyMessageCreated = functions.firestore
+  .document("societies/{societyId}/messages/{messageId}")
+  .onCreate(async (snapshot, context) => {
+    const message = snapshot.data() as ChatMessage;
+    const {societyId, messageId} = context.params;
     try {
-      // Buscar informações do evento
-      const eventDoc = await admin.firestore()
-        .collection("services")
-        .doc(eventId)
-        .get();
-
-      const eventName = eventDoc.data()?.name || "Evento";
-
-      // Buscar FCM tokens dos usuários mencionados
-      const userDocs = await Promise.all(
-        message.mentionedUserIds.map((userId) =>
-          admin.firestore().collection("users").doc(userId).get()
-        )
-      );
-
-      // Filtrar usuários com FCM token, que não sejam o remetente
-      // e que tenham a notificação de menção habilitada
-      const tokens: string[] = [];
-      userDocs.forEach((userDoc) => {
-        if (userDoc.exists) {
-          const userData = userDoc.data();
-          const fcmToken = userData?.fcmToken;
-          const userDocId = userDoc.id;
-
-          // Não enviar notificação para o próprio remetente
-          if (userDocId === message.userId) {
-            return;
-          }
-
-          // Verificar se o usuário tem FCM token
-          if (!fcmToken) {
-            return;
-          }
-
-          // Verificar se a notificação de menção está habilitada
-          // Se não existe o campo ou não contém 'chat_mention',
-          // // está habilitada
-          const disabledNotifications =
-              userData?.disabled_notifications || [];
-          const isMentionEnabled = !disabledNotifications
-            .includes("chat_mention");
-
-          if (isMentionEnabled) {
-            tokens.push(fcmToken);
-          }
-        }
+      return await sendChatMentionNotifications({
+        source: "society",
+        entityId: societyId,
+        messageId,
+        message,
       });
-
-      if (tokens.length === 0) {
-        console.log("Nenhum token FCM encontrado para usuários mencionados");
-        return null;
-      }
-
-      // Preparar texto da notificação
-      const previewText = message.text.length > 50 ?
-        message.text.substring(0, 50) + "..." :
-        message.text;
-
-      // Criar payload da notificação
-      const payload: admin.messaging.MulticastMessage = {
-        notification: {
-          title: `@${message.userName} te mencionou`,
-          body: `${eventName}: ${previewText}`,
-        },
-        data: {
-          type: "chat_mention",
-          eventId: eventId,
-          messageId: messageId,
-          senderId: message.userId,
-          senderName: message.userName,
-        },
-        tokens: tokens,
-        android: {
-          priority: "high",
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: "default",
-              badge: 1,
-            },
-          },
-        },
-      };
-
-      // Enviar notificações
-      const response =
-        await admin.messaging().sendEachForMulticast(payload);
-
-      const logMessage =
-        `Notificações enviadas: ${response.successCount}/${tokens.length}`;
-      console.log(logMessage);
-
-      if (response.failureCount > 0) {
-        console.error("Alguns envios falharam:", response.responses);
-      }
-
-      return null;
     } catch (error) {
-      console.error("Erro ao enviar notificações:", error);
+      console.error("Erro ao enviar notificações de chat (sociedade):", error);
       return null;
     }
   });
@@ -1041,7 +1061,7 @@ export const mondayPrayerMeetingReminder = functions
  */
 export const eloAvailabilityReminder = functions
   .region("us-central1")
-  .pubsub.schedule("0 9 15,20 * *") // Dias 15 e 20 de cada mês às 9h
+  .pubsub.schedule("0 9 15,20,25 * *") // Dias 15, 20 e 25 de cada mês às 9h
   .timeZone("America/Sao_Paulo")
   .onRun(async () => {
     try {
@@ -1607,5 +1627,194 @@ export const onServiceStepsUpdated = functions.firestore
     } catch (error) {
       console.error("Erro ao processar atualização de músicas:", error);
       return null;
+    }
+  });
+
+/**
+ * Cloud Function HTTP para enviar notificações de lembrete de disponibilidade
+ * para membros específicos da ELO que ainda não informaram suas
+ * disponibilidades
+ *
+ * Endpoint: POST /notifications/elo-availability-reminder
+ * Body: {
+ *   userIds: string[],
+ *   monthName: string
+ * }
+ */
+export const sendEloAvailabilityReminder = functions
+  .region("us-central1")
+  .https.onRequest(async (req, res) => {
+    // Permitir apenas requisições POST
+    if (req.method !== "POST") {
+      res.status(405).json({error: "Método não permitido. Use POST."});
+      return;
+    }
+
+    try {
+      const {userIds, monthName} = req.body;
+
+      // Validar dados de entrada
+      if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+        res.status(400).json({
+          error: "userIds é obrigatório e deve ser um array não vazio",
+        });
+        return;
+      }
+
+      if (!monthName || typeof monthName !== "string") {
+        res.status(400).json({
+          error: "monthName é obrigatório e deve ser uma string",
+        });
+        return;
+      }
+
+      console.log(
+        "Enviando lembretes de disponibilidade para " +
+        `${userIds.length} usuário(s)`
+      );
+
+      // Buscar dados dos usuários e seus FCM tokens
+      const userDocs = await Promise.all(
+        userIds.map((userId: string) =>
+          admin.firestore().collection("users").doc(userId).get()
+        )
+      );
+
+      const messages: admin.messaging.Message[] = [];
+      const processedTokens = new Set<string>();
+
+      for (const userDoc of userDocs) {
+        if (!userDoc.exists) {
+          console.log(`Usuário ${userDoc.id} não encontrado`);
+          continue;
+        }
+
+        const userData = userDoc.data();
+        const fcmToken = userData?.fcmToken;
+        const userId = userDoc.id;
+
+        // Verificar se tem FCM token
+        if (!fcmToken) {
+          console.log(`Usuário ${userId} não possui FCM token`);
+          continue;
+        }
+
+        // Validar FCM token
+        const userFcmToken = fcmToken?.trim();
+        if (!userFcmToken || userFcmToken === "") {
+          console.log(`FCM token vazio para usuário ${userId}`);
+          continue;
+        }
+
+        // Verificar se este token já foi processado (evitar duplicatas)
+        if (processedTokens.has(userFcmToken)) {
+          continue;
+        }
+
+        // Validar formato básico do token FCM
+        if (userFcmToken.length < 100 || userFcmToken.length > 200) {
+          console.log(`Token FCM com formato inválido para usuário ${userId}`);
+          continue;
+        }
+
+        if (
+          userFcmToken.startsWith("http://") ||
+          userFcmToken.startsWith("https://") ||
+          userFcmToken.includes("<!DOCTYPE")
+        ) {
+          console.log(
+            `Token FCM com formato inválido (URL) para usuário ${userId}`
+          );
+          continue;
+        }
+
+        // Verificar se a notificação de disponibilidade está habilitada
+        const disabledNotifications = userData?.disabled_notifications || [];
+        const isAvailabilityReminderEnabled =
+          !disabledNotifications.includes("elo_availability_reminder");
+
+        if (isAvailabilityReminderEnabled) {
+          messages.push({
+            notification: {
+              title: "Lembrete de Disponibilidade",
+              body: "Não esqueça de informar sua disponibilidade " +
+                `para ${monthName}`,
+            },
+            data: {
+              type: "elo_availability_reminder",
+            },
+            token: userFcmToken,
+            android: {
+              priority: "high",
+            },
+            apns: {
+              payload: {
+                aps: {
+                  sound: "default",
+                  badge: 1,
+                },
+              },
+            },
+          });
+
+          // Marcar token como processado
+          processedTokens.add(userFcmToken);
+        } else {
+          console.log(
+            `Notificação de disponibilidade desabilitada para usuário ${userId}`
+          );
+        }
+      }
+
+      if (messages.length === 0) {
+        console.log("Nenhuma notificação de disponibilidade para enviar");
+        res.status(200).json({
+          success: true,
+          message: "Nenhuma notificação enviada (todos os usuários têm " +
+            "notificações desabilitadas ou não possuem FCM token)",
+          sent: 0,
+          total: userIds.length,
+        });
+        return;
+      }
+
+      // Enviar notificações em lote
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const message of messages) {
+        try {
+          await admin.messaging().send(message);
+          successCount++;
+        } catch (sendError) {
+          failureCount++;
+          console.error(
+            "Erro ao enviar notificação de disponibilidade:",
+            sendError
+          );
+        }
+      }
+
+      const logMessage =
+        `Lembretes de disponibilidade ELO enviados: ${successCount}/` +
+        `${messages.length} (${failureCount} falhas)`;
+      console.log(logMessage);
+
+      res.status(200).json({
+        success: true,
+        message: logMessage,
+        sent: successCount,
+        failed: failureCount,
+        total: userIds.length,
+      });
+    } catch (error) {
+      console.error(
+        "Erro ao enviar lembretes de disponibilidade ELO:",
+        error
+      );
+      res.status(500).json({
+        error: "Erro interno do servidor",
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });

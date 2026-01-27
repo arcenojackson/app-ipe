@@ -185,5 +185,47 @@ class SocietiesRepository {
       );
     }
   }
+
+  /// Atualizar usuários do Fórum por categoria
+  Future<void> updateForumUsersByCategory({
+    required String id,
+    required Map<String, List<String>> forumUsersByCategory,
+  }) async {
+    try {
+      await _firestore.collection('societies').doc(id).update({
+        'forumUsersByCategory': forumUsersByCategory,
+      });
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao atualizar usuários do Fórum: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Buscar usuários do Fórum por categoria
+  Future<Map<String, List<String>>> getForumUsersByCategory(String id) async {
+    try {
+      final doc = await _firestore.collection('societies').doc(id).get();
+      if (!doc.exists) {
+        return {};
+      }
+      final data = doc.data()!;
+      final forumUsersData = data['forumUsersByCategory'];
+      if (forumUsersData == null || forumUsersData is! Map) {
+        return {};
+      }
+      final result = <String, List<String>>{};
+      forumUsersData.forEach((key, value) {
+        if (value is List) {
+          result[key.toString()] = value.map((e) => e.toString()).toList();
+        }
+      });
+      return result;
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao buscar usuários do Fórum: ${e.toString()}',
+      );
+    }
+  }
 }
 

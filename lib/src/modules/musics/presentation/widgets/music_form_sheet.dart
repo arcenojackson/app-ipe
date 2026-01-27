@@ -382,6 +382,9 @@ class _MusicFormSheetState extends State<MusicFormSheet> {
   Future<void> _searchYoutube() async {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
+    
+    if (!mounted) return;
+
     setState(() {
       _isSearchingYoutube = true;
       _youtubeResults = const [];
@@ -392,6 +395,22 @@ class _MusicFormSheetState extends State<MusicFormSheet> {
       );
       if (mounted) {
         setState(() => _youtubeResults = results);
+      }
+    } catch (e) {
+      if (mounted) {
+        // Exibir erro no console
+        print('❌ Erro ao buscar no YouTube:');
+        print(e.toString());
+        print('');
+        
+        // Mostrar mensagem de erro mais amigável
+        final errorMessage = e.toString().contains('Failed host lookup') ||
+                e.toString().contains('Connection refused') ||
+                e.toString().contains('localhost')
+            ? 'Erro de conexão. Verifique se o servidor está rodando.'
+            : 'Erro ao buscar no YouTube: ${e.toString()}';
+        
+        showErrorToast(context, errorMessage);
       }
     } finally {
       if (mounted) {

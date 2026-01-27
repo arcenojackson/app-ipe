@@ -15,9 +15,20 @@ class ApiClient {
     String path, {
     Map<String, String>? queryParameters,
   }) async {
-    final uri = _buildUri(path, queryParameters);
-    final response = await _httpClient.get(uri, headers: _defaultHeaders);
-    return _handleResponse(response);
+    try {
+      final uri = _buildUri(path, queryParameters);
+      final response = await _httpClient.get(uri, headers: _defaultHeaders);
+      return _handleResponse(response);
+    } on http.ClientException catch (e) {
+      throw AppException(
+        message: 'Erro de conexão: ${e.message}. Verifique se o servidor está rodando e acessível.',
+      );
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException(
+        message: 'Erro ao fazer requisição: ${e.toString()}',
+      );
+    }
   }
 
   Future<Map<String, dynamic>> post(

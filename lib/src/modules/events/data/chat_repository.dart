@@ -315,4 +315,161 @@ class ChatRepository {
       return null;
     }
   }
+
+  /// Marca mensagens como visualizadas pelo usuário atual
+  Future<void> markMessagesAsViewed(
+    String eventId,
+    List<String> messageIds,
+  ) async {
+    try {
+      final userId = _currentUserId;
+      if (userId == null) return;
+
+      final batch = _firestore.batch();
+      
+      for (final messageId in messageIds) {
+        final messageRef = _firestore
+            .collection('services')
+            .doc(eventId)
+            .collection('messages')
+            .doc(messageId);
+        
+        // Usar FieldValue.arrayUnion para adicionar o userId sem duplicatas
+        batch.update(messageRef, {
+          'viewedBy': FieldValue.arrayUnion([userId]),
+        });
+      }
+      
+      await batch.commit();
+    } catch (e) {
+      // Ignorar erros silenciosamente
+    }
+  }
+
+  /// Marca todas as mensagens visíveis como visualizadas
+  Future<void> markAllMessagesAsViewed(String eventId) async {
+    try {
+      final userId = _currentUserId;
+      if (userId == null) return;
+
+      // Buscar todas as mensagens não deletadas
+      final snapshot = await _firestore
+          .collection('services')
+          .doc(eventId)
+          .collection('messages')
+          .where('isDeleted', isEqualTo: false)
+          .get();
+
+      if (snapshot.docs.isEmpty) return;
+
+      final batch = _firestore.batch();
+      for (final doc in snapshot.docs) {
+        final viewedBy = (doc.data()['viewedBy'] as List<dynamic>?) ?? [];
+        if (!viewedBy.contains(userId)) {
+          batch.update(doc.reference, {
+            'viewedBy': FieldValue.arrayUnion([userId]),
+          });
+        }
+      }
+      
+      await batch.commit();
+    } catch (e) {
+      // Ignorar erros silenciosamente
+    }
+  }
+
+  /// Obtém a última mensagem lida pelo usuário no evento
+  Future<String?> getLastReadMessageId(String eventId) async {
+    try {
+      final userId = _currentUserId;
+      if (userId == null) return null;
+
+      final userReadDoc = await _firestore
+          .collection('services')
+          .doc(eventId)
+          .collection('user_reads')
+          .doc(userId)
+          .get();
+
+      if (!userReadDoc.exists) return null;
+      
+      return userReadDoc.data()?['lastMessageId']?.toString();
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Salva a última mensagem lida pelo usuário no evento
+  Future<void> setLastReadMessageId(String eventId, String messageId) async {
+    try {
+      final userId = _currentUserId;
+      if (userId == null) return;
+
+      await _firestore
+          .collection('services')
+          .doc(eventId)
+          .collection('user_reads')
+          .doc(userId)
+          .set({
+        'lastMessageId': messageId,
+        'lastReadAt': Timestamp.now(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      // Ignorar erros silenciosamente
+    }
+  }
+
+  /// Conta mensagens não lidas para o usuário atual no evento
+  Stream<int> getUnreadMessageCount(String eventId) {
+    final userId = _currentUserId;
+    if (userId == null) {
+      return Stream.value(0);
+    }
+
+    return _firestore
+        .collection('services')
+        .doc(eventId)
+        .collection('messages')
+        .where('isDeleted', isEqualTo: false)
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .asyncMap((messagesSnapshot) async {
+      if (messagesSnapshot.docs.isEmpty) {
+        return 0;
+      }
+
+      // Buscar última mensagem lida
+      final lastReadDoc = await _firestore
+          .collection('services')
+          .doc(eventId)
+          .collection('user_reads')
+          .doc(userId)
+          .get();
+
+      final lastReadMessageId = lastReadDoc.data()?['lastMessageId']?.toString();
+      
+      if (lastReadMessageId == null) {
+        // Se nunca leu, todas as mensagens são não lidas
+        return messagesSnapshot.docs.length;
+      }
+
+      // Encontrar índice da última mensagem lida (ordenado por timestamp descendente)
+      int lastReadIndex = -1;
+      for (int i = 0; i < messagesSnapshot.docs.length; i++) {
+        if (messagesSnapshot.docs[i].id == lastReadMessageId) {
+          lastReadIndex = i;
+          break;
+        }
+      }
+
+      // Se não encontrou a mensagem lida, todas são não lidas
+      if (lastReadIndex == -1) {
+        return messagesSnapshot.docs.length;
+      }
+
+      // Como está ordenado descendente, o índice representa quantas mensagens
+      // são mais recentes (não lidas) que a última lida
+      return lastReadIndex;
+    });
+  }
 }

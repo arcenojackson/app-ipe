@@ -8,7 +8,9 @@ import '../../../shared/utils/app_toast.dart';
 import '../../../shared/utils/sort_utils.dart';
 import '../../../shared/state/app_state.dart';
 import '../data/societies_repository.dart';
+import '../data/society_chat_repository.dart';
 import '../models/society.dart';
+import 'society_chat_page.dart';
 
 class _CustomFABLocation extends FloatingActionButtonLocation {
   final double offset;
@@ -39,8 +41,8 @@ class SocietyDetailsPage extends StatefulWidget {
 }
 
 class _SocietyDetailsPageState extends State<SocietyDetailsPage>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+    with TickerProviderStateMixin {
+  TabController? _tabController;
   bool _isLoading = true;
   bool _isSaving = false;
   int _currentTabIndex = 0;
@@ -49,26 +51,63 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
   List<String> _selectedMembers = const [];
   List<String> _selectedBoard = const [];
   Map<String, List<String>> _boardWithPositions = const {}; // Map<position, List<userId>>
+  Map<String, List<String>> _forumUsersByCategory = const {}; // Map<category, List<userId>>
+  final SocietyChatRepository _chatRepository = SocietyChatRepository();
+
+  // Hard-coded: ELO é a única sociedade que tem a aba Fórum
+  static const String _eloSocietyName = 'ELO';
 
   @override
   void initState() {
     super.initState();
+    // Inicializar com 2 tabs por padrão (será atualizado após carregar dados se for ELO)
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(_onTabChanged);
+    _tabController!.addListener(_onTabChanged);
     _loadData();
+  }
+
+  bool get _isELOSociety {
+    return _society?.name == _eloSocietyName;
+  }
+
+  bool get _canSeeForumTab {
+    if (!_isELOSociety) return false;
+    final user = context.read<AppState>().currentUser;
+    if (user == null || _society == null) return false;
+    if (user.isAdminUser) return true;
+    return _society!.allBoardIds.contains(user.id);
+  }
+
+  void _updateTabControllerIfNeeded() {
+    final shouldHaveForumTab = _isELOSociety && _canSeeForumTab;
+    final currentTabCount = _tabController?.length ?? 2;
+    final targetTabCount = shouldHaveForumTab ? 3 : 2;
+
+    if (currentTabCount != targetTabCount) {
+      final oldIndex = _tabController?.index ?? 0;
+      _tabController?.removeListener(_onTabChanged);
+      _tabController?.dispose();
+      _tabController = TabController(
+        length: targetTabCount,
+        vsync: this,
+        initialIndex: oldIndex < targetTabCount ? oldIndex : 0,
+      );
+      _tabController!.addListener(_onTabChanged);
+      _currentTabIndex = _tabController!.index;
+    }
   }
 
   @override
   void dispose() {
-    _tabController.removeListener(_onTabChanged);
-    _tabController.dispose();
+    _tabController?.removeListener(_onTabChanged);
+    _tabController?.dispose();
     super.dispose();
   }
 
   void _onTabChanged() {
-    if (_currentTabIndex != _tabController.index) {
+    if (_tabController != null && _currentTabIndex != _tabController!.index) {
       setState(() {
-        _currentTabIndex = _tabController.index;
+        _currentTabIndex = _tabController!.index;
       });
     }
   }
@@ -83,6 +122,18 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
   Widget build(BuildContext context) {
     final society = _society;
     final title = society == null ? 'Sociedade' : society.name;
+    final canSeeForum = _canSeeForumTab;
+
+    // Atualizar TabController se necessário (após dados carregados)
+    if (!_isLoading && society != null) {
+      _updateTabControllerIfNeeded();
+    }
+
+    if (_tabController == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -105,33 +156,119 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
               ? Color(society.color)
               : const Color(0xFF4CAF50),
           unselectedLabelColor: Colors.white,
-          tabs: const [
-            Tab(text: 'Diretoria'),
-            Tab(text: 'Membros'),
-          ],
+          tabs: _tabController!.length == 3
+              ? [
+                  const Tab(text: 'Diretoria'),
+                  const Tab(text: 'Membros'),
+                  const Tab(text: 'Fórum'),
+                ]
+              : [
+                  const Tab(text: 'Diretoria'),
+                  const Tab(text: 'Membros'),
+                ],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : society == null
-              ? const Center(child: Text('Sociedade não encontrada.'))
-              : TabBarView(
-                  controller: _tabController,
-                  children: [
-                    _buildBoardTab(),
-                    _buildMembersTab(),
-                  ],
-                ),
+      body: Stack(
+        children: [
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : society == null
+                  ? const Center(child: Text('Sociedade não encontrada.'))
+                  : TabBarView(
+                      controller: _tabController,
+                      children: _tabController!.length == 3
+                          ? [
+                              _buildBoardTab(),
+                              _buildMembersTab(),
+                              _buildForumTab(),
+                            ]
+                          : [
+                              _buildBoardTab(),
+                              _buildMembersTab(),
+                            ],
+                    ),
+          // Botão de chat flutuante - acima do botão +
+          if (society != null && society.allBoardIds.isNotEmpty)
+            Builder(
+              builder: (context) {
+                final user = context.read<AppState>().currentUser;
+                // Botão só aparece se o usuário estiver na lista da Diretoria
+                final isInBoard = user != null && society.allBoardIds.contains(user.id);
+                
+                if (!isInBoard) return const SizedBox.shrink();
+                
+                return Positioned(
+                  bottom: _canEdit ? 150 : 100, // Espaçamento ajustado do botão +
+                  right: 16,
+                  child: StreamBuilder<int>(
+                    stream: _chatRepository.getUnreadMessageCount(widget.societyId),
+                    builder: (context, snapshot) {
+                      final unreadCount = snapshot.data ?? 0;
+                      final hasUnread = unreadCount > 0;
+                      
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          FloatingActionButton(
+                            heroTag: 'chat',
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => SocietyChatPage(
+                                    societyId: widget.societyId,
+                                    society: society,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Icon(Icons.chat),
+                          ),
+                          if (hasUnread)
+                            Positioned(
+                              top: 0,
+                              right: 0,
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  border: Border.fromBorderSide(
+                                    BorderSide(color: Color(0xFF0D1220), width: 2),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
       floatingActionButton: _canEdit
           ? (_currentTabIndex == 0
               ? FloatingActionButton(
+                  heroTag: 'add',
                   onPressed: _manageBoard,
                   child: const Icon(Icons.group_add),
                 )
-              : FloatingActionButton(
-                  onPressed: _manageMembers,
-                  child: const Icon(Icons.group_add),
-                ))
+              : _currentTabIndex == 1
+                  ? FloatingActionButton(
+                      heroTag: 'add',
+                      onPressed: _manageMembers,
+                      child: const Icon(Icons.group_add),
+                    )
+                  : canSeeForum && _currentTabIndex == 2
+                      ? FloatingActionButton(
+                          heroTag: 'add',
+                          onPressed: _manageForum,
+                          child: const Icon(Icons.people),
+                        )
+                      : null)
           : null,
       floatingActionButtonLocation: const _CustomFABLocation(offset: 80),
     );
@@ -339,7 +476,17 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
                 ),
               )
             : {};
+        // Carregar forumUsersByCategory
+        _forumUsersByCategory = society.forumUsersByCategory != null
+            ? Map<String, List<String>>.from(
+                society.forumUsersByCategory!.map(
+                  (key, value) => MapEntry(key, List<String>.from(value)),
+                ),
+              )
+            : {};
         _people = people;
+        // Atualizar TabController após carregar dados se for ELO
+        _updateTabControllerIfNeeded();
       });
     } catch (e) {
       setState(() {
@@ -474,6 +621,14 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
           boardIds: _selectedBoard,
         );
       }
+
+      // Salvar forumUsersByCategory se for ELO
+      if (_society?.name == 'ELO' && _forumUsersByCategory.isNotEmpty) {
+        await repository.updateForumUsersByCategory(
+          id: widget.societyId,
+          forumUsersByCategory: _forumUsersByCategory,
+        );
+      }
       
       if (mounted) {
         showSuccessToast(context, 'Sociedade atualizada com sucesso!');
@@ -487,6 +642,184 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
       if (mounted) {
         setState(() => _isSaving = false);
       }
+    }
+  }
+
+  Widget _buildForumTab() {
+    if (_society?.name != 'ELO') {
+      return const Center(
+        child: Text('Esta funcionalidade é apenas para a sociedade ELO.'),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Usuários do Fórum por Categoria',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Gerencie os usuários que podem avaliar músicas em cada categoria',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white70,
+                ),
+          ),
+          const SizedBox(height: 24),
+          _buildForumCategorySection('theological', 'Coerência Teológica'),
+          const SizedBox(height: 24),
+          _buildForumCategorySection('congregational', 'Coerência Congregacional'),
+          const SizedBox(height: 24),
+          _buildForumCategorySection('musical', 'Coerência Musical'),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildForumCategorySection(String categoryKey, String categoryLabel) {
+    final userIds = _forumUsersByCategory[categoryKey] ?? [];
+    final users = _people
+        .where((user) => userIds.contains(user.id))
+        .toList()
+      ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              categoryLabel,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white70,
+                  ),
+            ),
+            TextButton.icon(
+              icon: const Icon(Icons.edit),
+              label: const Text('Gerenciar'),
+              onPressed: () => _manageForumCategory(categoryKey, categoryLabel),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        if (users.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Nenhum usuário adicionado',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Colors.white60,
+                  ),
+            ),
+          )
+        else
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: users
+                .map(
+                  (user) => InputChip(
+                    label: Text(user.name),
+                    avatar: CircleAvatar(
+                      child: Text(user.name.isNotEmpty ? user.name[0] : '?'),
+                    ),
+                    onDeleted: _canEdit
+                        ? () {
+                            setState(() {
+                              final currentList = _forumUsersByCategory[categoryKey] ?? [];
+                              _forumUsersByCategory = Map<String, List<String>>.from(
+                                _forumUsersByCategory,
+                              )..[categoryKey] = List<String>.from(currentList)
+                                ..[categoryKey]!.remove(user.id);
+                            });
+                          }
+                        : null,
+                  ),
+                )
+                .toList(),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _manageForumCategory(String categoryKey, String categoryLabel) async {
+    // Recarregar usuários
+    try {
+      final peopleRepository = context.read<PeopleRepository>();
+      final people = await peopleRepository.fetchAll();
+      setState(() {
+        _people = people;
+      });
+    } catch (e) {
+      if (mounted) {
+        showErrorToast(context, 'Erro ao carregar usuários: ${e.toString()}');
+      }
+      return;
+    }
+
+    final currentUserIds = _forumUsersByCategory[categoryKey] ?? [];
+    final result = await showModalBottomSheet<List<String>>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => PeopleSelectorSheet(
+        people: _people,
+        selectedIds: currentUserIds,
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        _forumUsersByCategory = Map<String, List<String>>.from(_forumUsersByCategory)
+          ..[categoryKey] = result;
+      });
+    }
+  }
+
+  Future<void> _manageForum() async {
+    // Mostrar diálogo para selecionar categoria
+    final selectedCategory = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Selecionar categoria'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Coerência Teológica'),
+              onTap: () => Navigator.of(context).pop('theological'),
+            ),
+            ListTile(
+              title: const Text('Coerência Congregacional'),
+              onTap: () => Navigator.of(context).pop('congregational'),
+            ),
+            ListTile(
+              title: const Text('Coerência Musical'),
+              onTap: () => Navigator.of(context).pop('musical'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (selectedCategory != null) {
+      final categoryLabels = {
+        'theological': 'Coerência Teológica',
+        'congregational': 'Coerência Congregacional',
+        'musical': 'Coerência Musical',
+      };
+      await _manageForumCategory(selectedCategory, categoryLabels[selectedCategory]!);
     }
   }
 }

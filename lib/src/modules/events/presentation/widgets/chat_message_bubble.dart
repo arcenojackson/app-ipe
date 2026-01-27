@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../models/chat_message.dart';
+import '../../../auth/models/user.dart';
 import 'quoted_message_preview.dart';
 
 class ChatMessageBubble extends StatelessWidget {
@@ -12,6 +13,7 @@ class ChatMessageBubble extends StatelessWidget {
     this.onDelete,
     this.onQuote,
     this.isHighlighted = false,
+    this.availableUsers = const [],
   });
 
   final ChatMessageModel message;
@@ -20,6 +22,7 @@ class ChatMessageBubble extends StatelessWidget {
   final VoidCallback? onDelete;
   final VoidCallback? onQuote;
   final bool isHighlighted;
+  final List<UserModel> availableUsers;
 
   bool get isOwnMessage => message.userId == currentUserId;
   bool get canDelete => isOwnMessage || isAdmin;
@@ -110,6 +113,10 @@ class ChatMessageBubble extends StatelessWidget {
                             color: Colors.white.withOpacity(0.6),
                           ),
                         ),
+                        if (isOwnMessage && message.viewedBy.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          _buildViewedByIndicator(context),
+                        ],
                       ],
                     ),
                   ],
@@ -235,6 +242,115 @@ class ChatMessageBubble extends StatelessWidget {
     } else {
       return DateFormat('dd/MM HH:mm').format(timestamp);
     }
+  }
+
+  Widget _buildViewedByIndicator(BuildContext context) {
+    if (message.viewedBy.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Obter usuários que visualizaram, excluindo o autor da mensagem
+    final viewedUsers = availableUsers
+        .where((user) => 
+            message.viewedBy.contains(user.id) && 
+            user.id != message.userId) // Excluir o autor
+        .toList();
+
+    if (viewedUsers.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return GestureDetector(
+      onTap: () => _showViewedByDialog(context, viewedUsers),
+      child: Tooltip(
+        message: 'Visualizado por ${viewedUsers.length} ${viewedUsers.length == 1 ? 'pessoa' : 'pessoas'}',
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(width: 4),
+            // Mostrar até 2 avatares
+            ...viewedUsers.take(2).map((user) {
+              return Container(
+                margin: const EdgeInsets.only(left: 2),
+                child: CircleAvatar(
+                  radius: 7,
+                  backgroundColor: Colors.white.withOpacity(0.4),
+                  child: Text(
+                    user.name.isNotEmpty
+                        ? user.name[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 7,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              );
+            }),
+            if (viewedUsers.length > 2)
+              Container(
+                margin: const EdgeInsets.only(left: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '+${viewedUsers.length - 2}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 7,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showViewedByDialog(BuildContext context, List<UserModel> viewedUsers) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Text('Visualizado por'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: viewedUsers.length,
+            itemBuilder: (context, index) {
+              final user = viewedUsers[index];
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                  child: Text(
+                    user.name.isNotEmpty
+                        ? user.name[0].toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                title: Text(user.name),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fechar'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showOptions(BuildContext context) {

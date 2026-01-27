@@ -36,6 +36,7 @@ class ChatMessageModel {
     this.mentionedUserIds = const [],
     this.isDeleted = false,
     this.quotedMessage,
+    this.viewedBy = const [],
   });
 
   final String id;
@@ -46,6 +47,7 @@ class ChatMessageModel {
   final List<String> mentionedUserIds;
   final bool isDeleted;
   final QuotedMessage? quotedMessage;
+  final List<String> viewedBy;
 
   factory ChatMessageModel.fromJson(Map<String, dynamic> json) {
     // Parse timestamp
@@ -77,6 +79,14 @@ class ChatMessageModel {
           .toList();
     }
 
+    // Parse viewedBy user IDs
+    List<String> viewedBy = [];
+    if (json['viewedBy'] is List) {
+      viewedBy = (json['viewedBy'] as List)
+          .map((e) => e.toString())
+          .toList();
+    }
+
     return ChatMessageModel(
       id: json['id']?.toString() ?? '',
       text: json['text']?.toString() ?? '',
@@ -86,6 +96,7 @@ class ChatMessageModel {
       mentionedUserIds: mentionedUserIds,
       isDeleted: json['isDeleted'] == true,
       quotedMessage: quotedMessage,
+      viewedBy: viewedBy,
     );
   }
 
@@ -97,6 +108,7 @@ class ChatMessageModel {
       'timestamp': Timestamp.fromDate(timestamp),
       'mentionedUserIds': mentionedUserIds,
       'isDeleted': isDeleted,
+      'viewedBy': viewedBy,
     };
 
     if (quotedMessage != null) {
@@ -117,6 +129,7 @@ class ChatMessageModel {
     List<String>? mentionedUserIds,
     bool? isDeleted,
     QuotedMessage? quotedMessage,
+    List<String>? viewedBy,
   }) {
     return ChatMessageModel(
       id: id ?? this.id,
@@ -127,6 +140,7 @@ class ChatMessageModel {
       mentionedUserIds: mentionedUserIds ?? this.mentionedUserIds,
       isDeleted: isDeleted ?? this.isDeleted,
       quotedMessage: quotedMessage ?? this.quotedMessage,
+      viewedBy: viewedBy ?? this.viewedBy,
     );
   }
 }

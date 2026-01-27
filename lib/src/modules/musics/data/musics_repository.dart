@@ -1,5 +1,9 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:convert';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+
+import '../../../core/config/app_config.dart';
 import '../../../core/config/firebase_config.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/utils/app_exception.dart';
@@ -71,17 +75,57 @@ class MusicsRepository {
   }
 
   Future<List<YoutubeSearchResult>> searchYoutube(String query) async {
-    final response = await _apiClient.get(
-      '/musics/search/youtube',
-      queryParameters: {'q': query},
-    );
-    final data = response['data'];
-    if (data is! List) return const [];
-    return data
-        .map(
-          (item) => YoutubeSearchResult.fromJson(item as Map<String, dynamic>),
-        )
-        .toList();
+    try {
+      // Buscar diretamente na API do YouTube Data v3
+      final apiKey = AppConfig.youtubeApiKey;
+      if (apiKey.isEmpty) {
+        throw AppException(
+          message: 'API Key do YouTube não configurada. Configure YOUTUBE_API_KEY no app_config.dart ou como variável de ambiente.',
+        );
+      }
+
+      final encodedQuery = Uri.encodeComponent(query);
+      final url = Uri.parse(
+        'https://www.googleapis.com/youtube/v3/search'
+        '?part=snippet'
+        '&type=video'
+        '&maxResults=10'
+        '&q=$encodedQuery'
+        '&key=$apiKey',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode != 200) {
+        final errorData = jsonDecode(response.body) as Map<String, dynamic>;
+        final errorMessage = errorData['error']?['message']?.toString() ??
+            'Erro ao buscar no YouTube';
+        throw AppException(message: errorMessage);
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final items = data['items'] as List<dynamic>? ?? [];
+
+      return items.map((item) {
+        final itemData = item as Map<String, dynamic>;
+        final id = itemData['id'] as Map<String, dynamic>?;
+        final snippet = itemData['snippet'] as Map<String, dynamic>?;
+        final thumbnails = snippet?['thumbnails'] as Map<String, dynamic>?;
+        final defaultThumbnail = thumbnails?['default'] as Map<String, dynamic>?;
+
+        return YoutubeSearchResult(
+          id: id?['videoId']?.toString() ?? '',
+          title: snippet?['title']?.toString() ?? '',
+          thumbnail: defaultThumbnail?['url']?.toString() ?? '',
+        );
+      }).toList();
+    } on AppException {
+      rethrow;
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao buscar no YouTube: ${e.toString()}',
+      );
+    }
   }
 
   Future<MusicModel> create(MusicModel music) async {

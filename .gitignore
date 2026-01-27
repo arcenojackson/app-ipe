@@ -49,3 +49,6 @@ app.*.map.json
 *.jks
 *.keystore
 upload-keystore.jks
+
+# Secrets do app (NUNCA commitar!)
+lib/src/core/config/app_secrets.dart

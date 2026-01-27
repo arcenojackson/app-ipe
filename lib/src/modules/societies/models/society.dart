@@ -29,6 +29,7 @@ class SocietyModel {
     this.membersIds = const [],
     this.boardIds = const [],
     this.boardWithPositions = const {},
+    this.forumUsersByCategory,
   });
 
   final String id;
@@ -39,6 +40,7 @@ class SocietyModel {
   final List<String> membersIds; // IDs dos membros
   final List<String> boardIds; // IDs da diretoria (formato antigo - compatibilidade)
   final Map<String, List<String>> boardWithPositions; // Map<position, List<userId>> (formato novo)
+  final Map<String, List<String>>? forumUsersByCategory; // Map<category, List<userId>> - Usuários do Fórum por categoria
 
   factory SocietyModel.fromJson(Map<String, dynamic> json) {
     // Parse do board: pode ser List<String> (antigo) ou Map<String, List<String>> (novo)
@@ -67,6 +69,19 @@ class SocietyModel {
       }
     }
     
+    // Parse do forumUsersByCategory
+    final forumUsersData = json['forumUsersByCategory'];
+    Map<String, List<String>>? forumUsersByCategory;
+    if (forumUsersData != null && forumUsersData is Map) {
+      forumUsersByCategory = {};
+      forumUsersData.forEach((key, value) {
+        if (value is List) {
+          forumUsersByCategory![key.toString()] =
+              value.map((e) => e.toString()).toList();
+        }
+      });
+    }
+
     return SocietyModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
@@ -76,6 +91,7 @@ class SocietyModel {
       membersIds: _parseIds(json['members']),
       boardIds: boardIds,
       boardWithPositions: boardWithPositions,
+      forumUsersByCategory: forumUsersByCategory,
     );
   }
 
@@ -107,6 +123,8 @@ class SocietyModel {
         'board': boardWithPositions.isNotEmpty
             ? boardWithPositions
             : boardIds,
+        if (forumUsersByCategory != null && forumUsersByCategory!.isNotEmpty)
+          'forumUsersByCategory': forumUsersByCategory,
       };
 
   SocietyModel copyWith({
@@ -118,6 +136,7 @@ class SocietyModel {
     List<String>? membersIds,
     List<String>? boardIds,
     Map<String, List<String>>? boardWithPositions,
+    Map<String, List<String>>? forumUsersByCategory,
   }) {
     return SocietyModel(
       id: id ?? this.id,
@@ -128,6 +147,7 @@ class SocietyModel {
       membersIds: membersIds ?? this.membersIds,
       boardIds: boardIds ?? this.boardIds,
       boardWithPositions: boardWithPositions ?? this.boardWithPositions,
+      forumUsersByCategory: forumUsersByCategory ?? this.forumUsersByCategory,
     );
   }
   

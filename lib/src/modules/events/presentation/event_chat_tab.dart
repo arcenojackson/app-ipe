@@ -94,6 +94,28 @@ class _EventChatTabState extends State<EventChatTab> {
     }
   }
 
+  Future<void> _markMessagesAsViewed() async {
+    if (_currentUserId == null) return;
+    
+    try {
+      // Marcar todas as mensagens como visualizadas
+      await _chatRepository.markAllMessagesAsViewed(widget.eventId);
+      
+      // Atualizar última mensagem lida quando houver mensagens não deletadas
+      final nonDeletedMessages = _allMessages.where((m) => !m.isDeleted).toList();
+      if (nonDeletedMessages.isNotEmpty) {
+        // Ordenar por timestamp para pegar a mais recente
+        nonDeletedMessages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        await _chatRepository.setLastReadMessageId(
+          widget.eventId,
+          nonDeletedMessages.first.id,
+        );
+      }
+    } catch (e) {
+      // Ignorar erro silenciosamente
+    }
+  }
+
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
@@ -319,6 +341,18 @@ class _EventChatTabState extends State<EventChatTab> {
                   _filteredMessages = messages;
                 }
 
+                // Marcar mensagens como visualizadas quando o usuário visualiza o chat
+                // Usar um debounce para evitar muitas chamadas
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (!_isSearching && messages.isNotEmpty) {
+                    // Aguardar um pouco para garantir que o scroll foi feito
+                    await Future.delayed(const Duration(milliseconds: 1000));
+                    if (mounted && !_isSearching) {
+                      await _markMessagesAsViewed();
+                    }
+                  }
+                });
+
                 if (_filteredMessages.isEmpty) {
                   return Center(
                     child: Column(
@@ -381,6 +415,7 @@ class _EventChatTabState extends State<EventChatTab> {
                       isHighlighted: isHighlighted || isInitialMessage,
                       onDelete: () => _deleteMessage(message.id),
                       onQuote: () => _quoteMessage(message),
+                      availableUsers: _availableUsers,
                     );
                   },
                 );

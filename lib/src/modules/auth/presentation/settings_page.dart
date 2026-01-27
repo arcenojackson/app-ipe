@@ -13,6 +13,9 @@ import '../../people/presentation/people_section.dart';
 import '../../people/presentation/widgets/invite_person_sheet.dart';
 import '../../societies/presentation/societies_page.dart';
 import '../../notifications/presentation/notification_settings_page.dart';
+import '../../music_evaluations/presentation/evaluations_list_page.dart';
+import '../../events/presentation/elo_availability_status_page.dart';
+import '../../societies/data/societies_repository.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -49,14 +52,14 @@ class _SettingsPageState extends State<SettingsPage> {
 
   String _getInitials(String name) {
     if (name.trim().isEmpty) return '?';
-    
+
     final words = name.trim().split(' ').where((w) => w.isNotEmpty).toList();
     if (words.isEmpty) return '?';
-    
+
     if (words.length == 1) {
       return words[0][0].toUpperCase();
     }
-    
+
     // Pegar as primeiras duas iniciais
     return words.take(2).map((w) => w[0].toUpperCase()).join();
   }
@@ -110,160 +113,154 @@ class _SettingsPageState extends State<SettingsPage> {
                       GlassContainer(
                         padding: const EdgeInsets.all(20),
                         child: Row(
-                              children: [
-                                CircleAvatar(
-                                  radius: 28,
-                                  backgroundColor: theme.colorScheme.primary
-                                      .withOpacity(0.15),
-                                  child: Text(
-                                    _getInitials(
-                                      _isEditingName
-                                          ? _nameController.text
-                                          : user.name,
-                                    ),
-                                    style: theme.textTheme.titleLarge?.copyWith(
-                                      color: theme.colorScheme.primary,
-                                    ),
-                                  ),
+                          children: [
+                            CircleAvatar(
+                              radius: 28,
+                              backgroundColor: theme.colorScheme.primary
+                                  .withOpacity(0.15),
+                              child: Text(
+                                _getInitials(
+                                  _isEditingName
+                                      ? _nameController.text
+                                      : user.name,
                                 ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Expanded(
-                                            child: _isEditingName
-                                                ? TextField(
-                                                    controller: _nameController,
-                                                    style: theme.textTheme
-                                                        .titleMedium
-                                                        ?.copyWith(
+                                      Expanded(
+                                        child: _isEditingName
+                                            ? TextField(
+                                                controller: _nameController,
+                                                style: theme
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
                                                       fontWeight:
                                                           FontWeight.w600,
                                                       color: Colors.white,
                                                     ),
-                                                    decoration: InputDecoration(
-                                                      filled: true,
-                                                      fillColor: Colors.white
-                                                          .withOpacity(0.1),
-                                                      border:
-                                                          OutlineInputBorder(
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(12),
-                                                        borderSide:
-                                                            BorderSide.none,
-                                                      ),
-                                                      contentPadding:
-                                                          const EdgeInsets
-                                                              .symmetric(
+                                                decoration: InputDecoration(
+                                                  filled: true,
+                                                  fillColor: Colors.white
+                                                      .withOpacity(0.1),
+                                                  border: OutlineInputBorder(
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          12,
+                                                        ),
+                                                    borderSide: BorderSide.none,
+                                                  ),
+                                                  contentPadding:
+                                                      const EdgeInsets.symmetric(
                                                         horizontal: 12,
                                                         vertical: 12,
                                                       ),
-                                                      suffixIcon:
-                                                          _nameController
-                                                                  .text
-                                                                  .isNotEmpty
-                                                              ? IconButton(
-                                                                  icon: const Icon(
-                                                                    Icons
-                                                                        .close,
-                                                                    color: Colors
-                                                                        .white70,
-                                                                    size: 20,
-                                                                  ),
-                                                                  onPressed:
-                                                                      () {
-                                                                    setState(
-                                                                        () {
-                                                                      _nameController
-                                                                          .clear();
-                                                                    });
-                                                                  },
-                                                                )
-                                                              : null,
-                                                    ),
-                                                    onChanged: (value) {
-                                                      setState(() {});
-                                                    },
-                                                  )
-                                                : Text(
-                                                    user.name,
-                                                    style: theme.textTheme
-                                                        .titleMedium
-                                                        ?.copyWith(
+                                                  suffixIcon:
+                                                      _nameController
+                                                          .text
+                                                          .isNotEmpty
+                                                      ? IconButton(
+                                                          icon: const Icon(
+                                                            Icons.close,
+                                                            color:
+                                                                Colors.white70,
+                                                            size: 20,
+                                                          ),
+                                                          onPressed: () {
+                                                            setState(() {
+                                                              _nameController
+                                                                  .clear();
+                                                            });
+                                                          },
+                                                        )
+                                                      : null,
+                                                ),
+                                                onChanged: (value) {
+                                                  setState(() {});
+                                                },
+                                              )
+                                            : Text(
+                                                user.name,
+                                                style: theme
+                                                    .textTheme
+                                                    .titleMedium
+                                                    ?.copyWith(
                                                       fontWeight:
                                                           FontWeight.w600,
                                                       color: Colors.white,
                                                     ),
-                                                  ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          IconButton(
-                                            icon: Icon(
-                                              _isEditingName
-                                                  ? Icons.save
-                                                  : Icons.edit,
-                                              color: Colors.white70,
-                                              size: 20,
-                                            ),
-                                            onPressed: _isEditingName
-                                                ? () => _saveUserName(
-                                                      context,
-                                                      appState,
-                                                    )
-                                                : () {
-                                                    setState(() {
-                                                      _isEditingName = true;
-                                                      _nameController.text =
-                                                          user.name;
-                                                    });
-                                                  },
-                                            tooltip: _isEditingName
-                                                ? 'Salvar'
-                                                : 'Editar nome',
-                                          ),
-                                        ],
+                                              ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        user.email,
-                                        style: theme.textTheme.bodySmall
-                                            ?.copyWith(color: Colors.white60),
-                                      ),
-                                      if (user.isAdmin) ...[
-                                        const SizedBox(height: 8),
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(
-                                            vertical: 4,
-                                            horizontal: 12,
-                                          ),
-                                          decoration: BoxDecoration(
-                                            color: theme.colorScheme.primary
-                                                .withOpacity(0.15),
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
-                                          child: Text(
-                                            'Administrador',
-                                            style: theme.textTheme.bodySmall
-                                                ?.copyWith(
-                                                  color:
-                                                      theme.colorScheme.primary,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
-                                          ),
+                                      const SizedBox(width: 8),
+                                      IconButton(
+                                        icon: Icon(
+                                          _isEditingName
+                                              ? Icons.save
+                                              : Icons.edit,
+                                          color: Colors.white70,
+                                          size: 20,
                                         ),
-                                      ],
+                                        onPressed: _isEditingName
+                                            ? () => _saveUserName(
+                                                context,
+                                                appState,
+                                              )
+                                            : () {
+                                                setState(() {
+                                                  _isEditingName = true;
+                                                  _nameController.text =
+                                                      user.name;
+                                                });
+                                              },
+                                        tooltip: _isEditingName
+                                            ? 'Salvar'
+                                            : 'Editar nome',
+                                      ),
                                     ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    user.email,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.white60,
+                                    ),
+                                  ),
+                                  if (user.isAdmin) ...[
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 4,
+                                        horizontal: 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: theme.colorScheme.primary
+                                            .withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Text(
+                                        'Administrador',
+                                        style: theme.textTheme.bodySmall
+                                            ?.copyWith(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -379,7 +376,8 @@ class _SettingsPageState extends State<SettingsPage> {
                                 Icons.chevron_right,
                                 color: Colors.white54,
                               ),
-                              onTap: () => _navigateToWeeklyAssignments(context),
+                              onTap: () =>
+                                  _navigateToWeeklyAssignments(context),
                             ),
                           ],
                         ],
@@ -454,6 +452,111 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     const SizedBox(height: 24),
 
+                    // Seção de Equipe de Louvor
+                    Builder(
+                      builder: (context) {
+                        final appState = context.watch<AppState>();
+                        final user = appState.currentUser;
+                        if (user == null) return const SizedBox.shrink();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Equipe de Louvor',
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            GlassContainer(
+                              padding: EdgeInsets.zero,
+                              child: Column(
+                                children: [
+                                  // Opção "Avaliação de Músicas" - condicional
+                                  FutureBuilder<bool>(
+                                    future: _canAccessEvaluations(
+                                      context,
+                                      user,
+                                    ),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.hasData &&
+                                          snapshot.data == true) {
+                                        return Column(
+                                          children: [
+                                            ListTile(
+                                              leading: const Icon(
+                                                Icons.rate_review,
+                                                color: Colors.white70,
+                                              ),
+                                              title: const Text(
+                                                'Avaliação de Músicas',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              subtitle: Text(
+                                                'Avaliar músicas por coerência teológica, congregacional e musical',
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: Colors.white60,
+                                                    ),
+                                              ),
+                                              trailing: const Icon(
+                                                Icons.chevron_right,
+                                                color: Colors.white54,
+                                              ),
+                                              onTap: () =>
+                                                  _navigateToEvaluations(
+                                                    context,
+                                                  ),
+                                            ),
+                                            const Divider(
+                                              height: 1,
+                                              color: Colors.white12,
+                                            ),
+                                          ],
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
+                                  // Opção "Status de Disponibilidades" - sempre visível
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.calendar_today,
+                                      color: Colors.white70,
+                                    ),
+                                    title: const Text(
+                                      'Status de Disponibilidades',
+                                      style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      'Visualizar disponibilidades dos membros da ELO para o próximo mês',
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: Colors.white60),
+                                    ),
+                                    trailing: const Icon(
+                                      Icons.chevron_right,
+                                      color: Colors.white54,
+                                    ),
+                                    onTap: () =>
+                                        _navigateToAvailabilityStatus(context),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        );
+                      },
+                    ),
+
                     // Seção de Conta
                     Text(
                       'Conta',
@@ -489,7 +592,8 @@ class _SettingsPageState extends State<SettingsPage> {
                               Icons.chevron_right,
                               color: Colors.white54,
                             ),
-                            onTap: () => _navigateToNotificationSettings(context),
+                            onTap: () =>
+                                _navigateToNotificationSettings(context),
                           ),
                           const Divider(height: 1, color: Colors.white12),
                           ListTile(
@@ -622,12 +726,12 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       // Fazer logout primeiro
       await appState.signOut();
-      
+
       // Fechar a tela de configurações antes de navegar
       if (context.mounted) {
         Navigator.of(context).pop();
       }
-      
+
       // Usar o navigatorKey global para limpar toda a pilha de navegação
       // Isso garante que voltemos para a tela inicial (LoginPage)
       final navigator = IpeApp.navigatorKey.currentState;
@@ -675,27 +779,21 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _navigateToEventHistory(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EventHistoryPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EventHistoryPage()));
   }
 
   void _navigateToEventTemplate(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const EventTemplatePage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EventTemplatePage()));
   }
 
   void _navigateToCalendar(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const CalendarPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const CalendarPage()));
   }
 
   void _navigateToPeople(BuildContext context) {
@@ -728,7 +826,8 @@ class _SettingsPageState extends State<SettingsPage> {
                         Expanded(
                           child: Text(
                             'Pessoas',
-                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            style: Theme.of(context).textTheme.headlineSmall
+                                ?.copyWith(
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                 ),
@@ -773,35 +872,72 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   void _navigateToSocieties(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const SocietiesPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const SocietiesPage()));
   }
 
   void _navigateToNotificationSettings(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const NotificationSettingsPage(),
-      ),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotificationSettingsPage()));
   }
 
   void _navigateToWeeklyAssignments(BuildContext context) {
     Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => const WeeklyTeamAssignmentsPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const WeeklyTeamAssignmentsPage()),
     );
   }
 
-  Future<void> _saveUserName(
-    BuildContext context,
-    AppState appState,
-  ) async {
+  Future<bool> _canAccessEvaluations(BuildContext context, user) async {
+    try {
+      final societiesRepository = context.read<SocietiesRepository>();
+
+      // Buscar a sociedade ELO
+      final eloSociety = await societiesRepository.fetchByName('ELO');
+      if (eloSociety == null) {
+        return false;
+      }
+
+      // Verificar se o usuário é da diretoria ELO (sempre pode acessar)
+      if (eloSociety.allBoardIds.contains(user.id)) {
+        return true;
+      }
+
+      // Verificar se o usuário está vinculado a alguma categoria do Fórum
+      final forumUsersByCategory = eloSociety.forumUsersByCategory;
+      if (forumUsersByCategory == null || forumUsersByCategory.isEmpty) {
+        return false;
+      }
+
+      // Verificar se o usuário está em pelo menos uma categoria
+      for (final categoryUsers in forumUsersByCategory.values) {
+        if (categoryUsers.contains(user.id)) {
+          return true;
+        }
+      }
+
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _navigateToEvaluations(BuildContext context) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const EvaluationsListPage()));
+  }
+
+  void _navigateToAvailabilityStatus(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EloAvailabilityStatusPage()),
+    );
+  }
+
+  Future<void> _saveUserName(BuildContext context, AppState appState) async {
     final newName = _nameController.text.trim();
-    
+
     if (newName.isEmpty) {
       showErrorToast(context, 'O nome não pode estar vazio');
       return;

@@ -724,47 +724,6 @@ class _CalendarPageState extends State<CalendarPage> {
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Stack(
             children: [
-              // Balão informativo (nuvem) - posicionado à esquerda
-              Positioned(
-                left: 0,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return CustomPaint(
-                      painter: _CloudBubblePainter(
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'Edite',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            Text(
-                              'eventos aqui',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
               // Botões de visualização - centralizados com pequeno offset à esquerda
               Center(
                 child: Transform.translate(
@@ -793,6 +752,20 @@ class _CalendarPageState extends State<CalendarPage> {
                         });
                       },
                     ),
+                  ),
+                ),
+              ),
+              // Ícone informativo (nuvem) - posicionado próximo aos botões de visualização
+              Positioned(
+                left: -15,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: Image.asset(
+                    'assets/images/nuvem.png',
+                    width: 140,
+                    height: 130,
+                    fit: BoxFit.cover,
                   ),
                 ),
               ),
@@ -848,7 +821,8 @@ class _CalendarPageState extends State<CalendarPage> {
                         ],
                       );
                     } else {
-                      return Expanded(child: _buildCalendarView());
+                      // Para visualização Dia, usar constraints explícitas para evitar problemas em release builds
+                      return _buildDayViewWithConstraints(constraints);
                     }
                   },
                 ),
@@ -995,6 +969,69 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+  /// Constrói a visualização de dia com constraints explícitas para evitar problemas em release builds
+  Widget _buildDayViewWithConstraints(BoxConstraints constraints) {
+    final events = _getEventsForDay(_selectedDay);
+    final dateFormat = DateFormat('EEEE, d \'de\' MMMM \'de\' y', 'pt_BR');
+
+    // Calcular altura disponível para a lista de eventos
+    // Altura aproximada da navegação: ~80 pixels (padding + row com ícones)
+    const navigationHeight = 80.0;
+    final availableHeight = constraints.maxHeight > 0
+        ? constraints.maxHeight - navigationHeight
+        : null;
+
+    return Column(
+      children: [
+        // Navegação de dia
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.chevron_left, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _selectedDay = _selectedDay.subtract(
+                      const Duration(days: 1),
+                    );
+                    _focusedDay = _selectedDay;
+                  });
+                },
+              ),
+              Expanded(
+                child: Text(
+                  dateFormat.format(_selectedDay),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.chevron_right, color: Colors.white),
+                onPressed: () {
+                  setState(() {
+                    _selectedDay = _selectedDay.add(const Duration(days: 1));
+                    _focusedDay = _selectedDay;
+                  });
+                },
+              ),
+            ],
+          ),
+        ),
+        // Lista de eventos - usar SizedBox com altura explícita para garantir funcionamento em release
+        if (availableHeight != null && availableHeight > 0)
+          SizedBox(height: availableHeight, child: _buildDayEventList(events))
+        else
+          Expanded(child: _buildDayEventList(events)),
+      ],
+    );
+  }
+
   Widget _buildDayView() {
     final events = _getEventsForDay(_selectedDay);
     final dateFormat = DateFormat('EEEE, d \'de\' MMMM \'de\' y', 'pt_BR');
@@ -1049,11 +1086,11 @@ class _CalendarPageState extends State<CalendarPage> {
 
   Widget _buildDayEventList(List<CalendarEventModel> events) {
     if (events.isEmpty) {
-      return Align(
-        alignment: Alignment.topCenter,
+      return Center(
         child: Padding(
-          padding: const EdgeInsets.only(top: 40),
+          padding: const EdgeInsets.all(40),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.event_busy, size: 64, color: Colors.white38),
@@ -1420,74 +1457,4 @@ class _CalendarPageState extends State<CalendarPage> {
       ),
     );
   }
-}
-
-// Classe para desenhar o balão de fala em formato de nuvem
-class _CloudBubblePainter extends CustomPainter {
-  final Color color;
-
-  _CloudBubblePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    final path = Path();
-    final width = size.width;
-    final height = size.height;
-
-    // Desenha o corpo do balão com bordas arredondadas em formato de nuvem
-    // Começando do canto superior esquerdo (mais arredondado)
-    path.moveTo(12, 0);
-    path.quadraticBezierTo(6, 0, 6, 6);
-
-    // Lado esquerdo com bolha arredondada
-    path.lineTo(6, height / 2 - 8);
-    path.quadraticBezierTo(3, height / 2 - 5, 3, height / 2);
-
-    // Lado inferior esquerdo com bolha arredondada
-    path.quadraticBezierTo(3, height / 2 + 5, 6, height / 2 + 8);
-    path.lineTo(6, height - 6);
-
-    // Canto inferior esquerdo (mais arredondado)
-    path.quadraticBezierTo(6, height, 12, height);
-
-    // Lado inferior com bolhas arredondadas
-    path.lineTo(width - 24, height);
-    path.quadraticBezierTo(width - 20, height, width - 20, height - 4);
-    path.quadraticBezierTo(width - 18, height - 6, width - 16, height - 6);
-    path.quadraticBezierTo(width - 14, height - 6, width - 12, height - 4);
-    path.quadraticBezierTo(width - 10, height - 2, width - 8, height - 2);
-
-    // Cauda apontando para a direita (mais arredondada)
-    final tailStartX = width - 6;
-    final tailEndX = width + 3;
-    final tailY = height / 2;
-
-    path.lineTo(tailStartX, tailY - 5);
-    path.quadraticBezierTo(tailStartX + 3, tailY - 3, tailEndX, tailY - 1);
-    path.quadraticBezierTo(tailEndX + 1, tailY, tailEndX, tailY + 1);
-    path.quadraticBezierTo(tailStartX + 3, tailY + 3, tailStartX, tailY + 5);
-    path.lineTo(tailStartX - 2, tailY + 2);
-    path.quadraticBezierTo(tailStartX - 2, tailY, tailStartX - 2, tailY - 2);
-    path.lineTo(width - 10, 4);
-
-    // Lado superior com bolhas arredondadas
-    path.quadraticBezierTo(width - 14, 6, width - 16, 6);
-    path.quadraticBezierTo(width - 18, 6, width - 20, 4);
-    path.quadraticBezierTo(width - 22, 2, width - 24, 2);
-    path.quadraticBezierTo(width - 24, 0, width - 22, 0);
-
-    // Volta ao início (canto superior esquerdo)
-    path.lineTo(12, 0);
-    path.close();
-
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

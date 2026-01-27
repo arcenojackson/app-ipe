@@ -30,7 +30,12 @@ void _showCustomToast({
   required Color backgroundColor,
   required Widget icon,
 }) {
-  final overlay = Overlay.of(context);
+  // Verificar se o contexto ainda está válido
+  if (!context.mounted) return;
+  
+  final overlay = Overlay.maybeOf(context);
+  if (overlay == null) return;
+  
   late OverlayEntry overlayEntry;
   
   overlayEntry = OverlayEntry(
@@ -39,8 +44,14 @@ void _showCustomToast({
       backgroundColor: backgroundColor,
       icon: icon,
       onDismiss: () {
-        if (overlayEntry.mounted) {
-          overlayEntry.remove();
+        // Verificar se o overlay ainda está montado e se o contexto é válido
+        final currentOverlay = Overlay.maybeOf(context);
+        if (overlayEntry.mounted && currentOverlay != null) {
+          try {
+            overlayEntry.remove();
+          } catch (e) {
+            // Ignorar erro se o overlay já foi removido
+          }
         }
       },
     ),
@@ -50,8 +61,15 @@ void _showCustomToast({
 
   // Remove automaticamente após 3 segundos
   Future.delayed(const Duration(seconds: 3), () {
-    if (overlayEntry.mounted) {
-      overlayEntry.remove();
+    // Verificar se o contexto ainda está válido antes de remover
+    if (!context.mounted) return;
+    final currentOverlay = Overlay.maybeOf(context);
+    if (overlayEntry.mounted && currentOverlay != null) {
+      try {
+        overlayEntry.remove();
+      } catch (e) {
+        // Ignorar erro se o overlay já foi removido
+      }
     }
   });
 }

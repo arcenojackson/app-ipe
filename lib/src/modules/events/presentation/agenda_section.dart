@@ -160,13 +160,13 @@ class _AgendaSectionState extends State<AgendaSection> {
     }
   }
 
-  /// Verifica se a data atual está entre os dias 05 e 25 do mês
+  /// Verifica se a data atual está entre os dias 05 e 28 do mês
   /// E se o usuário é membro da sociedade ELO
   bool _shouldShowAvailabilityButton() {
     if (!_isELOMember) return false;
 
     final now = DateTime.now();
-    return now.day >= 5 && now.day <= 25;
+    return now.day >= 5 && now.day <= 28;
   }
 
   Future<void> _openAvailabilityModal(BuildContext context) async {

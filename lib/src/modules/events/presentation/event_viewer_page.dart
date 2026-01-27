@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -10,8 +11,10 @@ import '../../people/presentation/widgets/user_chip.dart';
 import '../../societies/data/societies_repository.dart';
 import '../../societies/models/society.dart';
 import '../data/events_repository.dart';
+import '../data/chat_repository.dart';
 import '../models/event.dart';
 import '../models/event_template.dart';
+import '../../../core/config/firebase_config.dart';
 import 'widgets/music_view_dialog.dart';
 import '../../../shared/utils/tone_utils.dart';
 import 'event_chat_tab.dart';
@@ -41,20 +44,71 @@ class _EventViewerPageState extends State<EventViewerPage>
   List<UserModel> _people = const [];
   List<SocietyModel> _societies = const [];
   EventTemplateModel? _template;
+  final ChatRepository _chatRepository = ChatRepository();
+  String? _currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _currentUserId = FirebaseConfig.auth.currentUser?.uid;
     _tabController = TabController(
       length: 4,
       vsync: this,
       initialIndex: widget.initialTabIndex.clamp(0, 3),
     );
+    _tabController.addListener(_onTabChanged);
     _loadData();
+  }
+
+  void _onTabChanged() {
+    // Quando a aba do chat (índice 3) é selecionada, marcar mensagens como lidas
+    if (_tabController.index == 3 && _event != null && _currentUserId != null) {
+      final isUserAssigned = _event!.people.allPeopleIds.contains(_currentUserId!);
+      if (isUserAssigned) {
+        // Aguardar um pouco para garantir que o chat foi carregado
+        Future.delayed(const Duration(milliseconds: 1000), () async {
+          if (mounted && _tabController.index == 3) {
+            try {
+              // Buscar todas as mensagens não deletadas (sem orderBy para evitar necessidade de índice)
+              final messagesSnapshot = await FirebaseConfig.firestore
+                  .collection('services')
+                  .doc(widget.eventId)
+                  .collection('messages')
+                  .where('isDeleted', isEqualTo: false)
+                  .get();
+              
+              if (messagesSnapshot.docs.isNotEmpty) {
+                // Encontrar a mensagem mais recente manualmente
+                var lastMessage = messagesSnapshot.docs.first;
+                var lastTimestamp = (lastMessage.data()['timestamp'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+                
+                for (var doc in messagesSnapshot.docs) {
+                  final timestamp = (doc.data()['timestamp'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+                  if (timestamp > lastTimestamp) {
+                    lastTimestamp = timestamp;
+                    lastMessage = doc;
+                  }
+                }
+                
+                // Marcar todas como visualizadas e atualizar última lida
+                await _chatRepository.markAllMessagesAsViewed(widget.eventId);
+                await _chatRepository.setLastReadMessageId(
+                  widget.eventId,
+                  lastMessage.id,
+                );
+              }
+            } catch (e) {
+              // Ignorar erros silenciosamente
+            }
+          }
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
     super.dispose();
   }
@@ -65,16 +119,20 @@ class _EventViewerPageState extends State<EventViewerPage>
         ? 'Evento'
         : '${_event!.name} (${DateFormat('dd/MM').format(_event!.date)})';
 
+    // Verificar se usuário está escalado no evento
+    final isUserAssigned = _event != null && _currentUserId != null &&
+        _event!.people.allPeopleIds.contains(_currentUserId);
+
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'Etapas'),
-            Tab(text: 'Pessoas'),
-            Tab(text: 'Equipes'),
-            Tab(text: 'Chat'),
+          tabs: [
+            const Tab(text: 'Etapas'),
+            const Tab(text: 'Pessoas'),
+            const Tab(text: 'Equipes'),
+            _buildChatTab(isUserAssigned),
           ],
         ),
       ),
@@ -609,6 +667,50 @@ class _EventViewerPageState extends State<EventViewerPage>
     await showDialog(
       context: context,
       builder: (_) => MusicViewDialog(music: music, customTone: customTone),
+    );
+  }
+
+  Widget _buildChatTab(bool isUserAssigned) {
+    // Se o usuário não está escalado, não mostrar indicador
+    if (!isUserAssigned || _event == null) {
+      return const Tab(text: 'Chat');
+    }
+
+    return StreamBuilder<int>(
+      stream: _chatRepository.getUnreadMessageCount(widget.eventId),
+      builder: (context, snapshot) {
+        // Se ainda está carregando, não mostrar indicador
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Tab(text: 'Chat');
+        }
+
+        final unreadCount = snapshot.data ?? 0;
+        final hasUnread = unreadCount > 0;
+
+        // Se a aba do chat está ativa, não mostrar indicador (mensagens serão marcadas como lidas)
+        final isChatTabActive = _tabController.index == 3;
+
+        return Tab(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Chat'),
+              if (hasUnread && !isChatTabActive) ...[
+                const SizedBox(width: 6),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 }

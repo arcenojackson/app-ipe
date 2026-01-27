@@ -11,6 +11,7 @@ import 'src/modules/musics/data/musics_repository.dart';
 import 'src/modules/people/data/people_repository.dart';
 import 'src/modules/societies/data/societies_repository.dart';
 import 'src/modules/events/data/weekly_team_assignments_repository.dart';
+import 'src/modules/music_evaluations/data/music_evaluations_repository.dart';
 import 'src/shared/services/session_storage.dart';
 import 'src/shared/state/app_state.dart';
 import 'src/modules/notifications/services/notification_service.dart';
@@ -29,6 +30,7 @@ void main() async {
     sessionStorage: storage,
   );
   final appState = AppState(authRepository: authRepository);
+  final societiesRepository = SocietiesRepository();
 
   await appState.bootstrap();
 
@@ -51,10 +53,15 @@ void main() async {
           value: PeopleRepository(apiClient: apiClient),
         ),
         Provider<SocietiesRepository>.value(
-          value: SocietiesRepository(),
+          value: societiesRepository,
         ),
         Provider<WeeklyTeamAssignmentsRepository>.value(
           value: WeeklyTeamAssignmentsRepository(),
+        ),
+        Provider<MusicEvaluationsRepository>.value(
+          value: MusicEvaluationsRepository(
+            societiesRepository: societiesRepository,
+          ),
         ),
         // Usar ChangeNotifierProvider.value mas garantir que as notificações funcionem
         ChangeNotifierProvider<AppState>.value(
