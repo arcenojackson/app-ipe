@@ -30,7 +30,7 @@ class EventChatTab extends StatefulWidget {
 class _EventChatTabState extends State<EventChatTab> {
   final ScrollController _scrollController = ScrollController();
   final ChatRepository _chatRepository = ChatRepository();
-  
+
   bool _isSearching = false;
   String _searchQuery = '';
   List<ChatMessageModel> _allMessages = [];
@@ -41,6 +41,8 @@ class _EventChatTabState extends State<EventChatTab> {
   String? _currentUserId;
   bool _isAdmin = false;
   bool _hasScrolledToInitialMessage = false;
+  bool _hasPerformedInitialScroll =
+      false; // Controla se o scroll inicial foi feito
   final GlobalKey _initialMessageKey = GlobalKey();
 
   @override
@@ -61,10 +63,10 @@ class _EventChatTabState extends State<EventChatTab> {
     try {
       final peopleRepository = context.read<PeopleRepository>();
       final allUsers = await peopleRepository.fetchAll();
-      
+
       // Obter IDs de usuários do evento
       final eventUserIds = widget.event.people.allPeopleIds.toSet();
-      
+
       // Filtrar apenas usuários vinculados ao evento
       setState(() {
         _availableUsers = allUsers
@@ -78,15 +80,16 @@ class _EventChatTabState extends State<EventChatTab> {
 
   Future<void> _checkAdminStatus() async {
     if (_currentUserId == null) return;
-    
+
     try {
       final userDoc = await FirebaseConfig.firestore
           .collection('users')
           .doc(_currentUserId!)
           .get();
-      
+
       setState(() {
-        _isAdmin = userDoc.data()?['is_admin'] == true ||
+        _isAdmin =
+            userDoc.data()?['is_admin'] == true ||
             userDoc.data()?['isAdmin'] == true;
       });
     } catch (e) {
@@ -96,13 +99,15 @@ class _EventChatTabState extends State<EventChatTab> {
 
   Future<void> _markMessagesAsViewed() async {
     if (_currentUserId == null) return;
-    
+
     try {
       // Marcar todas as mensagens como visualizadas
       await _chatRepository.markAllMessagesAsViewed(widget.eventId);
-      
+
       // Atualizar última mensagem lida quando houver mensagens não deletadas
-      final nonDeletedMessages = _allMessages.where((m) => !m.isDeleted).toList();
+      final nonDeletedMessages = _allMessages
+          .where((m) => !m.isDeleted)
+          .toList();
       if (nonDeletedMessages.isNotEmpty) {
         // Ordenar por timestamp para pegar a mais recente
         nonDeletedMessages.sort((a, b) => b.timestamp.compareTo(a.timestamp));
@@ -128,7 +133,7 @@ class _EventChatTabState extends State<EventChatTab> {
 
   void _scrollToInitialMessage(String messageId) {
     if (_hasScrolledToInitialMessage) return;
-    
+
     // Aguardar um pouco para garantir que o ListView está renderizado
     Future.delayed(const Duration(milliseconds: 800), () {
       if (!mounted || !_scrollController.hasClients) {
@@ -142,29 +147,34 @@ class _EventChatTabState extends State<EventChatTab> {
 
       if (messageIndex != -1) {
         // Tentar usar o GlobalKey para obter posição exata
-        final RenderBox? renderBox = 
+        final RenderBox? renderBox =
             _initialMessageKey.currentContext?.findRenderObject() as RenderBox?;
-        
+
         if (renderBox != null && _scrollController.hasClients) {
           try {
             // Obter a posição do widget no ScrollView
             final position = renderBox.localToGlobal(Offset.zero);
             final scrollViewBox = context.findRenderObject() as RenderBox?;
-            
+
             if (scrollViewBox != null) {
-              final scrollViewPosition = scrollViewBox.localToGlobal(Offset.zero);
+              final scrollViewPosition = scrollViewBox.localToGlobal(
+                Offset.zero,
+              );
               final relativeY = position.dy - scrollViewPosition.dy;
               final currentOffset = _scrollController.offset;
-              
+
               // Calcular o offset necessário para mostrar a mensagem com padding
               final targetOffset = currentOffset + relativeY - 150;
-              
+
               _scrollController.animateTo(
-                targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+                targetOffset.clamp(
+                  0.0,
+                  _scrollController.position.maxScrollExtent,
+                ),
                 duration: const Duration(milliseconds: 600),
                 curve: Curves.easeInOut,
               );
-              
+
               _hasScrolledToInitialMessage = true;
               return;
             }
@@ -172,12 +182,12 @@ class _EventChatTabState extends State<EventChatTab> {
             // Se falhar, usar fallback
           }
         }
-        
+
         // Fallback: usar índice estimado
         // Assumir altura média de ~100px por mensagem
         const estimatedMessageHeight = 100.0;
         final targetOffset = (messageIndex * estimatedMessageHeight) - 150;
-        
+
         _scrollController.animateTo(
           targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
           duration: const Duration(milliseconds: 600),
@@ -193,14 +203,17 @@ class _EventChatTabState extends State<EventChatTab> {
             final retryIndex = _filteredMessages.indexWhere(
               (msg) => msg.id == messageId && !msg.isDeleted,
             );
-            
+
             if (retryIndex != -1) {
               const estimatedMessageHeight = 100.0;
               final targetOffset = (retryIndex * estimatedMessageHeight) - 150;
-              
+
               if (_scrollController.hasClients) {
                 _scrollController.animateTo(
-                  targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+                  targetOffset.clamp(
+                    0.0,
+                    _scrollController.position.maxScrollExtent,
+                  ),
                   duration: const Duration(milliseconds: 600),
                   curve: Curves.easeInOut,
                 );
@@ -208,7 +221,7 @@ class _EventChatTabState extends State<EventChatTab> {
             } else {
               _scrollToBottom();
             }
-            
+
             _hasScrolledToInitialMessage = true;
           }
         });
@@ -216,7 +229,10 @@ class _EventChatTabState extends State<EventChatTab> {
     });
   }
 
-  Future<void> _onSendMessage(String text, List<String> mentionedUserIds) async {
+  Future<void> _onSendMessage(
+    String text,
+    List<String> mentionedUserIds,
+  ) async {
     if (text.trim().isEmpty) return;
     if (_currentUserId == null) return;
 
@@ -227,16 +243,16 @@ class _EventChatTabState extends State<EventChatTab> {
         mentionedUserIds,
         quotedMessageId: _quotedMessage?.id,
       );
-      
+
       // Scroll para baixo após enviar
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollToBottom();
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erro ao enviar mensagem: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Erro ao enviar mensagem: $e')));
       }
     }
   }
@@ -299,12 +315,15 @@ class _EventChatTabState extends State<EventChatTab> {
   Widget build(BuildContext context) {
     // Verificar se usuário está vinculado ao evento
     final eventUserIds = widget.event.people.allPeopleIds.toSet();
-    final canAccess = _currentUserId != null && 
+    final canAccess =
+        _currentUserId != null &&
         (eventUserIds.contains(_currentUserId) || _isAdmin);
 
     if (!canAccess) {
       return const Center(
-        child: Text('Você precisa estar escalado neste evento para acessar o chat.'),
+        child: Text(
+          'Você precisa estar escalado neste evento para acessar o chat.',
+        ),
       );
     }
 
@@ -328,13 +347,15 @@ class _EventChatTabState extends State<EventChatTab> {
 
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text('Erro ao carregar mensagens: ${snapshot.error}'),
+                    child: Text(
+                      'Erro ao carregar mensagens: ${snapshot.error}',
+                    ),
                   );
                 }
 
                 final messages = snapshot.data ?? [];
                 _allMessages = messages;
-                
+
                 if (_isSearching && _searchQuery.isNotEmpty) {
                   // Já foi filtrado em _onSearchChanged
                 } else {
@@ -379,17 +400,17 @@ class _EventChatTabState extends State<EventChatTab> {
                 }
 
                 // Scroll para mensagem inicial se especificada, senão para o final
+                // IMPORTANTE: Só faz scroll automático uma vez na abertura do chat
+                // para evitar forçar o scroll quando o usuário está navegando manualmente
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!_isSearching && !_hasScrolledToInitialMessage) {
-                    if (widget.initialMessageId != null && messages.isNotEmpty) {
+                  if (!_isSearching && !_hasPerformedInitialScroll) {
+                    if (widget.initialMessageId != null &&
+                        messages.isNotEmpty) {
                       _scrollToInitialMessage(widget.initialMessageId!);
                     } else {
                       _scrollToBottom();
                     }
-                  } else if (!_isSearching && _hasScrolledToInitialMessage) {
-                    // Após scrollar para a mensagem inicial, não fazer scroll automático
-                  } else if (!_isSearching) {
-                    _scrollToBottom();
+                    _hasPerformedInitialScroll = true;
                   }
                 });
 
@@ -399,11 +420,15 @@ class _EventChatTabState extends State<EventChatTab> {
                   itemCount: _filteredMessages.length,
                   itemBuilder: (context, index) {
                     final message = _filteredMessages[index];
-                    final isHighlighted = _searchQuery.isNotEmpty &&
-                        message.text.toLowerCase().contains(_searchQuery.toLowerCase());
-                    
+                    final isHighlighted =
+                        _searchQuery.isNotEmpty &&
+                        message.text.toLowerCase().contains(
+                          _searchQuery.toLowerCase(),
+                        );
+
                     // Destacar mensagem inicial se especificada
-                    final isInitialMessage = widget.initialMessageId != null &&
+                    final isInitialMessage =
+                        widget.initialMessageId != null &&
                         message.id == widget.initialMessageId &&
                         !_hasScrolledToInitialMessage;
 

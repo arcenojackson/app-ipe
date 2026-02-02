@@ -25,8 +25,10 @@ class PeopleSelectorSheet extends StatefulWidget {
   final List<String> selectedIds;
   final DateTime? eventDate;
   final bool filterByELO;
-  final String? filterBySociety; // Nome da sociedade para filtrar (ex: "Som e Imagem")
-  final String? instrument; // Instrumento selecionado (ex: "Violão", "Baixo", etc.)
+  final String?
+  filterBySociety; // Nome da sociedade para filtrar (ex: "Som e Imagem")
+  final String?
+  instrument; // Instrumento selecionado (ex: "Violão", "Baixo", etc.)
   final bool showTalkBack; // Se deve mostrar checkbox de Talk Back
   final String? title;
   final bool canGoBack;
@@ -113,35 +115,25 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
           .where((person) => memberIds.contains(person.id))
           .toList();
 
-      // Se for ELO, aplicar filtro de disponibilidade apenas se o evento for de um mês diferente do atual
+      // Se for ELO, aplicar filtro de disponibilidade sempre que houver data do evento
+      // O filtro usa as disponibilidades que foram informadas no mês anterior
       if (widget.filterByELO && widget.eventDate != null) {
-        final now = DateTime.now();
-        final eventDate = widget.eventDate!;
+        final eventsRepository = context.read<EventsRepository>();
+        final availablePeople = <UserModel>[];
 
-        // Verificar se o evento está no mesmo mês e ano do mês atual
-        final isSameMonth =
-            now.year == eventDate.year && now.month == eventDate.month;
-
-        // Aplicar filtro de disponibilidade apenas se o evento for de um mês diferente
-        if (!isSameMonth) {
-          final eventsRepository = context.read<EventsRepository>();
-          final availablePeople = <UserModel>[];
-
-          for (final person in filteredPeople) {
-            try {
-              final hasAvailability = await eventsRepository
-                  .hasAvailabilityForDate(person.id, widget.eventDate!);
-              if (hasAvailability) {
-                availablePeople.add(person);
-              }
-            } catch (e) {
-              // Se houver erro ao verificar disponibilidade, não incluir o usuário
+        for (final person in filteredPeople) {
+          try {
+            final hasAvailability = await eventsRepository
+                .hasAvailabilityForDate(person.id, widget.eventDate!);
+            if (hasAvailability) {
+              availablePeople.add(person);
             }
+          } catch (e) {
+            // Se houver erro ao verificar disponibilidade, não incluir o usuário
           }
-
-          filteredPeople = availablePeople;
         }
-        // Se estiver no mesmo mês, não filtrar por disponibilidade (mostrar todos)
+
+        filteredPeople = availablePeople;
       }
 
       // Aplicar filtro de busca se houver
@@ -154,9 +146,7 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
       }
 
       // Ordenar por nome alfabeticamente (ignorando acentos)
-      filteredPeople.sort(
-        (a, b) => compareNamesIgnoreAccents(a.name, b.name),
-      );
+      filteredPeople.sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
 
       setState(() {
         _isLoading = false;

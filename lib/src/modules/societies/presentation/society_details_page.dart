@@ -50,8 +50,10 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
   List<UserModel> _people = const [];
   List<String> _selectedMembers = const [];
   List<String> _selectedBoard = const [];
-  Map<String, List<String>> _boardWithPositions = const {}; // Map<position, List<userId>>
-  Map<String, List<String>> _forumUsersByCategory = const {}; // Map<category, List<userId>>
+  Map<String, List<String>> _boardWithPositions =
+      const {}; // Map<position, List<userId>>
+  Map<String, List<String>> _forumUsersByCategory =
+      const {}; // Map<category, List<userId>>
   final SocietyChatRepository _chatRepository = SocietyChatRepository();
 
   // Hard-coded: ELO é a única sociedade que tem a aba Fórum
@@ -74,7 +76,8 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     if (!_isELOSociety) return false;
     final user = context.read<AppState>().currentUser;
     if (user == null || _society == null) return false;
-    if (user.isAdminUser) return true;
+    // Apenas usuários que estão na Diretoria da ELO podem ver a aba Fórum
+    // (Admin não tem acesso automático)
     return _society!.allBoardIds.contains(user.id);
   }
 
@@ -130,9 +133,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     }
 
     if (_tabController == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     return Scaffold(
@@ -162,10 +163,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
                   const Tab(text: 'Membros'),
                   const Tab(text: 'Fórum'),
                 ]
-              : [
-                  const Tab(text: 'Diretoria'),
-                  const Tab(text: 'Membros'),
-                ],
+              : [const Tab(text: 'Diretoria'), const Tab(text: 'Membros')],
         ),
       ),
       body: Stack(
@@ -173,39 +171,37 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : society == null
-                  ? const Center(child: Text('Sociedade não encontrada.'))
-                  : TabBarView(
-                      controller: _tabController,
-                      children: _tabController!.length == 3
-                          ? [
-                              _buildBoardTab(),
-                              _buildMembersTab(),
-                              _buildForumTab(),
-                            ]
-                          : [
-                              _buildBoardTab(),
-                              _buildMembersTab(),
-                            ],
-                    ),
+              ? const Center(child: Text('Sociedade não encontrada.'))
+              : TabBarView(
+                  controller: _tabController,
+                  children: _tabController!.length == 3
+                      ? [_buildBoardTab(), _buildMembersTab(), _buildForumTab()]
+                      : [_buildBoardTab(), _buildMembersTab()],
+                ),
           // Botão de chat flutuante - acima do botão +
           if (society != null && society.allBoardIds.isNotEmpty)
             Builder(
               builder: (context) {
                 final user = context.read<AppState>().currentUser;
                 // Botão só aparece se o usuário estiver na lista da Diretoria
-                final isInBoard = user != null && society.allBoardIds.contains(user.id);
-                
+                final isInBoard =
+                    user != null && society.allBoardIds.contains(user.id);
+
                 if (!isInBoard) return const SizedBox.shrink();
-                
+
                 return Positioned(
-                  bottom: _canEdit ? 150 : 100, // Espaçamento ajustado do botão +
+                  bottom: _canEdit
+                      ? 150
+                      : 100, // Espaçamento ajustado do botão +
                   right: 16,
                   child: StreamBuilder<int>(
-                    stream: _chatRepository.getUnreadMessageCount(widget.societyId),
+                    stream: _chatRepository.getUnreadMessageCount(
+                      widget.societyId,
+                    ),
                     builder: (context, snapshot) {
                       final unreadCount = snapshot.data ?? 0;
                       final hasUnread = unreadCount > 0;
-                      
+
                       return Stack(
                         clipBehavior: Clip.none,
                         children: [
@@ -235,7 +231,10 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
                                   color: Colors.red,
                                   shape: BoxShape.circle,
                                   border: Border.fromBorderSide(
-                                    BorderSide(color: Color(0xFF0D1220), width: 2),
+                                    BorderSide(
+                                      color: Color(0xFF0D1220),
+                                      width: 2,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -251,24 +250,24 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
       ),
       floatingActionButton: _canEdit
           ? (_currentTabIndex == 0
-              ? FloatingActionButton(
-                  heroTag: 'add',
-                  onPressed: _manageBoard,
-                  child: const Icon(Icons.group_add),
-                )
-              : _currentTabIndex == 1
-                  ? FloatingActionButton(
-                      heroTag: 'add',
-                      onPressed: _manageMembers,
-                      child: const Icon(Icons.group_add),
-                    )
-                  : canSeeForum && _currentTabIndex == 2
-                      ? FloatingActionButton(
-                          heroTag: 'add',
-                          onPressed: _manageForum,
-                          child: const Icon(Icons.people),
-                        )
-                      : null)
+                ? FloatingActionButton(
+                    heroTag: 'add',
+                    onPressed: _manageBoard,
+                    child: const Icon(Icons.group_add),
+                  )
+                : _currentTabIndex == 1
+                ? FloatingActionButton(
+                    heroTag: 'add',
+                    onPressed: _manageMembers,
+                    child: const Icon(Icons.group_add),
+                  )
+                : canSeeForum && _currentTabIndex == 2
+                ? FloatingActionButton(
+                    heroTag: 'add',
+                    onPressed: _manageForum,
+                    child: const Icon(Icons.people),
+                  )
+                : null)
           : null,
       floatingActionButtonLocation: const _CustomFABLocation(offset: 80),
     );
@@ -290,18 +289,15 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         ),
       );
     }
-    final members = _people
-        .where((user) => _selectedMembers.contains(user.id))
-        .toList()
-      ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
-    
+    final members =
+        _people.where((user) => _selectedMembers.contains(user.id)).toList()
+          ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
+
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: members.length,
-      separatorBuilder: (context, index) => Divider(
-        height: 1,
-        color: Colors.white.withOpacity(0.1),
-      ),
+      separatorBuilder: (context, index) =>
+          Divider(height: 1, color: Colors.white.withOpacity(0.1)),
       itemBuilder: (context, index) {
         final user = members[index];
         return Container(
@@ -319,16 +315,17 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
               Expanded(
                 child: Text(
                   user.name,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.white,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.white),
                 ),
               ),
               if (_canEdit)
                 IconButton(
                   icon: const Icon(Icons.close, color: Colors.white54),
                   onPressed: () => setState(() {
-                    _selectedMembers = List.of(_selectedMembers)..remove(user.id);
+                    _selectedMembers = List.of(_selectedMembers)
+                      ..remove(user.id);
                   }),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
@@ -352,8 +349,11 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.admin_panel_settings_outlined,
-                  size: 64, color: Colors.white38),
+              Icon(
+                Icons.admin_panel_settings_outlined,
+                size: 64,
+                color: Colors.white38,
+              ),
               SizedBox(height: 16),
               Text('Nenhum membro da diretoria atribuído à sociedade.'),
             ],
@@ -372,10 +372,11 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
             ...BoardPosition.values.map((position) {
               // Buscar por label em minúsculo (formato esperado)
               final positionKey = position.label.toLowerCase();
-              final userIds = _boardWithPositions[positionKey] ?? 
-                             _boardWithPositions[position.name] ?? 
-                             _boardWithPositions[position.label] ?? 
-                             [];
+              final userIds =
+                  _boardWithPositions[positionKey] ??
+                  _boardWithPositions[position.name] ??
+                  _boardWithPositions[position.label] ??
+                  [];
               if (userIds.isEmpty) return const SizedBox.shrink();
               return Padding(
                 padding: const EdgeInsets.only(bottom: 24),
@@ -393,9 +394,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
   }
 
   Widget _buildPositionSection(String title, List<String> userIds) {
-    final people = _people
-        .where((user) => userIds.contains(user.id))
-        .toList()
+    final people = _people.where((user) => userIds.contains(user.id)).toList()
       ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
 
     if (people.isEmpty) return const SizedBox.shrink();
@@ -406,9 +405,9 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
@@ -425,16 +424,18 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
                       ? () {
                           setState(() {
                             // Remover do boardIds
-                            _selectedBoard = List.of(_selectedBoard)..remove(user.id);
+                            _selectedBoard = List.of(_selectedBoard)
+                              ..remove(user.id);
                             // Remover do boardWithPositions
-                            _boardWithPositions = Map<String, List<String>>.from(
-                              _boardWithPositions.map(
-                                (key, value) => MapEntry(
-                                  key,
-                                  List<String>.from(value)..remove(user.id),
-                                ),
-                              ),
-                            )..removeWhere((key, value) => value.isEmpty);
+                            _boardWithPositions =
+                                Map<String, List<String>>.from(
+                                  _boardWithPositions.map(
+                                    (key, value) => MapEntry(
+                                      key,
+                                      List<String>.from(value)..remove(user.id),
+                                    ),
+                                  ),
+                                )..removeWhere((key, value) => value.isEmpty);
                           });
                         }
                       : null,
@@ -520,10 +521,8 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => PeopleSelectorSheet(
-        people: _people,
-        selectedIds: _selectedMembers,
-      ),
+      builder: (_) =>
+          PeopleSelectorSheet(people: _people, selectedIds: _selectedMembers),
     );
     if (result != null) {
       setState(() => _selectedMembers = result);
@@ -566,7 +565,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         selectedIds: const [], // Não pré-selecionar ninguém
       ),
     );
-    
+
     if (result != null && result.isNotEmpty) {
       // Adicionar o usuário selecionado na lista do cargo escolhido
       setState(() {
@@ -574,20 +573,22 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         // Remover o usuário de outros cargos se já estiver em algum
         _boardWithPositions = Map<String, List<String>>.from(
           _boardWithPositions.map(
-            (key, value) => MapEntry(key, List<String>.from(value)..remove(userId)),
+            (key, value) =>
+                MapEntry(key, List<String>.from(value)..remove(userId)),
           ),
         )..removeWhere((key, value) => value.isEmpty);
-        
+
         // Adicionar o usuário ao cargo selecionado
         // Usar o label do cargo em minúsculo como chave (ex: 'presidente', 'vice', 'secretario(a)', 'tesoureiro(a)')
         final positionKey = selectedPosition.label.toLowerCase();
         final currentList = _boardWithPositions[positionKey] ?? [];
         if (!currentList.contains(userId)) {
           final newList = List<String>.from(currentList)..add(userId);
-          _boardWithPositions = Map<String, List<String>>.from(_boardWithPositions)
-            ..[positionKey] = newList;
+          _boardWithPositions = Map<String, List<String>>.from(
+            _boardWithPositions,
+          )..[positionKey] = newList;
         }
-        
+
         // Atualizar _selectedBoard para compatibilidade
         if (!_selectedBoard.contains(userId)) {
           _selectedBoard = List.of(_selectedBoard)..add(userId);
@@ -598,7 +599,10 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
 
   Future<void> _save() async {
     if (!_canEdit) {
-      showErrorToast(context, 'Você não tem permissão para editar esta sociedade.');
+      showErrorToast(
+        context,
+        'Você não tem permissão para editar esta sociedade.',
+      );
       return;
     }
     setState(() => _isSaving = true);
@@ -608,7 +612,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         id: widget.societyId,
         membersIds: _selectedMembers,
       );
-      
+
       // Se tiver posições, salvar no formato novo; senão, usar formato antigo
       if (_boardWithPositions.isNotEmpty) {
         await repository.updateBoardWithPositions(
@@ -629,7 +633,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
           forumUsersByCategory: _forumUsersByCategory,
         );
       }
-      
+
       if (mounted) {
         showSuccessToast(context, 'Sociedade atualizada com sucesso!');
         await _loadData();
@@ -660,21 +664,24 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
           Text(
             'Usuários do Fórum por Categoria',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Gerencie os usuários que podem avaliar músicas em cada categoria',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.white70,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
           ),
           const SizedBox(height: 24),
           _buildForumCategorySection('theological', 'Coerência Teológica'),
           const SizedBox(height: 24),
-          _buildForumCategorySection('congregational', 'Coerência Congregacional'),
+          _buildForumCategorySection(
+            'congregational',
+            'Coerência Congregacional',
+          ),
           const SizedBox(height: 24),
           _buildForumCategorySection('musical', 'Coerência Musical'),
         ],
@@ -684,9 +691,7 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
 
   Widget _buildForumCategorySection(String categoryKey, String categoryLabel) {
     final userIds = _forumUsersByCategory[categoryKey] ?? [];
-    final users = _people
-        .where((user) => userIds.contains(user.id))
-        .toList()
+    final users = _people.where((user) => userIds.contains(user.id)).toList()
       ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
 
     return Column(
@@ -698,9 +703,9 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
             Text(
               categoryLabel,
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white70,
-                  ),
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
             ),
             TextButton.icon(
               icon: const Icon(Icons.edit),
@@ -719,9 +724,9 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
             ),
             child: Text(
               'Nenhum usuário adicionado',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white60,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.white60),
             ),
           )
         else
@@ -738,11 +743,16 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
                     onDeleted: _canEdit
                         ? () {
                             setState(() {
-                              final currentList = _forumUsersByCategory[categoryKey] ?? [];
-                              _forumUsersByCategory = Map<String, List<String>>.from(
-                                _forumUsersByCategory,
-                              )..[categoryKey] = List<String>.from(currentList)
-                                ..[categoryKey]!.remove(user.id);
+                              final currentList =
+                                  _forumUsersByCategory[categoryKey] ?? [];
+                              _forumUsersByCategory =
+                                  Map<String, List<String>>.from(
+                                      _forumUsersByCategory,
+                                    )
+                                    ..[categoryKey] = List<String>.from(
+                                      currentList,
+                                    )
+                                    ..[categoryKey]!.remove(user.id);
                             });
                           }
                         : null,
@@ -754,7 +764,10 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     );
   }
 
-  Future<void> _manageForumCategory(String categoryKey, String categoryLabel) async {
+  Future<void> _manageForumCategory(
+    String categoryKey,
+    String categoryLabel,
+  ) async {
     // Recarregar usuários
     try {
       final peopleRepository = context.read<PeopleRepository>();
@@ -773,16 +786,15 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
     final result = await showModalBottomSheet<List<String>>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => PeopleSelectorSheet(
-        people: _people,
-        selectedIds: currentUserIds,
-      ),
+      builder: (_) =>
+          PeopleSelectorSheet(people: _people, selectedIds: currentUserIds),
     );
 
     if (result != null) {
       setState(() {
-        _forumUsersByCategory = Map<String, List<String>>.from(_forumUsersByCategory)
-          ..[categoryKey] = result;
+        _forumUsersByCategory = Map<String, List<String>>.from(
+          _forumUsersByCategory,
+        )..[categoryKey] = result;
       });
     }
   }
@@ -819,7 +831,10 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
         'congregational': 'Coerência Congregacional',
         'musical': 'Coerência Musical',
       };
-      await _manageForumCategory(selectedCategory, categoryLabels[selectedCategory]!);
+      await _manageForumCategory(
+        selectedCategory,
+        categoryLabels[selectedCategory]!,
+      );
     }
   }
 }
@@ -850,9 +865,9 @@ class _BoardPositionSelectorSheet extends StatelessWidget {
               Text(
                 'Selecionar cargo',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 24),
               ...BoardPosition.values.map((position) {
@@ -879,7 +894,8 @@ class _BoardPositionSelectorSheet extends StatelessWidget {
                           Expanded(
                             child: Text(
                               position.label,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                              style: Theme.of(context).textTheme.bodyLarge
+                                  ?.copyWith(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w500,
                                   ),
@@ -904,4 +920,3 @@ class _BoardPositionSelectorSheet extends StatelessWidget {
     );
   }
 }
-

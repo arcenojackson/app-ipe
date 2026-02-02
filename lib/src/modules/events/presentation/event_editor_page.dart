@@ -127,16 +127,16 @@ class _EventEditorPageState extends State<EventEditorPage>
       floatingActionButton: _isPastEvent
           ? null
           : (_currentTabIndex == 0
-              ? FloatingActionButton(
-                  onPressed: _addStep,
-                  child: const Icon(Icons.add),
-                )
-              : _currentTabIndex == 1
-                  ? FloatingActionButton(
-                      onPressed: _manageTeam,
-                      child: const Icon(Icons.group_add),
-                    )
-                  : null),
+                ? FloatingActionButton(
+                    onPressed: _addStep,
+                    child: const Icon(Icons.add),
+                  )
+                : _currentTabIndex == 1
+                ? FloatingActionButton(
+                    onPressed: _manageTeam,
+                    child: const Icon(Icons.group_add),
+                  )
+                : null),
       floatingActionButtonLocation: const _CustomFABLocation(offset: 80),
     );
   }
@@ -294,26 +294,36 @@ class _EventEditorPageState extends State<EventEditorPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_selectedPeople.elo.isNotEmpty || _selectedPeople.eloWithInstruments.isNotEmpty) ...[
+          if (_selectedPeople.elo.isNotEmpty ||
+              _selectedPeople.eloWithInstruments.isNotEmpty) ...[
             _buildEloSection(),
             const SizedBox(height: 24),
           ],
           if (_selectedPeople.soundImage.isNotEmpty) ...[
-            _buildPeopleSection('Som e Imagem', _selectedPeople.soundImage, 'soundImage'),
+            _buildPeopleSection(
+              'Som e Imagem',
+              _selectedPeople.soundImage,
+              'soundImage',
+            ),
             const SizedBox(height: 24),
           ],
           if (_selectedPeople.diaconia.isNotEmpty) ...[
-            _buildPeopleSection('Diaconia', _selectedPeople.diaconia, 'diaconia'),
+            _buildPeopleSection(
+              'Diaconia',
+              _selectedPeople.diaconia,
+              'diaconia',
+            ),
             const SizedBox(height: 24),
           ],
-          if (_selectedPeople.lead.isNotEmpty || _selectedPeople.preacher.isNotEmpty) ...[
+          if (_selectedPeople.lead.isNotEmpty ||
+              _selectedPeople.preacher.isNotEmpty) ...[
             _buildLeadAndPreacherSection(),
           ],
         ],
       ),
     );
   }
-  
+
   Widget _buildLeadAndPreacherSection() {
     final leadChips = _selectedPeople.lead.map((userId) {
       final user = _people.firstWhere(
@@ -328,12 +338,10 @@ class _EventEditorPageState extends State<EventEditorPage>
       );
       return _buildPersonChip(
         user: user,
-        onDeleted: _isPastEvent
-            ? null
-            : () => _removePerson(user.id, 'lead'),
+        onDeleted: _isPastEvent ? null : () => _removePerson(user.id, 'lead'),
       );
     }).toList();
-    
+
     final preacherChips = _selectedPeople.preacher.map((userId) {
       final user = _people.firstWhere(
         (u) => u.id == userId,
@@ -352,35 +360,36 @@ class _EventEditorPageState extends State<EventEditorPage>
             : () => _removePerson(user.id, 'preacher'),
       );
     }).toList();
-    
+
     final allChips = [...leadChips, ...preacherChips];
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (_selectedPeople.lead.isNotEmpty && _selectedPeople.preacher.isNotEmpty) ...[
+        if (_selectedPeople.lead.isNotEmpty &&
+            _selectedPeople.preacher.isNotEmpty) ...[
           Text(
             'Dirigente e Pregador',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white70,
-                ),
+              fontWeight: FontWeight.w600,
+              color: Colors.white70,
+            ),
           ),
         ] else if (_selectedPeople.lead.isNotEmpty) ...[
           Text(
             'Dirigente',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white70,
-                ),
+              fontWeight: FontWeight.w600,
+              color: Colors.white70,
+            ),
           ),
         ] else ...[
           Text(
             'Pregador',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white70,
-                ),
+              fontWeight: FontWeight.w600,
+              color: Colors.white70,
+            ),
           ),
         ],
         const SizedBox(height: 12),
@@ -392,25 +401,25 @@ class _EventEditorPageState extends State<EventEditorPage>
   Widget _buildEloSection() {
     // Agrupar pessoas por instrumento
     final instrumentGroups = <String, List<MapEntry<String, bool>>>{};
-    
+
     // Adicionar pessoas com instrumentos
     _selectedPeople.eloWithInstruments.forEach((userId, instruments) {
       instruments.forEach((instrument, talkBack) {
-        instrumentGroups.putIfAbsent(instrument, () => []).add(
-          MapEntry(userId, talkBack),
-        );
+        instrumentGroups
+            .putIfAbsent(instrument, () => [])
+            .add(MapEntry(userId, talkBack));
       });
     });
-    
+
     // Adicionar pessoas sem instrumento específico (elo antigo)
     for (final userId in _selectedPeople.elo) {
       if (!_selectedPeople.eloWithInstruments.containsKey(userId)) {
-        instrumentGroups.putIfAbsent('Geral', () => []).add(
-          MapEntry(userId, false),
-        );
+        instrumentGroups
+            .putIfAbsent('Geral', () => [])
+            .add(MapEntry(userId, false));
       }
     }
-    
+
     // Coletar todas as pessoas para exibir em duas colunas
     final allPeople = <Widget>[];
     instrumentGroups.forEach((instrument, people) {
@@ -427,34 +436,36 @@ class _EventEditorPageState extends State<EventEditorPage>
             isPending: false,
           ),
         );
-        
-        allPeople.add(_buildPersonChip(
-          user: user,
-          talkBack: talkBack,
-          instrument: instrument != 'Geral' ? instrument : null,
-          onDeleted: _isPastEvent
-              ? null
-              : () => _removePerson(user.id, 'elo', instrument),
-        ));
+
+        allPeople.add(
+          _buildPersonChip(
+            user: user,
+            talkBack: talkBack,
+            instrument: instrument != 'Geral' ? instrument : null,
+            onDeleted: _isPastEvent
+                ? null
+                : () => _removePerson(user.id, 'elo', instrument),
+          ),
+        );
       }
     });
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Equipe de Louvor',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
         ),
         const SizedBox(height: 12),
         _buildTwoColumnGrid(allPeople),
       ],
     );
   }
-  
+
   Widget _buildPersonChip({
     required UserModel user,
     bool talkBack = false,
@@ -516,7 +527,7 @@ class _EventEditorPageState extends State<EventEditorPage>
       onDeleted: onDeleted,
     );
   }
-  
+
   IconData _getInstrumentIcon(String instrument) {
     switch (instrument) {
       case 'Violão':
@@ -537,45 +548,52 @@ class _EventEditorPageState extends State<EventEditorPage>
         return Icons.music_note;
     }
   }
-  
+
   Widget _buildTwoColumnGrid(List<Widget> chips) {
     if (chips.isEmpty) return const SizedBox.shrink();
-    
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final itemWidth = (constraints.maxWidth - 8) / 2;
-        
+
         return Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: chips.map((chip) => SizedBox(
-            width: itemWidth,
-            child: chip,
-          )).toList(),
+          children: chips
+              .map((chip) => SizedBox(width: itemWidth, child: chip))
+              .toList(),
         );
       },
     );
   }
 
-  Widget _buildPeopleSection(String title, List<String> peopleIds, String type) {
-    final people = _people.where((user) => peopleIds.contains(user.id)).toList();
-    
-    final chips = people.map((user) => _buildPersonChip(
-      user: user,
-      onDeleted: _isPastEvent
-          ? null
-          : () => _removePerson(user.id, type),
-    )).toList();
-    
+  Widget _buildPeopleSection(
+    String title,
+    List<String> peopleIds,
+    String type,
+  ) {
+    final people = _people
+        .where((user) => peopleIds.contains(user.id))
+        .toList();
+
+    final chips = people
+        .map(
+          (user) => _buildPersonChip(
+            user: user,
+            onDeleted: _isPastEvent ? null : () => _removePerson(user.id, type),
+          ),
+        )
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
         ),
         const SizedBox(height: 12),
         _buildTwoColumnGrid(chips),
@@ -587,7 +605,8 @@ class _EventEditorPageState extends State<EventEditorPage>
     setState(() {
       switch (type) {
         case 'elo':
-          if (instrument != null && _selectedPeople.eloWithInstruments.containsKey(userId)) {
+          if (instrument != null &&
+              _selectedPeople.eloWithInstruments.containsKey(userId)) {
             // Remover instrumento específico
             final updatedInstruments = Map<String, Map<String, bool>>.from(
               _selectedPeople.eloWithInstruments,
@@ -596,13 +615,13 @@ class _EventEditorPageState extends State<EventEditorPage>
               updatedInstruments[userId] ?? {},
             );
             userInstruments.remove(instrument);
-            
+
             if (userInstruments.isEmpty) {
               updatedInstruments.remove(userId);
             } else {
               updatedInstruments[userId] = userInstruments;
             }
-            
+
             _selectedPeople = _selectedPeople.copyWith(
               eloWithInstruments: updatedInstruments,
             );
@@ -678,7 +697,9 @@ class _EventEditorPageState extends State<EventEditorPage>
       EventTemplateModel? template;
       if (event.templateId != null && event.templateId!.isNotEmpty) {
         try {
-          template = await eventsRepository.fetchTemplateById(event.templateId!);
+          template = await eventsRepository.fetchTemplateById(
+            event.templateId!,
+          );
         } catch (e) {
           // Se não conseguir carregar o template, continua sem ele
         }
@@ -719,9 +740,10 @@ class _EventEditorPageState extends State<EventEditorPage>
       if (result.type == EventStepType.music &&
           result.musicId != null &&
           _event != null) {
-        context
-            .read<MusicsRepository>()
-            .addEventDate(result.musicId!, _event!.date);
+        context.read<MusicsRepository>().addEventDate(
+          result.musicId!,
+          _event!.date,
+        );
       }
       _autoSave();
     }
@@ -749,9 +771,10 @@ class _EventEditorPageState extends State<EventEditorPage>
     if (step.type == EventStepType.music &&
         step.musicId != null &&
         _event != null) {
-      context
-          .read<MusicsRepository>()
-          .removeEventDate(step.musicId!, _event!.date);
+      context.read<MusicsRepository>().removeEventDate(
+        step.musicId!,
+        _event!.date,
+      );
     }
     setState(() {
       _steps = List.of(_steps)..removeAt(index);
@@ -827,7 +850,8 @@ class _EventEditorPageState extends State<EventEditorPage>
           title = 'Membros de Equipe de Louvor';
           filterByELO = true;
           instrumentParam = selectedInstrument;
-          showTalkBack = selectedInstrument != 'Ministrante' &&
+          showTalkBack =
+              selectedInstrument != 'Ministrante' &&
               selectedInstrument != 'Backing';
 
           // IDs selecionados para este instrumento
@@ -914,9 +938,9 @@ class _EventEditorPageState extends State<EventEditorPage>
               eloWithInstruments: updatedInstruments,
             );
           } else {
-             // Outros tipos retornam List<String>
-             final ids = result as List<String>;
-             switch (selectedType) {
+            // Outros tipos retornam List<String>
+            final ids = result as List<String>;
+            switch (selectedType) {
               case 'pregador':
                 _selectedPeople = _selectedPeople.copyWith(preacher: ids);
                 break;
@@ -959,60 +983,76 @@ class _EventEditorPageState extends State<EventEditorPage>
 
   Widget _buildTeamsTab() {
     final templateName = _template?.name ?? '';
-    
+
     // Determinar quais itens mostrar baseado no template
     final shouldShowLiturgia = _shouldShowLiturgia(templateName);
     final shouldShowLanche = _shouldShowLanche(templateName);
     final shouldShowAberturaEbd = _shouldShowAberturaEbd(templateName);
     final shouldShowReuniaoOracao = _shouldShowReuniaoOracao(templateName);
-    
+
     final items = <Widget>[];
-    
+
     if (shouldShowLiturgia) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Montar liturgia',
-        icon: Icons.menu_book,
-        societyId: _selectedTeams.liturgia,
-      ));
-      if (shouldShowLanche || shouldShowAberturaEbd || shouldShowReuniaoOracao) {
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Montar liturgia',
+          icon: Icons.menu_book,
+          responsibilityKey: 'liturgia',
+          societyId: _selectedTeams.liturgia,
+        ),
+      );
+      if (shouldShowLanche ||
+          shouldShowAberturaEbd ||
+          shouldShowReuniaoOracao) {
         items.add(const SizedBox(height: 16));
       }
     }
-    
+
     if (shouldShowLanche) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Lanche pós-culto',
-        icon: Icons.restaurant,
-        societyId: _selectedTeams.lanche,
-      ));
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Lanche pós-culto',
+          icon: Icons.restaurant,
+          responsibilityKey: 'lanche',
+          societyId: _selectedTeams.lanche,
+        ),
+      );
       if (shouldShowAberturaEbd || shouldShowReuniaoOracao) {
         items.add(const SizedBox(height: 16));
       }
     }
-    
+
     if (shouldShowAberturaEbd) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Abertura EBD',
-        icon: Icons.school,
-        societyId: _selectedTeams.aberturaEbd,
-      ));
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Abertura EBD',
+          icon: Icons.school,
+          responsibilityKey: 'aberturaEbd',
+          societyId: _selectedTeams.aberturaEbd,
+        ),
+      );
       if (shouldShowReuniaoOracao) {
         items.add(const SizedBox(height: 16));
       }
     }
-    
+
     if (shouldShowReuniaoOracao) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Reunião de oração',
-        icon: Icons.favorite,
-        societyId: _selectedTeams.reuniaoOracao,
-      ));
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Reunião de oração',
+          icon: Icons.favorite,
+          responsibilityKey: 'reuniaoOracao',
+          societyId: _selectedTeams.reuniaoOracao,
+        ),
+      );
     }
-    
+
     if (items.isEmpty) {
-      return const Center(child: Text('Nenhuma equipe atribuída para este tipo de evento.'));
+      return const Center(
+        child: Text('Nenhuma equipe atribuída para este tipo de evento.'),
+      );
     }
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -1024,31 +1064,29 @@ class _EventEditorPageState extends State<EventEditorPage>
 
   bool _shouldShowLiturgia(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('culto à noite') || 
-           name.contains('culto de ceia');
+    return name.contains('culto à noite') || name.contains('culto de ceia');
   }
 
   bool _shouldShowLanche(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('culto à noite') || 
-           name.contains('culto de ceia');
+    return name.contains('culto à noite') || name.contains('culto de ceia');
   }
 
   bool _shouldShowAberturaEbd(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('escola bíblica') || 
-           name.contains('escola biblica');
+    return name.contains('escola bíblica') || name.contains('escola biblica');
   }
 
   bool _shouldShowReuniaoOracao(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('reunião de oração') || 
-           name.contains('reuniao de oracao');
+    return name.contains('reunião de oração') ||
+        name.contains('reuniao de oracao');
   }
 
   Widget _buildTeamResponsibilityCard({
     required String title,
     required IconData icon,
+    required String responsibilityKey,
     String? societyId,
   }) {
     final society = societyId != null
@@ -1064,54 +1102,63 @@ class _EventEditorPageState extends State<EventEditorPage>
           )
         : null;
 
+    final canEdit = !_isPastEvent;
+
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: canEdit
+            ? () => _selectSocietyForResponsibility(responsibilityKey)
+            : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 24,
+                ),
               ),
-              child: Icon(
-                icon,
-                color: Theme.of(context).colorScheme.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  if (society != null)
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      society.name,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white70,
-                          ),
-                    )
-                  else
-                    Text(
-                      'Nenhuma sociedade atribuída',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white54,
-                            fontStyle: FontStyle.italic,
-                          ),
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                ],
+                    const SizedBox(height: 4),
+                    if (society != null)
+                      Text(
+                        society.name,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                      )
+                    else
+                      Text(
+                        'Nenhuma sociedade atribuída',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white54,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              if (canEdit) Icon(Icons.chevron_right, color: Colors.white54),
+            ],
+          ),
         ),
       ),
     );
@@ -1170,7 +1217,6 @@ class _EventEditorPageState extends State<EventEditorPage>
         return null;
     }
   }
-
 }
 
 class _PeopleTypeSelectorSheet extends StatelessWidget {
@@ -1184,66 +1230,66 @@ class _PeopleTypeSelectorSheet extends StatelessWidget {
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                Text(
-                  'Adicionar pessoa',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+              ),
+              Text(
+                'Adicionar pessoa',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
+                      _OptionTile(
+                        icon: Icons.music_note,
+                        title: 'Equipe de louvor',
+                        onTap: () => Navigator.of(context).pop('elo'),
                       ),
-                ),
-                const SizedBox(height: 24),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        _OptionTile(
-                          icon: Icons.music_note,
-                          title: 'Equipe de louvor',
-                          onTap: () => Navigator.of(context).pop('elo'),
-                        ),
-                        const SizedBox(height: 12),
-                        _OptionTile(
-                          icon: Icons.video_library,
-                          title: 'Som e imagem',
-                          onTap: () => Navigator.of(context).pop('soundImage'),
-                        ),
-                        const SizedBox(height: 12),
-                        _OptionTile(
-                          icon: Icons.volunteer_activism,
-                          title: 'Diaconia',
-                          onTap: () => Navigator.of(context).pop('diaconia'),
-                        ),
-                        const SizedBox(height: 12),
-                        _OptionTile(
-                          icon: Icons.mic,
-                          title: 'Pregador',
-                          onTap: () => Navigator.of(context).pop('pregador'),
-                        ),
-                        const SizedBox(height: 12),
-                        _OptionTile(
-                          icon: Icons.person,
-                          title: 'Dirigente',
-                          onTap: () => Navigator.of(context).pop('dirigente'),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
+                      const SizedBox(height: 12),
+                      _OptionTile(
+                        icon: Icons.video_library,
+                        title: 'Som e imagem',
+                        onTap: () => Navigator.of(context).pop('soundImage'),
+                      ),
+                      const SizedBox(height: 12),
+                      _OptionTile(
+                        icon: Icons.volunteer_activism,
+                        title: 'Diaconia',
+                        onTap: () => Navigator.of(context).pop('diaconia'),
+                      ),
+                      const SizedBox(height: 12),
+                      _OptionTile(
+                        icon: Icons.mic,
+                        title: 'Pregador',
+                        onTap: () => Navigator.of(context).pop('pregador'),
+                      ),
+                      const SizedBox(height: 12),
+                      _OptionTile(
+                        icon: Icons.person,
+                        title: 'Dirigente',
+                        onTap: () => Navigator.of(context).pop('dirigente'),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1296,9 +1342,9 @@ class _InstrumentSelectorSheet extends StatelessWidget {
                     child: Text(
                       'Selecionar instrumento',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],
@@ -1310,14 +1356,16 @@ class _InstrumentSelectorSheet extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Column(
                   children: [
-                    ...instruments.map((instrument) => Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _OptionTile(
-                            icon: _getInstrumentIcon(instrument),
-                            title: instrument,
-                            onTap: () => Navigator.of(context).pop(instrument),
-                          ),
-                        )),
+                    ...instruments.map(
+                      (instrument) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _OptionTile(
+                          icon: _getInstrumentIcon(instrument),
+                          title: instrument,
+                          onTap: () => Navigator.of(context).pop(instrument),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -1372,10 +1420,7 @@ class _OptionTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.05),
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.1),
-            width: 1,
-          ),
+          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
         ),
         child: Row(
           children: [
@@ -1385,9 +1430,9 @@ class _OptionTile extends StatelessWidget {
               child: Text(
                 title,
                 style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
             Icon(
@@ -1403,10 +1448,7 @@ class _OptionTile extends StatelessWidget {
 }
 
 class _SocietySelectorSheet extends StatelessWidget {
-  const _SocietySelectorSheet({
-    required this.societies,
-    this.currentSocietyId,
-  });
+  const _SocietySelectorSheet({required this.societies, this.currentSocietyId});
 
   final List<SocietyModel> societies;
   final String? currentSocietyId;
@@ -1436,9 +1478,9 @@ class _SocietySelectorSheet extends StatelessWidget {
               Text(
                 'Selecionar sociedade',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 24),
               Flexible(
@@ -1446,52 +1488,52 @@ class _SocietySelectorSheet extends StatelessWidget {
                   child: Column(
                     children: [
                       // Opção para remover sociedade (apenas se houver uma selecionada)
-                      if (currentSocietyId != null && currentSocietyId!.isNotEmpty)
+                      if (currentSocietyId != null &&
+                          currentSocietyId!.isNotEmpty)
                         InkWell(
                           onTap: () => Navigator.of(context).pop(''),
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.05),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.1),
-                              width: 1,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 16,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.05),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.1),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.remove_circle_outline,
+                                  color: Colors.red.withOpacity(0.8),
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(
+                                    'Remover sociedade',
+                                    style: Theme.of(context).textTheme.bodyLarge
+                                        ?.copyWith(
+                                          color: Colors.red.withOpacity(0.8),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.remove_circle_outline,
-                                color: Colors.red.withOpacity(0.8),
-                                size: 24,
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Text(
-                                  'Remover sociedade',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .bodyLarge
-                                      ?.copyWith(
-                                        color: Colors.red.withOpacity(0.8),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
-                        ),
-                      if (societies.isNotEmpty && 
-                          (currentSocietyId == null || currentSocietyId!.isEmpty))
+                      if (societies.isNotEmpty &&
+                          (currentSocietyId == null ||
+                              currentSocietyId!.isEmpty))
                         const SizedBox(height: 12),
-                      if (currentSocietyId != null && 
-                          currentSocietyId!.isNotEmpty && 
+                      if (currentSocietyId != null &&
+                          currentSocietyId!.isNotEmpty &&
                           societies.isNotEmpty)
                         const SizedBox(height: 12),
                       // Lista de sociedades
@@ -1500,8 +1542,7 @@ class _SocietySelectorSheet extends StatelessWidget {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: InkWell(
-                            onTap: () =>
-                                Navigator.of(context).pop(society.id),
+                            onTap: () => Navigator.of(context).pop(society.id),
                             borderRadius: BorderRadius.circular(12),
                             child: Container(
                               padding: const EdgeInsets.symmetric(
@@ -1510,10 +1551,9 @@ class _SocietySelectorSheet extends StatelessWidget {
                               ),
                               decoration: BoxDecoration(
                                 color: isSelected
-                                    ? Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withOpacity(0.2)
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.primary.withOpacity(0.2)
                                     : Colors.white.withOpacity(0.05),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
@@ -1529,8 +1569,9 @@ class _SocietySelectorSheet extends StatelessWidget {
                                     width: 40,
                                     height: 40,
                                     decoration: BoxDecoration(
-                                      color: Color(society.color)
-                                          .withOpacity(0.2),
+                                      color: Color(
+                                        society.color,
+                                      ).withOpacity(0.2),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Center(
@@ -1582,9 +1623,9 @@ class _SocietySelectorSheet extends StatelessWidget {
                                   if (isSelected)
                                     Icon(
                                       Icons.check_circle,
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.primary,
                                       size: 24,
                                     ),
                                 ],

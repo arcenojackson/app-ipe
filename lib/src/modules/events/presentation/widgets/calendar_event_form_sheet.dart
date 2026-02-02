@@ -120,8 +120,9 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
       ),
       child: Padding(
         padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom +
-              (Platform.isAndroid 
+          bottom:
+              MediaQuery.of(context).viewInsets.bottom +
+              (Platform.isAndroid
                   ? 16 // Padding reduzido no Android para subir a modal
                   : PlatformUtils.getModalBottomPadding(context)),
           left: 24,
@@ -517,9 +518,22 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
           start: _timeController.text.trim(),
         );
 
+        // Se a categoria for diferente de "Geral", criar também um evento no Planejar
+        if (_selectedCategory != 'Geral') {
+          await repository.createEvent(
+            name: _nameController.text.trim(),
+            date: eventDate,
+            start: _timeController.text.trim(),
+            templateId: null, // Sem template
+          );
+        }
+
         if (mounted) {
           Navigator.of(context).pop(true);
-          showSuccessToast(context, 'Evento criado com sucesso!');
+          final message = _selectedCategory != 'Geral'
+              ? 'Evento criado com sucesso! Também foi adicionado ao Planejar.'
+              : 'Evento criado com sucesso!';
+          showSuccessToast(context, message);
         }
       }
     } catch (error) {
