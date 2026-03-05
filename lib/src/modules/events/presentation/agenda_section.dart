@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../auth/models/user.dart';
 import '../../societies/data/societies_repository.dart';
+import '../../societies/models/society.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/widgets/highlighted_button_wrapper.dart';
 import '../data/events_repository.dart';
@@ -177,12 +178,23 @@ class _AgendaSectionState extends State<AgendaSection> {
       });
     }
 
+    SocietyModel? eloSociety;
+    try {
+      final societiesRepository = context.read<SocietiesRepository>();
+      eloSociety = await societiesRepository.fetchByName('ELO');
+    } catch (_) {
+      // Ignorar erro - modal funciona sem contador
+    }
+
+    if (!mounted) return;
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) =>
-          WorshipTeamAvailabilityModal(userId: widget.user.id),
+      builder: (context) => WorshipTeamAvailabilityModal(
+        userId: widget.user.id,
+        eloSociety: eloSociety,
+      ),
     );
   }
 

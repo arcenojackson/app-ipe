@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../auth/models/user.dart';
+import '../../events/models/calendar_art_template.dart';
+import '../../events/presentation/widgets/calendar_art_template_sheet.dart';
 import '../../people/data/people_repository.dart';
 import '../../people/presentation/widgets/people_selector_sheet.dart';
 import '../../../shared/utils/app_toast.dart';
@@ -274,70 +276,117 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
   }
 
   Widget _buildMembersTab() {
-    if (_selectedMembers.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.people_outline, size: 64, color: Colors.white38),
-              SizedBox(height: 16),
-              Text('Nenhum membro atribuído à sociedade.'),
-            ],
-          ),
-        ),
-      );
-    }
     final members =
         _people.where((user) => _selectedMembers.contains(user.id)).toList()
           ..sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      itemCount: members.length,
-      separatorBuilder: (context, index) =>
-          Divider(height: 1, color: Colors.white.withOpacity(0.1)),
-      itemBuilder: (context, index) {
-        final user = members[index];
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 20,
-                child: Text(
-                  user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
-                  style: const TextStyle(fontSize: 16),
+    final membersList = _selectedMembers.isEmpty
+        ? const Padding(
+            padding: EdgeInsets.all(32.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.people_outline, size: 64, color: Colors.white38),
+                SizedBox(height: 16),
+                Text('Nenhum membro atribuído à sociedade.'),
+              ],
+            ),
+          )
+        : ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: members.length,
+            separatorBuilder: (context, index) =>
+                Divider(height: 1, color: Colors.white.withOpacity(0.1)),
+            itemBuilder: (context, index) {
+              final user = members[index];
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      child: Text(
+                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        user.name,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                      ),
+                    ),
+                    if (_canEdit)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white54),
+                        onPressed: () => setState(() {
+                          _selectedMembers = List.of(_selectedMembers)
+                            ..remove(user.id);
+                        }),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(
-                  user.name,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+              );
+            },
+          );
+
+    return _selectedMembers.isEmpty
+        ? Center(child: membersList)
+        : ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            itemCount: members.length,
+            separatorBuilder: (context, index) =>
+                Divider(height: 1, color: Colors.white.withOpacity(0.1)),
+            itemBuilder: (context, index) {
+              final user = members[index];
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      child: Text(
+                        user.name.isNotEmpty ? user.name[0].toUpperCase() : '?',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        user.name,
+                        style: Theme.of(
+                          context,
+                        ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                      ),
+                    ),
+                    if (_canEdit)
+                      IconButton(
+                        icon: const Icon(Icons.close, color: Colors.white54),
+                        onPressed: () => setState(() {
+                          _selectedMembers = List.of(_selectedMembers)
+                            ..remove(user.id);
+                        }),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              if (_canEdit)
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white54),
-                  onPressed: () => setState(() {
-                    _selectedMembers = List.of(_selectedMembers)
-                      ..remove(user.id);
-                  }),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 40,
-                    minHeight: 40,
-                  ),
-                ),
-            ],
-          ),
-        );
-      },
-    );
+              );
+            },
+          );
   }
 
   Widget _buildBoardTab() {
@@ -388,9 +437,102 @@ class _SocietyDetailsPageState extends State<SocietyDetailsPage>
           if (_boardWithPositions.isEmpty && _selectedBoard.isNotEmpty) ...[
             _buildPositionSection('Diretoria', _selectedBoard),
           ],
+          // Template da arte do calendário (compartilhamento)
+          if (_canEdit) ...[
+            const SizedBox(height: 24),
+            _buildCalendarArtTemplateSection(),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildCalendarArtTemplateSection() {
+    final hasTemplate = _society?.calendarArtTemplate != null;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.image, color: Colors.white70, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                'Template da arte do calendário',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Define o visual da arte gerada ao compartilhar o calendário do mês com filtro desta sociedade.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Colors.white70,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                hasTemplate ? 'Template configurado' : 'Nenhum template definido',
+                style: TextStyle(
+                  color: hasTemplate ? Colors.green.shade300 : Colors.white54,
+                  fontSize: 13,
+                ),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                icon: Icon(Icons.edit, size: 18, color: Colors.white70),
+                label: Text(hasTemplate ? 'Alterar' : 'Configurar'),
+                onPressed: _canEdit ? _openCalendarArtTemplateSheet : null,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openCalendarArtTemplateSheet() async {
+    if (_society == null || !_canEdit) return;
+    final current = _society!.calendarArtTemplate ?? const CalendarArtTemplate();
+    final result = await showModalBottomSheet<CalendarArtTemplate>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => CalendarArtTemplateSheet(
+        template: current,
+        categoryColors: {_society!.name: Color(_society!.color)},
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() => _isSaving = true);
+    try {
+      final repository = context.read<SocietiesRepository>();
+      await repository.updateCalendarArtTemplate(
+        id: widget.societyId,
+        template: result,
+      );
+      if (mounted) {
+        showSuccessToast(context, 'Template da arte atualizado.');
+        _loadData();
+      }
+    } catch (e) {
+      if (mounted) {
+        showErrorToast(context, 'Erro ao salvar template: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   Widget _buildPositionSection(String title, List<String> userIds) {

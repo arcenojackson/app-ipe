@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../../core/config/firebase_config.dart';
 import '../../../core/utils/app_exception.dart';
+import '../../events/models/calendar_art_template.dart';
 import '../models/society.dart';
 
 class SocietiesRepository {
@@ -96,6 +97,24 @@ class SocietiesRepository {
       if (e is AppException) rethrow;
       throw AppException(
         message: 'Erro ao criar sociedade: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Atualiza o template da arte do calendário de uma sociedade
+  Future<SocietyModel> updateCalendarArtTemplate({
+    required String id,
+    required CalendarArtTemplate template,
+  }) async {
+    try {
+      await _firestore.collection('societies').doc(id).update({
+        'calendarArtTemplate': template.toJson(),
+      });
+      return await fetchById(id);
+    } catch (e) {
+      if (e is AppException) rethrow;
+      throw AppException(
+        message: 'Erro ao atualizar template da arte: ${e.toString()}',
       );
     }
   }
@@ -198,6 +217,24 @@ class SocietiesRepository {
     } catch (e) {
       throw AppException(
         message: 'Erro ao atualizar usuários do Fórum: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Atualiza Vocais e Ministros da sociedade (ELO)
+  Future<void> updateEloRoles({
+    required String id,
+    required List<String> vocaisIds,
+    required List<String> ministrosIds,
+  }) async {
+    try {
+      await _firestore.collection('societies').doc(id).update({
+        'vocais': vocaisIds,
+        'ministros': ministrosIds,
+      });
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao atualizar Vocais/Ministros: ${e.toString()}',
       );
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
@@ -12,12 +13,16 @@ import 'src/modules/people/data/people_repository.dart';
 import 'src/modules/societies/data/societies_repository.dart';
 import 'src/modules/events/data/weekly_team_assignments_repository.dart';
 import 'src/modules/music_evaluations/data/music_evaluations_repository.dart';
+import 'src/shared/services/pexels/pexels_client.dart';
 import 'src/shared/services/session_storage.dart';
 import 'src/shared/state/app_state.dart';
 import 'src/modules/notifications/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Edge-to-edge explícito (Android 15+ / avisos do Play Console)
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   // Inicializar formato de data para português brasileiro
   await initializeDateFormatting('pt_BR', null);
@@ -63,6 +68,7 @@ void main() async {
             societiesRepository: societiesRepository,
           ),
         ),
+        Provider<PexelsClient>.value(value: PexelsClient()),
         // Usar ChangeNotifierProvider.value mas garantir que as notificações funcionem
         ChangeNotifierProvider<AppState>.value(
           value: appState,

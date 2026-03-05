@@ -139,10 +139,10 @@ class EventsRepository {
         'date': Timestamp.fromDate(date),
         'start': start,
       };
-      
+
       // Incluir templateId no update (pode ser null para remover o template)
       updateData['templateId'] = templateId;
-      
+
       await _firestore.collection('services').doc(id).update(updateData);
 
       // Buscar o documento atualizado
@@ -163,23 +163,23 @@ class EventsRepository {
     try {
       // Buscar o evento atual
       final event = await fetchById(eventId);
-      
+
       // Buscar o novo template
       final template = await fetchTemplateById(templateId);
-      
+
       // Filtrar apenas as músicas do evento atual
       final musicSteps = event.steps
           .where((step) => step.type == EventStepType.music)
           .toList();
-      
+
       // Combinar: steps do template + músicas existentes
       final newSteps = [...template.steps, ...musicSteps];
-      
+
       // Atualizar o evento com os novos steps
       await _firestore.collection('services').doc(eventId).update({
         'steps': newSteps.map((step) => step.toJson()).toList(),
       });
-      
+
       // Retornar o evento atualizado
       return await fetchById(eventId);
     } catch (e) {
@@ -209,7 +209,7 @@ class EventsRepository {
         'steps': steps.map((step) => step.toJson()).toList(),
         'people': people.toJson(),
       };
-      
+
       // Para teams, incluir todos os campos (null ou não) para que campos null sejam removidos
       final teamsData = <String, dynamic>{};
       if (teams != null) {
@@ -218,7 +218,7 @@ class EventsRepository {
         teamsData['lanche'] = teams.lanche;
         teamsData['aberturaEbd'] = teams.aberturaEbd;
         teamsData['reuniaoOracao'] = teams.reuniaoOracao;
-        
+
         // Remover campos null antes de salvar (para não enviar null ao Firestore)
         // Em vez disso, vamos usar FieldValue.delete() para campos null
         final teamsToUpdate = <String, dynamic>{};
@@ -234,13 +234,13 @@ class EventsRepository {
         if (teams.reuniaoOracao != null) {
           teamsToUpdate['reuniaoOracao'] = teams.reuniaoOracao;
         }
-        
+
         // Adicionar campos não-null ao updateData
         updateData['teams'] = teamsToUpdate;
       } else {
         // Se teams é null, não incluir no update
       }
-      
+
       // Processar teams: incluir apenas campos não-null
       // Quando atualizamos o objeto teams completo, campos que não estão incluídos são removidos
       if (teams != null) {
@@ -257,12 +257,12 @@ class EventsRepository {
         if (teams.reuniaoOracao != null) {
           teamsToUpdate['reuniaoOracao'] = teams.reuniaoOracao!;
         }
-        
+
         // Verificar se há equipes existentes para decidir se remove o objeto ou atualiza
         final doc = await _firestore.collection('services').doc(id).get();
         final currentData = doc.data();
         final hasExistingTeams = currentData?['teams'] != null;
-        
+
         if (teamsToUpdate.isEmpty && hasExistingTeams) {
           // Se não há equipes e havia antes, remover o objeto teams completamente
           updateData['teams'] = FieldValue.delete();
@@ -272,7 +272,7 @@ class EventsRepository {
           updateData['teams'] = teamsToUpdate;
         }
       }
-      
+
       await _firestore.collection('services').doc(id).update(updateData);
     } catch (e) {
       throw AppException(
@@ -285,6 +285,13 @@ class EventsRepository {
   /// Suporta tanto a estrutura antiga (array simples) quanto a nova (objeto com elo, preacher, lead, soundImage, eloWithInstruments)
   Future<List<EventModel>> fetchServicesForUser(String userId) async {
     try {
+      // Garantir token fresco antes da leitura (evita permission-denied quando o app
+      // voltou do background após muito tempo e o ID token expirou).
+      final user = FirebaseConfig.auth.currentUser;
+      if (user != null) {
+        await user.getIdToken(true);
+      }
+
       // Buscar todos os serviços e filtrar no código, pois Firestore não suporta
       // consultas complexas em estruturas aninhadas
       final snapshot = await _firestore.collection('services').get();
@@ -300,7 +307,7 @@ class EventsRepository {
               final preacher = people['preacher'] as List<dynamic>? ?? [];
               final lead = people['lead'] as List<dynamic>? ?? [];
               final soundImage = people['soundImage'] as List<dynamic>? ?? [];
-              
+
               // Verificar se está em alguma lista simples
               if (elo.contains(userId) ||
                   preacher.contains(userId) ||
@@ -308,14 +315,14 @@ class EventsRepository {
                   soundImage.contains(userId)) {
                 return true;
               }
-              
+
               // Verificar se está em eloWithInstruments (Map<userId, Map<instrument, talkBack>>)
               final eloWithInstruments = people['eloWithInstruments'];
               if (eloWithInstruments is Map) {
                 // Se o userId está nas chaves do Map, significa que está escalado
                 return eloWithInstruments.containsKey(userId);
               }
-              
+
               return false;
             }
 
@@ -372,14 +379,16 @@ class EventsRepository {
           .where((doc) {
             final data = doc.data();
             final eventTemplateId = data['templateId']?.toString();
-            
+
             // Se a lista contém 'NO_TEMPLATE', incluir eventos sem template
-            if (templateIds.contains('NO_TEMPLATE') && eventTemplateId == null) {
+            if (templateIds.contains('NO_TEMPLATE') &&
+                eventTemplateId == null) {
               return true;
             }
-            
+
             // Verificar se o templateId do evento está na lista de filtros
-            return eventTemplateId != null && templateIds.contains(eventTemplateId);
+            return eventTemplateId != null &&
+                templateIds.contains(eventTemplateId);
           })
           .map((doc) {
             final data = doc.data();
@@ -590,8 +599,7 @@ class EventsRepository {
         return CalendarEventModel.fromJson(data);
       }).toList();
 
-      // Ordenar por data após buscar (evita necessidade de índice composto)
-      events.sort((a, b) => a.date.compareTo(b.date));
+      events.sort(CalendarEventModel.compareByDateAndTime);
       return events;
     } catch (e) {
       throw AppException(
@@ -600,20 +608,20 @@ class EventsRepository {
     }
   }
 
-  /// Busca eventos do calendário por múltiplas categorias
+  /// Busca eventos do calendário por múltiplas categorias.
+  /// Inclui sempre os serviços (cultos/EBD/reuniões) quando "Geral" está nas categorias ou quando nenhum filtro está ativo.
   Future<List<CalendarEventModel>> fetchCalendarEventsByCategories(
     List<String> categories,
   ) async {
     try {
       if (categories.isEmpty) {
-        return await fetchAllCalendarEvents();
+        return await fetchAllEventsForCalendar();
       }
 
-      // Buscar todos os eventos e filtrar por categoria
-      // (Firestore não suporta OR diretamente, então fazemos no código)
+      // Buscar todos os eventos do calendário e filtrar por categoria
       final snapshot = await _firestore.collection('events').get();
 
-      final events = snapshot.docs
+      final calendarEvents = snapshot.docs
           .map((doc) {
             final data = doc.data();
             data['id'] = doc.id;
@@ -625,9 +633,24 @@ class EventsRepository {
           .where((event) => categories.contains(event.category))
           .toList();
 
-      // Ordenar por data após buscar
-      events.sort((a, b) => a.date.compareTo(b.date));
-      return events;
+      // Incluir serviços (cultos, EBD, reuniões) quando "Geral" estiver selecionado
+      if (categories.contains('Geral')) {
+        final services = await fetchAllServices();
+        final fromServices = services.map((s) => CalendarEventModel(
+              id: s.id,
+              name: s.name,
+              date: s.date,
+              category: 'Geral',
+              start: s.start,
+              sourceCollection: 'services',
+            ));
+        final combined = [...calendarEvents, ...fromServices];
+        combined.sort(CalendarEventModel.compareByDateAndTime);
+        return combined;
+      }
+
+      calendarEvents.sort(CalendarEventModel.compareByDateAndTime);
+      return calendarEvents;
     } catch (e) {
       throw AppException(
         message: 'Erro ao carregar eventos do calendário: ${e.toString()}',
@@ -676,7 +699,7 @@ class EventsRepository {
           })
           .toList();
 
-      events.sort((a, b) => a.date.compareTo(b.date));
+      events.sort(CalendarEventModel.compareByDateAndTime);
       return events;
     } catch (e) {
       throw AppException(
@@ -720,9 +743,72 @@ class EventsRepository {
         return CalendarEventModel.fromJson(data);
       }).toList();
 
-      // Ordenar por data após buscar (evita necessidade de índice)
-      events.sort((a, b) => a.date.compareTo(b.date));
+      events.sort(CalendarEventModel.compareByDateAndTime);
       return events;
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao carregar eventos do calendário: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Busca todos os eventos para exibir no calendário: eventos da collection
+  /// [events] + serviços da collection [services] (cultos, EBD, reuniões, Planejar).
+  Future<List<CalendarEventModel>> fetchAllEventsForCalendar() async {
+    try {
+      final calendarEvents = await fetchAllCalendarEvents();
+      final services = await fetchAllServices();
+
+      final fromServices = services.map((s) => CalendarEventModel(
+            id: s.id,
+            name: s.name,
+            date: s.date,
+            category: 'Geral',
+            start: s.start,
+            sourceCollection: 'services',
+          ));
+
+      final combined = [...calendarEvents, ...fromServices];
+      combined.sort(CalendarEventModel.compareByDateAndTime);
+      return combined;
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao carregar eventos do calendário: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Busca eventos + serviços em um intervalo de datas (ex.: mês para arte do calendário).
+  /// Útil para exibir bolinhas nos dias com todos os eventos, mantendo lista só com eventos.
+  Future<List<CalendarEventModel>> fetchAllEventsForCalendarInRange(
+    DateTime start,
+    DateTime end,
+  ) async {
+    try {
+      final startNorm = DateTime(start.year, start.month, start.day);
+      final endNorm = DateTime(end.year, end.month, end.day);
+
+      final calendarInRange = await fetchCalendarEventsByDateRange(start, end);
+      final services = await fetchAllServices();
+
+      final fromServices = services
+          .where((s) {
+            final d = DateTime(s.date.year, s.date.month, s.date.day);
+            return d.compareTo(startNorm) >= 0 && d.compareTo(endNorm) <= 0;
+          })
+          .map((s) => CalendarEventModel(
+                id: s.id,
+                name: s.name,
+                date: s.date,
+                category: 'Geral',
+                start: s.start,
+                sourceCollection: 'services',
+              ))
+          .toList();
+
+      final combined = [...calendarInRange, ...fromServices];
+      combined.sort(CalendarEventModel.compareByDateAndTime);
+      return combined;
     } catch (e) {
       throw AppException(
         message: 'Erro ao carregar eventos do calendário: ${e.toString()}',
@@ -936,6 +1022,49 @@ class EventsRepository {
     } catch (e) {
       throw AppException(
         message: 'Erro ao verificar disponibilidade: ${e.toString()}',
+      );
+    }
+  }
+
+  /// Retorna a quantidade de pessoas disponíveis por domingo, para uma lista de usuários (ex: vocais ou ministros)
+  /// Permite exibir o contador na modal de disponibilidade conforme o papel do usuário
+  Future<Map<DateTime, int>> getWorshipTeamAvailabilityCountByDate(
+    List<String> userIds,
+    List<DateTime> sundays,
+  ) async {
+    if (userIds.isEmpty || sundays.isEmpty) {
+      return {for (final d in sundays) d: 0};
+    }
+
+    try {
+      final results = await Future.wait(
+        userIds.map((id) => fetchWorshipTeamAvailability(id)),
+      );
+
+      final Map<DateTime, int> counts = {};
+      for (final sunday in sundays) {
+        final normalizedSunday = DateTime(
+          sunday.year,
+          sunday.month,
+          sunday.day,
+        );
+        int count = 0;
+        for (var i = 0; i < userIds.length; i++) {
+          final availability = results[i];
+          final hasDate = availability.any(
+            (d) =>
+                d.year == normalizedSunday.year &&
+                d.month == normalizedSunday.month &&
+                d.day == normalizedSunday.day,
+          );
+          if (hasDate) count++;
+        }
+        counts[normalizedSunday] = count;
+      }
+      return counts;
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao buscar contagem de disponibilidade: ${e.toString()}',
       );
     }
   }

@@ -2,13 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../societies/models/society.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../data/events_repository.dart';
 
 class WorshipTeamAvailabilityModal extends StatefulWidget {
-  const WorshipTeamAvailabilityModal({super.key, required this.userId});
+  const WorshipTeamAvailabilityModal({
+    super.key,
+    required this.userId,
+    this.eloSociety,
+  });
 
   final String userId;
+  final SocietyModel? eloSociety;
 
   @override
   State<WorshipTeamAvailabilityModal> createState() =>
@@ -18,8 +24,26 @@ class WorshipTeamAvailabilityModal extends StatefulWidget {
 class _WorshipTeamAvailabilityModalState
     extends State<WorshipTeamAvailabilityModal> {
   final Set<DateTime> _selectedSundays = {};
+  Map<DateTime, int> _availabilityCounts = {};
   bool _isLoading = false;
   bool _isSaving = false;
+
+  /// Define o papel do usuário para exibição do contador: ministro ou vocal
+  String? get _userRoleLabel {
+    final elo = widget.eloSociety;
+    if (elo == null) return null;
+    if (elo.ministrosIds.contains(widget.userId)) return 'ministros';
+    if (elo.vocaisIds.contains(widget.userId)) return 'vocais';
+    return null;
+  }
+
+  List<String>? get _roleUserIds {
+    final elo = widget.eloSociety;
+    if (elo == null) return null;
+    if (elo.ministrosIds.contains(widget.userId)) return elo.ministrosIds;
+    if (elo.vocaisIds.contains(widget.userId)) return elo.vocaisIds;
+    return null;
+  }
 
   @override
   void initState() {
@@ -27,7 +51,7 @@ class _WorshipTeamAvailabilityModalState
     _loadExistingAvailability();
   }
 
-  /// Carrega a disponibilidade já salva do usuário
+  /// Carrega a disponibilidade já salva do usuário e, se aplicável, os contadores
   Future<void> _loadExistingAvailability() async {
     setState(() => _isLoading = true);
     try {
@@ -36,14 +60,33 @@ class _WorshipTeamAvailabilityModalState
         widget.userId,
       );
       setState(() {
-        // Normalizar todas as datas para garantir comparação correta
         _selectedSundays.addAll(
           availability.map((date) => DateTime(date.year, date.month, date.day)),
         );
-        _isLoading = false;
       });
+      await _loadAvailabilityCounts();
     } catch (e) {
-      setState(() => _isLoading = false);
+      // ignore
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Carrega a contagem de disponibilidade por domingo (ministros ou vocais)
+  Future<void> _loadAvailabilityCounts() async {
+    final userIds = _roleUserIds;
+    if (userIds == null || userIds.isEmpty) return;
+
+    try {
+      final repository = context.read<EventsRepository>();
+      final sundays = _getNextMonthSundays();
+      final counts = await repository.getWorshipTeamAvailabilityCountByDate(
+        userIds,
+        sundays,
+      );
+      if (mounted) setState(() => _availabilityCounts = counts);
+    } catch (e) {
+      // Silenciar erro - contador é opcional
     }
   }
 
@@ -66,6 +109,16 @@ class _WorshipTeamAvailabilityModalState
   /// Formata a data para exibição
   String _formatDate(DateTime date) {
     return DateFormat('dd/MM/yyyy').format(date);
+  }
+
+  /// Formata o contador com concordância singular/plural
+  String _formatCountLabel(int count, String role) {
+    if (role == 'ministros') {
+      return count == 1
+          ? '1 ministro disponível'
+          : '$count ministros disponíveis';
+    }
+    return count == 1 ? '1 vocal disponível' : '$count vocais disponíveis';
   }
 
   /// Salva a disponibilidade no Firestore
@@ -246,12 +299,37 @@ class _WorshipTeamAvailabilityModalState
                                 ),
                                 const SizedBox(width: 16),
                                 Expanded(
-                                  child: Text(
-                                    _formatDate(sunday),
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w500,
-                                    ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _formatDate(sunday),
+                                        style: theme.textTheme.bodyLarge
+                                            ?.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                      ),
+                                      if (_userRoleLabel != null &&
+                                          _availabilityCounts.containsKey(
+                                            normalizedSunday,
+                                          )) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          _formatCountLabel(
+                                            _availabilityCounts[normalizedSunday] ??
+                                                0,
+                                            _userRoleLabel!,
+                                          ),
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                                color: Colors.white60,
+                                                fontSize: 12,
+                                              ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               ],

@@ -84,4 +84,6 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    // Edge-to-edge no Android 15+ (recomendação do Play Console)
+    implementation("androidx.core:core-ktx:1.17.0")
 }

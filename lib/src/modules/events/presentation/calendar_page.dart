@@ -15,6 +15,8 @@ import '../data/weekly_team_assignments_repository.dart';
 import '../models/calendar_event.dart';
 import '../models/event.dart';
 import '../models/weekly_team_assignment.dart';
+import 'calendar_art_page.dart';
+import 'event_editor_page.dart';
 import 'widgets/calendar_event_form_sheet.dart';
 
 enum CalendarViewMode { day, week, month }
@@ -74,7 +76,7 @@ class _CalendarPageState extends State<CalendarPage> {
     try {
       final repository = context.read<EventsRepository>();
       final events = _selectedCategories.isEmpty
-          ? await repository.fetchAllCalendarEvents()
+          ? await repository.fetchAllEventsForCalendar()
           : await repository.fetchCalendarEventsByCategories(
               _selectedCategories,
             );
@@ -94,10 +96,14 @@ class _CalendarPageState extends State<CalendarPage> {
     }
   }
 
+  /// Eventos do dia, ordenados apenas pelo horário (ex.: 10:00 antes de 19:30),
+  /// independente da categoria (ELO, Geral, etc.).
   List<CalendarEventModel> _getEventsForDay(DateTime day) {
-    return _events.where((event) {
-      return isSameDay(event.date, day);
-    }).toList();
+    final list = _events
+        .where((event) => isSameDay(event.date, day))
+        .toList();
+    list.sort(CalendarEventModel.compareByDateAndTime);
+    return list;
   }
 
   Widget _buildEventMarkers(List<CalendarEventModel> events) {
@@ -622,6 +628,21 @@ class _CalendarPageState extends State<CalendarPage> {
                     _showBatchEventCreator();
                   },
                 ),
+                ListTile(
+                  leading: const Icon(Icons.image, color: Colors.white70),
+                  title: const Text('Gerar arte do mês'),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (context) => CalendarArtPage(
+                          initialMonth: _focusedDay,
+                          initialCategories: _selectedCategories,
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -631,6 +652,17 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _editEvent(CalendarEventModel event) async {
+    // Serviços (cultos/EBD/reuniões/Planejar) abrem na tela de edição do serviço
+    if (event.sourceCollection == 'services') {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => EventEditorPage(eventId: event.id),
+        ),
+      );
+      await _loadEvents();
+      return;
+    }
+
     final result = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -674,7 +706,11 @@ class _CalendarPageState extends State<CalendarPage> {
 
     try {
       final repository = context.read<EventsRepository>();
-      await repository.deleteCalendarEvent(event.id);
+      if (event.sourceCollection == 'services') {
+        await repository.deleteEvent(event.id);
+      } else {
+        await repository.deleteCalendarEvent(event.id);
+      }
       if (mounted) {
         showSuccessToast(context, 'Evento "${event.name}" excluído.');
         await _loadEvents();

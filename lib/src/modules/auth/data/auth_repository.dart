@@ -321,6 +321,17 @@ class AuthRepository {
       return await _sessionStorage.loadUser();
     }
 
+    // Forçar refresh do ID token antes de acessar o Firestore.
+    // Evita "permission-denied" quando o app foi fechado por muito tempo e o token expirou:
+    // o Firebase mantém currentUser não-nulo, mas o token usado pelo Firestore pode estar expirado.
+    try {
+      await firebaseUser.getIdToken(true);
+    } catch (e) {
+      // Token inválido ou expirado e não foi possível renovar (ex.: revogado, offline por muito tempo).
+      await signOut();
+      return null;
+    }
+
     // Buscar dados atualizados do Firestore
     final userModel = await _getUserFromFirestore(firebaseUser.uid);
     if (userModel != null) {

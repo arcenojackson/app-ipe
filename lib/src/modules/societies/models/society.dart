@@ -1,3 +1,5 @@
+import '../../events/models/calendar_art_template.dart';
+
 enum BoardPosition {
   presidente('Presidente'),
   vice('Vice'),
@@ -30,6 +32,9 @@ class SocietyModel {
     this.boardIds = const [],
     this.boardWithPositions = const {},
     this.forumUsersByCategory,
+    this.vocaisIds = const [],
+    this.ministrosIds = const [],
+    this.calendarArtTemplate,
   });
 
   final String id;
@@ -41,6 +46,9 @@ class SocietyModel {
   final List<String> boardIds; // IDs da diretoria (formato antigo - compatibilidade)
   final Map<String, List<String>> boardWithPositions; // Map<position, List<userId>> (formato novo)
   final Map<String, List<String>>? forumUsersByCategory; // Map<category, List<userId>> - Usuários do Fórum por categoria
+  final List<String> vocaisIds; // IDs dos vocais (ELO - cantores)
+  final List<String> ministrosIds; // IDs dos ministros (ELO - quem ministra)
+  final CalendarArtTemplate? calendarArtTemplate;
 
   factory SocietyModel.fromJson(Map<String, dynamic> json) {
     // Parse do board: pode ser List<String> (antigo) ou Map<String, List<String>> (novo)
@@ -82,6 +90,13 @@ class SocietyModel {
       });
     }
 
+    final calendarArtTemplateData = json['calendarArtTemplate'];
+    final CalendarArtTemplate? calendarArtTemplate =
+        calendarArtTemplateData is Map
+            ? CalendarArtTemplate.fromJson(
+                Map<String, dynamic>.from(calendarArtTemplateData))
+            : null;
+
     return SocietyModel(
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
@@ -92,6 +107,9 @@ class SocietyModel {
       boardIds: boardIds,
       boardWithPositions: boardWithPositions,
       forumUsersByCategory: forumUsersByCategory,
+      vocaisIds: _parseIds(json['vocais']),
+      ministrosIds: _parseIds(json['ministros']),
+      calendarArtTemplate: calendarArtTemplate,
     );
   }
 
@@ -125,6 +143,9 @@ class SocietyModel {
             : boardIds,
         if (forumUsersByCategory != null && forumUsersByCategory!.isNotEmpty)
           'forumUsersByCategory': forumUsersByCategory,
+        if (vocaisIds.isNotEmpty) 'vocais': vocaisIds,
+        if (ministrosIds.isNotEmpty) 'ministros': ministrosIds,
+        if (calendarArtTemplate != null) 'calendarArtTemplate': calendarArtTemplate!.toJson(),
       };
 
   SocietyModel copyWith({
@@ -137,6 +158,9 @@ class SocietyModel {
     List<String>? boardIds,
     Map<String, List<String>>? boardWithPositions,
     Map<String, List<String>>? forumUsersByCategory,
+    List<String>? vocaisIds,
+    List<String>? ministrosIds,
+    CalendarArtTemplate? calendarArtTemplate,
   }) {
     return SocietyModel(
       id: id ?? this.id,
@@ -148,6 +172,9 @@ class SocietyModel {
       boardIds: boardIds ?? this.boardIds,
       boardWithPositions: boardWithPositions ?? this.boardWithPositions,
       forumUsersByCategory: forumUsersByCategory ?? this.forumUsersByCategory,
+      vocaisIds: vocaisIds ?? this.vocaisIds,
+      ministrosIds: ministrosIds ?? this.ministrosIds,
+      calendarArtTemplate: calendarArtTemplate ?? this.calendarArtTemplate,
     );
   }
   

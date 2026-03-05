@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/config/app_config.dart';
+import 'core/config/firebase_config.dart';
 import 'modules/auth/presentation/login_page.dart';
 import 'modules/home/presentation/home_shell.dart';
 import 'shared/state/app_state.dart';
@@ -28,8 +29,34 @@ class IpeApp extends StatelessWidget {
 }
 
 // Widget que gerencia a navegação baseada no estado de autenticação
-class _AppHome extends StatelessWidget {
+class _AppHome extends StatefulWidget {
   const _AppHome();
+
+  @override
+  State<_AppHome> createState() => _AppHomeState();
+}
+
+class _AppHomeState extends State<_AppHome> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Renovar o token ao voltar do background para evitar "permission-denied"
+      // em leituras do Firestore (ex.: tela Agenda) quando o app ficou fechado por um tempo.
+      FirebaseConfig.auth.currentUser?.getIdToken(true);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -16,6 +16,7 @@ import '../../notifications/presentation/notification_settings_page.dart';
 import '../../music_evaluations/presentation/evaluations_list_page.dart';
 import '../../events/presentation/elo_availability_status_page.dart';
 import '../../societies/data/societies_repository.dart';
+import '../../societies/presentation/elo_roles_config_page.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -523,6 +524,52 @@ class _SettingsPageState extends State<SettingsPage> {
                                       return const SizedBox.shrink();
                                     },
                                   ),
+                                  // Opção "Vocais e Ministros" - para quem pode editar ELO
+                                  FutureBuilder<bool>(
+                                    future: _canEditElo(context, user),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.hasData &&
+                                          snapshot.data == true) {
+                                        return Column(
+                                          children: [
+                                            ListTile(
+                                              leading: const Icon(
+                                                Icons.music_note,
+                                                color: Colors.white70,
+                                              ),
+                                              title: const Text(
+                                                'Vocais e Ministros',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              subtitle: Text(
+                                                'Definir quem são vocais e ministros na equipe de louvor',
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
+                                                      color: Colors.white60,
+                                                    ),
+                                              ),
+                                              trailing: const Icon(
+                                                Icons.chevron_right,
+                                                color: Colors.white54,
+                                              ),
+                                              onTap: () =>
+                                                  _navigateToEloRolesConfig(
+                                                    context,
+                                                  ),
+                                            ),
+                                            const Divider(
+                                              height: 1,
+                                              color: Colors.white12,
+                                            ),
+                                          ],
+                                        );
+                                      }
+                                      return const SizedBox.shrink();
+                                    },
+                                  ),
                                   // Opção "Status de Disponibilidades" - sempre visível
                                   ListTile(
                                     leading: const Icon(
@@ -889,6 +936,17 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  Future<bool> _canEditElo(BuildContext context, user) async {
+    try {
+      final societiesRepository = context.read<SocietiesRepository>();
+      final eloSociety = await societiesRepository.fetchByName('ELO');
+      if (eloSociety == null) return false;
+      return user.isAdmin || user.id == eloSociety.userId;
+    } catch (e) {
+      return false;
+    }
+  }
+
   Future<bool> _canAccessEvaluations(BuildContext context, user) async {
     try {
       final societiesRepository = context.read<SocietiesRepository>();
@@ -932,6 +990,12 @@ class _SettingsPageState extends State<SettingsPage> {
   void _navigateToAvailabilityStatus(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const EloAvailabilityStatusPage()),
+    );
+  }
+
+  void _navigateToEloRolesConfig(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EloRolesConfigPage()),
     );
   }
 
