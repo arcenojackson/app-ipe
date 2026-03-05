@@ -60,7 +60,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>O App IPE não acessa nem navega nas suas fotos. O sistema pode solicitar este acesso quando você compartilha a arte do calendário do mês e escolhe salvar a imagem na Fotos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>O app precisa de acesso para salvar a arte do calendário na sua galeria.</string>
+	<string>Usado quando você salva a arte do calendário do mês na galeria (Fotos), após tocar em Compartilhar na tela "Gerar arte do mês".</string>
 </dict>
 </plist>
