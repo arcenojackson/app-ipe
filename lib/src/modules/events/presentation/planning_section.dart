@@ -12,11 +12,7 @@ import 'event_editor_page.dart';
 import 'widgets/event_form_sheet.dart';
 
 class PlanningSection extends StatefulWidget {
-  const PlanningSection({
-    super.key,
-    required this.user,
-    this.onEventsChanged,
-  });
+  const PlanningSection({super.key, required this.user, this.onEventsChanged});
 
   final UserModel user;
   final ValueChanged<bool>? onEventsChanged;
@@ -35,6 +31,8 @@ class _PlanningSectionState extends State<PlanningSection> {
   bool _isLoadingTemplates = true;
   bool _isSelectionMode = false;
   Set<String> _selectedEventIds = {};
+  final ScrollController _scrollController = ScrollController();
+  double _scrollOffset = 0.0;
 
   /// Compara apenas a data (sem hora) de dois DateTime
   bool _isDateBeforeToday(DateTime date) {
@@ -64,7 +62,7 @@ class _PlanningSectionState extends State<PlanningSection> {
     // Converter "HH:mm" para minutos do dia para comparação
     final minutes1 = _timeToMinutes(time1);
     final minutes2 = _timeToMinutes(time2);
-    
+
     return minutes1.compareTo(minutes2);
   }
 
@@ -72,10 +70,10 @@ class _PlanningSectionState extends State<PlanningSection> {
   int _timeToMinutes(String time) {
     final parts = time.split(':');
     if (parts.length != 2) return 0;
-    
+
     final hours = int.tryParse(parts[0]) ?? 0;
     final minutes = int.tryParse(parts[1]) ?? 0;
-    
+
     return hours * 60 + minutes;
   }
 
@@ -84,6 +82,15 @@ class _PlanningSectionState extends State<PlanningSection> {
     super.initState();
     _loadTemplates();
     _loadEvents();
+    _scrollController.addListener(() {
+      _scrollOffset = _scrollController.offset;
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -137,6 +144,7 @@ class _PlanningSectionState extends State<PlanningSection> {
                   ],
                 )
               : ListView.separated(
+                  controller: _scrollController,
                   physics: const BouncingScrollPhysics(
                     parent: AlwaysScrollableScrollPhysics(),
                   ),
@@ -156,9 +164,15 @@ class _PlanningSectionState extends State<PlanningSection> {
                       isSelected: isSelected,
                       onOpen: _isSelectionMode ? null : () => _openEvent(event),
                       onLongPress: () => _enterSelectionMode(event.id),
-                      onTap: _isSelectionMode ? () => _toggleEventSelection(event.id) : null,
-                      onEdit: isPastEvent || _isSelectionMode ? null : () => _onEditEvent(event),
-                      onDelete: isPastEvent || _isSelectionMode ? null : () => _onDeleteEvent(event),
+                      onTap: _isSelectionMode
+                          ? () => _toggleEventSelection(event.id)
+                          : null,
+                      onEdit: isPastEvent || _isSelectionMode
+                          ? null
+                          : () => _onEditEvent(event),
+                      onDelete: isPastEvent || _isSelectionMode
+                          ? null
+                          : () => _onDeleteEvent(event),
                     );
                   },
                 ),
@@ -169,8 +183,12 @@ class _PlanningSectionState extends State<PlanningSection> {
           right: 0,
           child: FloatingActionButton(
             heroTag: 'filter_planning',
-            onPressed: _isSelectionMode ? _toggleSelectAll : _showTemplateFilter,
-            child: Icon(_isSelectionMode ? Icons.select_all : Icons.filter_list),
+            onPressed: _isSelectionMode
+                ? _toggleSelectAll
+                : _showTemplateFilter,
+            child: Icon(
+              _isSelectionMode ? Icons.select_all : Icons.filter_list,
+            ),
           ),
         ),
         // Botão de adicionar / excluir
@@ -179,7 +197,9 @@ class _PlanningSectionState extends State<PlanningSection> {
           right: 0,
           child: FloatingActionButton(
             heroTag: 'add_delete_planning',
-            onPressed: _isSelectionMode ? _deleteSelectedEvents : _onCreateEvent,
+            onPressed: _isSelectionMode
+                ? _deleteSelectedEvents
+                : _onCreateEvent,
             backgroundColor: _isSelectionMode ? Colors.red : null,
             child: Icon(_isSelectionMode ? Icons.delete : Icons.add),
           ),
@@ -198,12 +218,12 @@ class _PlanningSectionState extends State<PlanningSection> {
       final allEvents = _selectedTemplateIds.isEmpty
           ? await repository.fetchAllServices()
           : await repository.fetchServicesByTemplates(_selectedTemplateIds);
-      
+
       // Filtrar apenas eventos com data >= hoje -1 dia
       final filteredEvents = allEvents
           .where((event) => _isDateTodayOrAfter(event.date))
           .toList();
-      
+
       // Ordenar eventos por data e horário crescente
       filteredEvents.sort((a, b) {
         // Primeiro compara a data
@@ -214,7 +234,7 @@ class _PlanningSectionState extends State<PlanningSection> {
         // Se as datas forem iguais, compara o horário
         return _compareTime(a.start, b.start);
       });
-      
+
       setState(() {
         _events = filteredEvents;
       });
@@ -303,6 +323,17 @@ class _PlanningSectionState extends State<PlanningSection> {
       MaterialPageRoute(builder: (_) => EventEditorPage(eventId: event.id)),
     );
     await _loadEvents();
+    if (mounted) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollOffset);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _scrollController.hasClients) {
+            _scrollController.jumpTo(_scrollOffset);
+          }
+        });
+      }
+    }
   }
 
   void _enterSelectionMode(String eventId) {
@@ -384,7 +415,7 @@ class _PlanningSectionState extends State<PlanningSection> {
     try {
       final repository = context.read<EventsRepository>();
       int deletedCount = 0;
-      
+
       for (final eventId in _selectedEventIds) {
         try {
           await repository.deleteEvent(eventId);
@@ -397,7 +428,10 @@ class _PlanningSectionState extends State<PlanningSection> {
       if (mounted) {
         _exitSelectionMode();
         if (deletedCount > 0) {
-          showSuccessToast(context, '$deletedCount evento(s) excluído(s) com sucesso.');
+          showSuccessToast(
+            context,
+            '$deletedCount evento(s) excluído(s) com sucesso.',
+          );
           await _loadEvents();
         } else {
           showErrorToast(context, 'Erro ao excluir eventos.');
@@ -434,9 +468,9 @@ class _PlanningSectionState extends State<PlanningSection> {
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   'Filtrar por Template',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(color: Colors.white),
                 ),
               ),
               Flexible(
@@ -448,11 +482,14 @@ class _PlanningSectionState extends State<PlanningSection> {
                         ),
                         child: ListView.builder(
                           shrinkWrap: true,
-                          itemCount: 2 + _templates.length, // Todos + Sem template + templates
+                          itemCount:
+                              2 +
+                              _templates
+                                  .length, // Todos + Sem template + templates
                           itemBuilder: (context, index) {
                             String displayName;
                             String value;
-                            
+
                             if (index == 0) {
                               displayName = 'Todos';
                               value = 'ALL';
@@ -474,19 +511,25 @@ class _PlanningSectionState extends State<PlanningSection> {
                               title: Text(
                                 displayName,
                                 style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.white70,
+                                  color: isSelected
+                                      ? Colors.white
+                                      : Colors.white70,
                                   fontWeight: isSelected
                                       ? FontWeight.w600
                                       : FontWeight.normal,
                                 ),
                               ),
-                              activeColor: Theme.of(context).colorScheme.primary,
+                              activeColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               onChanged: value == 'ALL'
                                   ? null
                                   : (bool? checked) {
                                       setModalState(() {
                                         if (checked == true) {
-                                          if (!tempSelectedTemplateIds.contains(value)) {
+                                          if (!tempSelectedTemplateIds.contains(
+                                            value,
+                                          )) {
                                             tempSelectedTemplateIds.add(value);
                                           }
                                         } else {
@@ -573,7 +616,7 @@ class _PlanningCard extends StatelessWidget {
     final theme = Theme.of(context);
     // Aplicar opacidade reduzida para eventos passados
     final opacity = isPastEvent ? 0.5 : 1.0;
-    
+
     return Opacity(
       opacity: opacity,
       child: GestureDetector(
@@ -592,72 +635,72 @@ class _PlanningCard extends StatelessWidget {
           child: GlassContainer(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
             child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Checkbox no modo de seleção, ícone normal caso contrário
-              if (isSelectionMode)
-                Checkbox(
-                  value: isSelected,
-                  onChanged: onTap != null ? (_) => onTap!() : null,
-                  activeColor: theme.colorScheme.primary,
-                )
-              else
-                Container(
-                  height: 48,
-                  width: 48,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.secondary.withOpacity(0.18),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.calendar_month,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      event.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Checkbox no modo de seleção, ícone normal caso contrário
+                if (isSelectionMode)
+                  Checkbox(
+                    value: isSelected,
+                    onChanged: onTap != null ? (_) => onTap!() : null,
+                    activeColor: theme.colorScheme.primary,
+                  )
+                else
+                  Container(
+                    height: 48,
+                    width: 48,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.secondary.withOpacity(0.18),
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      timeLabel.isNotEmpty
-                          ? '$dateLabel · $timeLabel'
-                          : dateLabel,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.white60,
-                      ),
+                    child: const Icon(
+                      Icons.calendar_month,
+                      color: Colors.white,
+                      size: 24,
                     ),
-                  ],
-                ),
-              ),
-              if (!isSelectionMode && (onEdit != null || onDelete != null))
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (onEdit != null)
-                      IconButton(
-                        tooltip: 'Editar',
-                        icon: const Icon(Icons.edit_outlined, size: 20),
-                        onPressed: onEdit,
+                  ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        event.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    if (onDelete != null)
-                      IconButton(
-                        tooltip: 'Excluir',
-                        icon: const Icon(Icons.delete_outline, size: 20),
-                        onPressed: onDelete,
+                      const SizedBox(height: 4),
+                      Text(
+                        timeLabel.isNotEmpty
+                            ? '$dateLabel · $timeLabel'
+                            : dateLabel,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.white60,
+                        ),
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-            ],
-          ),
+                if (!isSelectionMode && (onEdit != null || onDelete != null))
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onEdit != null)
+                        IconButton(
+                          tooltip: 'Editar',
+                          icon: const Icon(Icons.edit_outlined, size: 20),
+                          onPressed: onEdit,
+                        ),
+                      if (onDelete != null)
+                        IconButton(
+                          tooltip: 'Excluir',
+                          icon: const Icon(Icons.delete_outline, size: 20),
+                          onPressed: onDelete,
+                        ),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),

@@ -18,6 +18,9 @@ import '../../../core/config/firebase_config.dart';
 import 'widgets/music_view_dialog.dart';
 import '../../../shared/utils/tone_utils.dart';
 import 'event_chat_tab.dart';
+import '../../holyrics/data/holyrics_service.dart';
+import '../../holyrics/presentation/holyrics_settings_screen.dart';
+import '../../../shared/utils/app_toast.dart';
 
 class EventViewerPage extends StatefulWidget {
   const EventViewerPage({
@@ -29,7 +32,8 @@ class EventViewerPage extends StatefulWidget {
 
   final String eventId;
   final int initialTabIndex; // 0: Etapas, 1: Pessoas, 2: Equipes, 3: Chat
-  final String? initialMessageId; // ID da mensagem para scrollar (usado no chat)
+  final String?
+  initialMessageId; // ID da mensagem para scrollar (usado no chat)
 
   @override
   State<EventViewerPage> createState() => _EventViewerPageState();
@@ -46,6 +50,8 @@ class _EventViewerPageState extends State<EventViewerPage>
   EventTemplateModel? _template;
   final ChatRepository _chatRepository = ChatRepository();
   String? _currentUserId;
+  bool _holyricsConfigured = false;
+  final HolyricsService _holyricsService = HolyricsService();
 
   @override
   void initState() {
@@ -58,12 +64,23 @@ class _EventViewerPageState extends State<EventViewerPage>
     );
     _tabController.addListener(_onTabChanged);
     _loadData();
+    _checkHolyricsConfig();
+  }
+
+  Future<void> _checkHolyricsConfig() async {
+    final configured = await _holyricsService.isConfigured();
+    if (mounted) setState(() => _holyricsConfigured = configured);
   }
 
   void _onTabChanged() {
+    // Atualiza a barra de navegação do Holyrics ao trocar de aba
+    if (mounted) setState(() {});
+
     // Quando a aba do chat (índice 3) é selecionada, marcar mensagens como lidas
     if (_tabController.index == 3 && _event != null && _currentUserId != null) {
-      final isUserAssigned = _event!.people.allPeopleIds.contains(_currentUserId!);
+      final isUserAssigned = _event!.people.allPeopleIds.contains(
+        _currentUserId!,
+      );
       if (isUserAssigned) {
         // Aguardar um pouco para garantir que o chat foi carregado
         Future.delayed(const Duration(milliseconds: 1000), () async {
@@ -76,20 +93,26 @@ class _EventViewerPageState extends State<EventViewerPage>
                   .collection('messages')
                   .where('isDeleted', isEqualTo: false)
                   .get();
-              
+
               if (messagesSnapshot.docs.isNotEmpty) {
                 // Encontrar a mensagem mais recente manualmente
                 var lastMessage = messagesSnapshot.docs.first;
-                var lastTimestamp = (lastMessage.data()['timestamp'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
-                
+                var lastTimestamp =
+                    (lastMessage.data()['timestamp'] as Timestamp?)
+                        ?.millisecondsSinceEpoch ??
+                    0;
+
                 for (var doc in messagesSnapshot.docs) {
-                  final timestamp = (doc.data()['timestamp'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+                  final timestamp =
+                      (doc.data()['timestamp'] as Timestamp?)
+                          ?.millisecondsSinceEpoch ??
+                      0;
                   if (timestamp > lastTimestamp) {
                     lastTimestamp = timestamp;
                     lastMessage = doc;
                   }
                 }
-                
+
                 // Marcar todas como visualizadas e atualizar última lida
                 await _chatRepository.markAllMessagesAsViewed(widget.eventId);
                 await _chatRepository.setLastReadMessageId(
@@ -110,6 +133,7 @@ class _EventViewerPageState extends State<EventViewerPage>
   void dispose() {
     _tabController.removeListener(_onTabChanged);
     _tabController.dispose();
+    _holyricsService.close();
     super.dispose();
   }
 
@@ -120,12 +144,22 @@ class _EventViewerPageState extends State<EventViewerPage>
         : '${_event!.name} (${DateFormat('dd/MM').format(_event!.date)})';
 
     // Verificar se usuário está escalado no evento
-    final isUserAssigned = _event != null && _currentUserId != null &&
+    final isUserAssigned =
+        _event != null &&
+        _currentUserId != null &&
         _event!.people.allPeopleIds.contains(_currentUserId);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
+        actions: [
+          if (_event != null && _event!.steps.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.send),
+              tooltip: 'Preparar liturgia no Holyrics',
+              onPressed: _isLoading || _event == null ? null : _sendToHolyrics,
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -136,6 +170,9 @@ class _EventViewerPageState extends State<EventViewerPage>
           ],
         ),
       ),
+      bottomNavigationBar: _holyricsConfigured && _tabController.index == 0
+          ? _buildHolyricsNavBar()
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _event == null
@@ -156,6 +193,57 @@ class _EventViewerPageState extends State<EventViewerPage>
                   const Center(child: Text('Carregando...')),
               ],
             ),
+    );
+  }
+
+  Widget _buildHolyricsNavBar() {
+    return SafeArea(
+      child: Container(
+        height: 56,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          border: Border(
+            top: BorderSide(color: Colors.white.withOpacity(0.1)),
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.cast_connected, size: 16, color: Colors.green),
+            const SizedBox(width: 8),
+            const Text(
+              'Holyrics',
+              style: TextStyle(fontSize: 12, color: Colors.green),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () async {
+                try {
+                  await _holyricsService.actionPrevious();
+                } catch (e) {
+                  if (!mounted) return;
+                  showErrorToast(context, 'Erro ao voltar: $e');
+                }
+              },
+              icon: const Icon(Icons.skip_previous, size: 20),
+              label: const Text('Anterior'),
+            ),
+            const SizedBox(width: 8),
+            TextButton.icon(
+              onPressed: () async {
+                try {
+                  await _holyricsService.actionNext();
+                } catch (e) {
+                  if (!mounted) return;
+                  showErrorToast(context, 'Erro ao avançar: $e');
+                }
+              },
+              icon: const Icon(Icons.skip_next, size: 20),
+              label: const Text('Próxima'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -193,7 +281,19 @@ class _EventViewerPageState extends State<EventViewerPage>
                   ),
               ],
             ),
-            trailing: isMusic ? const Icon(Icons.play_circle) : null,
+            trailing: _holyricsConfigured
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (isMusic) const Icon(Icons.play_circle),
+                      IconButton(
+                        icon: const Icon(Icons.send, size: 20),
+                        tooltip: 'Enviar para o Holyrics',
+                        onPressed: () => _sendStepToHolyrics(step),
+                      ),
+                    ],
+                  )
+                : (isMusic ? const Icon(Icons.play_circle) : null),
           ),
         );
       },
@@ -211,7 +311,8 @@ class _EventViewerPageState extends State<EventViewerPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (_event!.people.elo.isNotEmpty || _event!.people.eloWithInstruments.isNotEmpty) ...[
+          if (_event!.people.elo.isNotEmpty ||
+              _event!.people.eloWithInstruments.isNotEmpty) ...[
             _buildEloSection(),
             const SizedBox(height: 24),
           ],
@@ -219,36 +320,37 @@ class _EventViewerPageState extends State<EventViewerPage>
             _buildPeopleSection('Som e Imagem', _event!.people.soundImage),
             const SizedBox(height: 24),
           ],
-          if (_event!.people.lead.isNotEmpty || _event!.people.preacher.isNotEmpty) ...[
+          if (_event!.people.lead.isNotEmpty ||
+              _event!.people.preacher.isNotEmpty) ...[
             _buildLeadAndPreacherSection(),
           ],
         ],
       ),
     );
   }
-  
+
   Widget _buildEloSection() {
     // Agrupar pessoas por instrumento
     final instrumentGroups = <String, List<MapEntry<String, bool>>>{};
-    
+
     // Adicionar pessoas com instrumentos
     _event!.people.eloWithInstruments.forEach((userId, instruments) {
       instruments.forEach((instrument, talkBack) {
-        instrumentGroups.putIfAbsent(instrument, () => []).add(
-          MapEntry(userId, talkBack),
-        );
+        instrumentGroups
+            .putIfAbsent(instrument, () => [])
+            .add(MapEntry(userId, talkBack));
       });
     });
-    
+
     // Adicionar pessoas sem instrumento específico (elo antigo)
     for (final userId in _event!.people.elo) {
       if (!_event!.people.eloWithInstruments.containsKey(userId)) {
-        instrumentGroups.putIfAbsent('Geral', () => []).add(
-          MapEntry(userId, false),
-        );
+        instrumentGroups
+            .putIfAbsent('Geral', () => [])
+            .add(MapEntry(userId, false));
       }
     }
-    
+
     // Coletar todas as pessoas para exibir em duas colunas
     final allPeople = <Widget>[];
     instrumentGroups.forEach((instrument, people) {
@@ -265,31 +367,33 @@ class _EventViewerPageState extends State<EventViewerPage>
             isPending: false,
           ),
         );
-        
-        allPeople.add(_buildEloPersonChip(
-          user: user,
-          instrument: instrument != 'Geral' ? instrument : null,
-          talkBack: talkBack,
-        ));
+
+        allPeople.add(
+          _buildEloPersonChip(
+            user: user,
+            instrument: instrument != 'Geral' ? instrument : null,
+            talkBack: talkBack,
+          ),
+        );
       }
     });
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Equipe de Louvor',
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
         ),
         const SizedBox(height: 12),
         _buildTwoColumnGrid(allPeople),
       ],
     );
   }
-  
+
   Widget _buildEloPersonChip({
     required UserModel user,
     String? instrument,
@@ -300,10 +404,7 @@ class _EventViewerPageState extends State<EventViewerPage>
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.1),
-          width: 1,
-        ),
+        border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -354,34 +455,32 @@ class _EventViewerPageState extends State<EventViewerPage>
       ),
     );
   }
-  
+
   Widget _buildTwoColumnGrid(List<Widget> chips) {
     if (chips.isEmpty) return const SizedBox.shrink();
-    
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final itemWidth = (constraints.maxWidth - 8) / 2;
-        
+
         return Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: chips.map((chip) => SizedBox(
-            width: itemWidth,
-            child: chip,
-          )).toList(),
+          children: chips
+              .map((chip) => SizedBox(width: itemWidth, child: chip))
+              .toList(),
         );
       },
     );
   }
-  
+
   Widget _buildLeadAndPreacherSection() {
-    final allPeopleIds = [
-      ..._event!.people.lead,
-      ..._event!.people.preacher,
-    ];
-    
-    final people = _people.where((user) => allPeopleIds.contains(user.id)).toList();
-    
+    final allPeopleIds = [..._event!.people.lead, ..._event!.people.preacher];
+
+    final people = _people
+        .where((user) => allPeopleIds.contains(user.id))
+        .toList();
+
     String title;
     if (_event!.people.lead.isNotEmpty && _event!.people.preacher.isNotEmpty) {
       title = 'Dirigente e Pregador';
@@ -390,29 +489,27 @@ class _EventViewerPageState extends State<EventViewerPage>
     } else {
       title = 'Pregador';
     }
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: people
-              .map((user) => UserChip(user: user))
-              .toList(),
+          children: people.map((user) => UserChip(user: user)).toList(),
         ),
       ],
     );
   }
-  
+
   IconData _getInstrumentIcon(String instrument) {
     switch (instrument) {
       case 'Violão':
@@ -435,25 +532,25 @@ class _EventViewerPageState extends State<EventViewerPage>
   }
 
   Widget _buildPeopleSection(String title, List<String> peopleIds) {
-    final people = _people.where((user) => peopleIds.contains(user.id)).toList();
-    
+    final people = _people
+        .where((user) => peopleIds.contains(user.id))
+        .toList();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: Colors.white70,
-              ),
+            fontWeight: FontWeight.w600,
+            color: Colors.white70,
+          ),
         ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: people
-              .map((user) => UserChip(user: user))
-              .toList(),
+          children: people.map((user) => UserChip(user: user)).toList(),
         ),
       ],
     );
@@ -462,60 +559,72 @@ class _EventViewerPageState extends State<EventViewerPage>
   Widget _buildTeamsTab() {
     final teams = _event!.teams;
     final templateName = _template?.name ?? '';
-    
+
     // Determinar quais itens mostrar baseado no template
     final shouldShowLiturgia = _shouldShowLiturgia(templateName);
     final shouldShowLanche = _shouldShowLanche(templateName);
     final shouldShowAberturaEbd = _shouldShowAberturaEbd(templateName);
     final shouldShowReuniaoOracao = _shouldShowReuniaoOracao(templateName);
-    
+
     final items = <Widget>[];
-    
+
     if (shouldShowLiturgia) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Montar liturgia',
-        icon: Icons.menu_book,
-        societyId: teams.liturgia,
-      ));
-      if (shouldShowLanche || shouldShowAberturaEbd || shouldShowReuniaoOracao) {
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Montar liturgia',
+          icon: Icons.menu_book,
+          societyId: teams.liturgia,
+        ),
+      );
+      if (shouldShowLanche ||
+          shouldShowAberturaEbd ||
+          shouldShowReuniaoOracao) {
         items.add(const SizedBox(height: 16));
       }
     }
-    
+
     if (shouldShowLanche) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Lanche pós-culto',
-        icon: Icons.restaurant,
-        societyId: teams.lanche,
-      ));
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Lanche pós-culto',
+          icon: Icons.restaurant,
+          societyId: teams.lanche,
+        ),
+      );
       if (shouldShowAberturaEbd || shouldShowReuniaoOracao) {
         items.add(const SizedBox(height: 16));
       }
     }
-    
+
     if (shouldShowAberturaEbd) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Abertura EBD',
-        icon: Icons.school,
-        societyId: teams.aberturaEbd,
-      ));
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Abertura EBD',
+          icon: Icons.school,
+          societyId: teams.aberturaEbd,
+        ),
+      );
       if (shouldShowReuniaoOracao) {
         items.add(const SizedBox(height: 16));
       }
     }
-    
+
     if (shouldShowReuniaoOracao) {
-      items.add(_buildTeamResponsibilityCard(
-        title: 'Reunião de oração',
-        icon: Icons.favorite,
-        societyId: teams.reuniaoOracao,
-      ));
+      items.add(
+        _buildTeamResponsibilityCard(
+          title: 'Reunião de oração',
+          icon: Icons.favorite,
+          societyId: teams.reuniaoOracao,
+        ),
+      );
     }
-    
+
     if (items.isEmpty) {
-      return const Center(child: Text('Nenhuma equipe atribuída para este tipo de evento.'));
+      return const Center(
+        child: Text('Nenhuma equipe atribuída para este tipo de evento.'),
+      );
     }
-    
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -527,26 +636,23 @@ class _EventViewerPageState extends State<EventViewerPage>
 
   bool _shouldShowLiturgia(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('culto à noite') || 
-           name.contains('culto de ceia');
+    return name.contains('culto à noite') || name.contains('culto de ceia');
   }
 
   bool _shouldShowLanche(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('culto à noite') || 
-           name.contains('culto de ceia');
+    return name.contains('culto à noite') || name.contains('culto de ceia');
   }
 
   bool _shouldShowAberturaEbd(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('escola bíblica') || 
-           name.contains('escola biblica');
+    return name.contains('escola bíblica') || name.contains('escola biblica');
   }
 
   bool _shouldShowReuniaoOracao(String templateName) {
     final name = templateName.toLowerCase();
-    return name.contains('reunião de oração') || 
-           name.contains('reuniao de oracao');
+    return name.contains('reunião de oração') ||
+        name.contains('reuniao de oracao');
   }
 
   Widget _buildTeamResponsibilityCard({
@@ -592,24 +698,24 @@ class _EventViewerPageState extends State<EventViewerPage>
                   Text(
                     title,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 4),
                   if (society != null)
                     Text(
                       society.name,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white70,
-                          ),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                     )
                   else
                     Text(
                       'Nenhuma sociedade atribuída',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white54,
-                            fontStyle: FontStyle.italic,
-                          ),
+                        color: Colors.white54,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                 ],
               ),
@@ -637,7 +743,9 @@ class _EventViewerPageState extends State<EventViewerPage>
       EventTemplateModel? template;
       if (event.templateId != null && event.templateId!.isNotEmpty) {
         try {
-          template = await eventsRepository.fetchTemplateById(event.templateId!);
+          template = await eventsRepository.fetchTemplateById(
+            event.templateId!,
+          );
         } catch (_) {
           // Se não conseguir carregar o template, continua sem ele
         }
@@ -668,6 +776,146 @@ class _EventViewerPageState extends State<EventViewerPage>
       context: context,
       builder: (_) => MusicViewDialog(music: music, customTone: customTone),
     );
+  }
+
+  // Projeta uma etapa individualmente no Holyrics (uso ao vivo durante o culto)
+  Future<void> _sendStepToHolyrics(EventStepModel step) async {
+    try {
+      if (step.type == EventStepType.music && step.musicId != null) {
+        final music = await context.read<MusicsRepository>().fetchById(
+          step.musicId!,
+        );
+        await _holyricsService.showSong(music.title);
+      } else {
+        final desc = (step.description ?? '').trim();
+        if (desc.isNotEmpty && _looksLikeBibleReference(desc)) {
+          await _holyricsService.showVerse(desc);
+        } else if (desc.isNotEmpty) {
+          await _holyricsService.showText(desc);
+        } else {
+          await _holyricsService.showText(step.title);
+        }
+      }
+
+      if (!mounted) return;
+      showSuccessToast(context, '"${step.title}" enviado para o Holyrics');
+    } catch (e) {
+      if (!mounted) return;
+      showErrorToast(context, 'Erro ao enviar "${step.title}": $e');
+    }
+  }
+
+  // Monta toda a liturgia na playlist do Holyrics de uma só vez.
+  // Músicas são buscadas pelo título no banco do Holyrics via SearchLyrics.
+  // Versículos bíblicos são passados diretamente como referência textual.
+  // Itens de texto e etapas genéricas são adicionados como plain_text.
+  Future<void> _sendToHolyrics() async {
+    if (_event == null || _event!.steps.isEmpty) return;
+
+    final configured = await _holyricsService.isConfigured();
+    if (!configured) {
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => const HolyricsSettingsScreen(),
+        ),
+      );
+      await _checkHolyricsConfig();
+      return;
+    }
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const AlertDialog(
+        title: Text('Preparando liturgia'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Pesquisando músicas no Holyrics...'),
+            SizedBox(height: 16),
+            CircularProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final items = <Map<String, dynamic>>[];
+      final notFoundSongs = <String>[];
+
+      // Cabeçalho da liturgia
+      final dateStr = DateFormat('dd/MM').format(_event!.date);
+      items.add({'type': 'title', 'name': '${_event!.name} — $dateStr'});
+
+      for (final step in _event!.steps) {
+        if (step.type == EventStepType.music && step.musicId != null) {
+          final music = await context.read<MusicsRepository>().fetchById(
+            step.musicId!,
+          );
+          final songId = await _holyricsService.searchSong(music.title);
+          if (songId != null) {
+            items.add({'type': 'song', 'id': songId});
+          } else {
+            notFoundSongs.add(music.title);
+            // Mantém a ordem da liturgia adicionando como texto
+            items.add({'type': 'plain_text', 'text': '♪ ${music.title}'});
+          }
+        } else {
+          final desc = (step.description ?? '').trim();
+          if (desc.isNotEmpty && _looksLikeBibleReference(desc)) {
+            items.add({'type': 'verse', 'references': desc});
+          } else {
+            final text = desc.isNotEmpty ? '${step.title}\n$desc' : step.title;
+            items.add({'type': 'plain_text', 'text': text});
+          }
+        }
+      }
+
+      await _holyricsService.addToPlaylist(items);
+
+      if (!mounted) return;
+      Navigator.of(context).pop();
+
+      if (notFoundSongs.isEmpty) {
+        showSuccessToast(
+          context,
+          'Liturgia adicionada à playlist do Holyrics!',
+        );
+      } else {
+        final songList = notFoundSongs.map((s) => '• $s').join('\n');
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Liturgia enviada com avisos'),
+            content: Text(
+              'A liturgia foi adicionada à playlist.\n\n'
+              'Músicas não encontradas no Holyrics (adicionadas como texto):\n$songList',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      showErrorToast(context, 'Erro ao enviar para o Holyrics: $e');
+    }
+  }
+
+  bool _looksLikeBibleReference(String text) {
+    // Aceita formatos como: "João 3:16", "Sl 23.1", "1Jo 3:16-18", "Rm 12:2"
+    final biblePattern = RegExp(
+      r'^[1-3]?\s*[A-Za-zÀ-ÿ]+\.?\s+\d+[:.]\d+(?:[.-]\d+)?$',
+      caseSensitive: false,
+    );
+    return biblePattern.hasMatch(text.trim());
   }
 
   Widget _buildChatTab(bool isUserAssigned) {

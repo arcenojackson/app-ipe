@@ -754,6 +754,7 @@ class EventsRepository {
 
   /// Busca todos os eventos para exibir no calendário: eventos da collection
   /// [events] + serviços da collection [services] (cultos, EBD, reuniões, Planejar).
+  /// Evita duplicação excluindo serviços que já têm evento correspondente na collection [events].
   Future<List<CalendarEventModel>> fetchAllEventsForCalendar() async {
     try {
       final calendarEvents = await fetchAllCalendarEvents();
@@ -763,17 +764,26 @@ class EventsRepository {
             id: s.id,
             name: s.name,
             date: s.date,
-            category: 'Geral',
+            category: "Geral",
             start: s.start,
-            sourceCollection: 'services',
-          ));
+            sourceCollection: "services",
+          )).where((serviceEvent) {
+        // Filtrar serviços que já têm evento correspondente na collection [events]
+        // para evitar duplicação quando eventos são criados a partir do calendário
+        return !calendarEvents.any((calendarEvent) =>
+            calendarEvent.name == serviceEvent.name &&
+            calendarEvent.date.year == serviceEvent.date.year &&
+            calendarEvent.date.month == serviceEvent.date.month &&
+            calendarEvent.date.day == serviceEvent.date.day &&
+            calendarEvent.start == serviceEvent.start);
+      }).toList();
 
       final combined = [...calendarEvents, ...fromServices];
       combined.sort(CalendarEventModel.compareByDateAndTime);
       return combined;
     } catch (e) {
       throw AppException(
-        message: 'Erro ao carregar eventos do calendário: ${e.toString()}',
+        message: "Erro ao carregar eventos do calendário: ${e.toString()}",
       );
     }
   }
