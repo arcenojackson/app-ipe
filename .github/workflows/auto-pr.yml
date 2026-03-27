@@ -1,0 +1,70 @@
+name: Auto PR
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - master
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check if PR already exists
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number')
+          echo "pr_number=$PR" >> $GITHUB_OUTPUT
+
+      - name: Generate PR description from diff
+        if: steps.check_pr.outputs.pr_number == ''
+        id: diff
+        run: |
+          BASE=$(git merge-base origin/main HEAD 2>/dev/null || git merge-base origin/master HEAD 2>/dev/null || echo "")
+          if [ -z "$BASE" ]; then
+            DIFF_SUMMARY="Branch nova sem base detectada."
+          else
+            FILES=$(git diff --name-only $BASE HEAD | head -20 | sed 's/^/- /')
+            COMMITS=$(git log --oneline $BASE..HEAD | head -10 | sed 's/^/- /')
+            DIFF_SUMMARY="**Arquivos alterados:**\n$FILES\n\n**Commits:**\n$COMMITS"
+          fi
+          echo "summary<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$DIFF_SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Pull Request
+        if: steps.check_pr.outputs.pr_number == ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          # Formata o título da branch em título legível (feat/login-page → feat: login page)
+          TITLE=$(echo "$BRANCH" | sed 's|feat/|feat: |;s|fix/|fix: |;s|chore/|chore: |;s|docs/|docs: |;s|-| |g')
+
+          gh pr create \
+            --title "$TITLE" \
+            --body "## O que mudou
+
+          ${{ steps.diff.outputs.summary }}
+
+          ## Checklist
+
+          - [ ] Testado localmente
+          - [ ] Sem erros de build
+          - [ ] Pronto para review
+
+          ---
+          *PR gerado automaticamente pelo workflow ArcLabz* 🤖" \
+            --base master \
+            --draft
