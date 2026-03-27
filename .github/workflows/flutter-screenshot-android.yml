@@ -13,6 +13,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android/sdk/ndk \
+            /usr/local/share/boost /opt/ghc /usr/local/share/chromium \
+            /usr/local/lib/android/sdk/build-tools/33.0.* \
+            /usr/local/lib/android/sdk/build-tools/34.0.* \
+            /usr/local/lib/android/sdk/platforms/android-34
+          sudo apt-get clean
+          df -h
+
       - name: Checkout
         uses: actions/checkout@v4
 
