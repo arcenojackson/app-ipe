@@ -22,7 +22,7 @@ jobs:
       - name: Check if PR already exists
         id: check_pr
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           PR=$(gh pr list --head "${{ github.ref_name }}" --json number --jq '.[0].number')
           echo "pr_number=$PR" >> $GITHUB_OUTPUT
@@ -46,7 +46,7 @@ jobs:
       - name: Create Pull Request
         if: steps.check_pr.outputs.pr_number == ''
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PAT }}
         run: |
           BRANCH="${{ github.ref_name }}"
           # Formata o título da branch em título legível (feat/login-page → feat: login page)
