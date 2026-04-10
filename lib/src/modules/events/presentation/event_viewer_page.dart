@@ -281,19 +281,7 @@ class _EventViewerPageState extends State<EventViewerPage>
                   ),
               ],
             ),
-            trailing: _holyricsConfigured
-                ? Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (isMusic) const Icon(Icons.play_circle),
-                      IconButton(
-                        icon: const Icon(Icons.send, size: 20),
-                        tooltip: 'Enviar para o Holyrics',
-                        onPressed: () => _sendStepToHolyrics(step),
-                      ),
-                    ],
-                  )
-                : (isMusic ? const Icon(Icons.play_circle) : null),
+            trailing: isMusic ? const Icon(Icons.play_circle) : null,
           ),
         );
       },
@@ -778,33 +766,6 @@ class _EventViewerPageState extends State<EventViewerPage>
     );
   }
 
-  // Projeta uma etapa individualmente no Holyrics (uso ao vivo durante o culto)
-  Future<void> _sendStepToHolyrics(EventStepModel step) async {
-    try {
-      if (step.type == EventStepType.music && step.musicId != null) {
-        final music = await context.read<MusicsRepository>().fetchById(
-          step.musicId!,
-        );
-        await _holyricsService.showSong(music.title);
-      } else {
-        final desc = (step.description ?? '').trim();
-        if (desc.isNotEmpty && _looksLikeBibleReference(desc)) {
-          await _holyricsService.showVerse(desc);
-        } else if (desc.isNotEmpty) {
-          await _holyricsService.showText(desc);
-        } else {
-          await _holyricsService.showText(step.title);
-        }
-      }
-
-      if (!mounted) return;
-      showSuccessToast(context, '"${step.title}" enviado para o Holyrics');
-    } catch (e) {
-      if (!mounted) return;
-      showErrorToast(context, 'Erro ao enviar "${step.title}": $e');
-    }
-  }
-
   // Monta toda a liturgia na playlist do Holyrics de uma só vez.
   // Músicas são buscadas pelo título no banco do Holyrics via SearchLyrics.
   // Versículos bíblicos são passados diretamente como referência textual.
@@ -858,17 +819,44 @@ class _EventViewerPageState extends State<EventViewerPage>
           if (songId != null) {
             items.add({'type': 'song', 'id': songId});
           } else {
-            notFoundSongs.add(music.title);
-            // Mantém a ordem da liturgia adicionando como texto
-            items.add({'type': 'plain_text', 'text': '♪ ${music.title}'});
+            // Tenta criar a música no Holyrics com os dados do app
+            try {
+              final createdId = await _holyricsService.createSong(
+                title: music.title,
+                artist: music.artist,
+                lyrics: music.lyrics,
+                tone: music.tone,
+                minorTone: music.minorTone,
+                bpm: music.bpm,
+              );
+              items.add({'type': 'song', 'id': createdId});
+            } catch (e) {
+              notFoundSongs.add('${music.title} (${e.toString()})');
+              items.add({'type': 'plain_text', 'name': '♪ ${music.title}', 'text': '♪ ${music.title}'});
+            }
           }
         } else {
-          final desc = (step.description ?? '').trim();
-          if (desc.isNotEmpty && _looksLikeBibleReference(desc)) {
-            items.add({'type': 'verse', 'references': desc});
+          final bibleRef = _extractBibleReference(step.title);
+          final hymnNumber = _extractHymnNumber(step.title);
+          if (bibleRef != null) {
+            items.add({'type': 'verse', 'references': bibleRef});
+          } else if (hymnNumber != null) {
+            final searchTitle = 'HNC $hymnNumber';
+            final songId = await _holyricsService.searchSong(searchTitle);
+            if (songId != null) {
+              items.add({'type': 'song', 'id': songId});
+            } else {
+              notFoundSongs.add(searchTitle);
+              items.add({'type': 'plain_text', 'name': searchTitle, 'text': searchTitle});
+            }
           } else {
-            final text = desc.isNotEmpty ? '${step.title}\n$desc' : step.title;
-            items.add({'type': 'plain_text', 'text': text});
+            final desc = (step.description ?? '').trim();
+            if (desc.isNotEmpty && _looksLikeBibleReference(desc)) {
+              items.add({'type': 'verse', 'references': desc});
+            } else {
+              final text = desc.isNotEmpty ? '${step.title}\n$desc' : step.title;
+              items.add({'type': 'plain_text', 'name': step.title, 'text': text});
+            }
           }
         }
       }
@@ -907,6 +895,32 @@ class _EventViewerPageState extends State<EventViewerPage>
       Navigator.of(context).pop();
       showErrorToast(context, 'Erro ao enviar para o Holyrics: $e');
     }
+  }
+
+  // Extrai o número do hino HNC do título de etapas de "Cântico: <número>".
+  // Retorna o número formatado com 3 dígitos (ex: "015"), ou null se não for um cântico.
+  String? _extractHymnNumber(String title) {
+    final match = RegExp(
+      r'c[âa]ntico:?\s+(\d+)',
+      caseSensitive: false,
+    ).firstMatch(title.trim());
+    if (match == null) return null;
+    final number = int.tryParse(match.group(1)!);
+    if (number == null) return null;
+    return number.toString().padLeft(3, '0');
+  }
+
+  // Extrai a referência bíblica do título de etapas de "Leitura Bíblica".
+  // Ex: "Leitura Bíblica 2 Sm 10.2" → "2 Sm 10.2"
+  // Retorna null se o título não contiver "Leitura Bíblica" ou não houver referência.
+  String? _extractBibleReference(String title) {
+    final match = RegExp(
+      r'leitura\s+b[íi]blica:?\s+(.+)',
+      caseSensitive: false,
+    ).firstMatch(title.trim());
+    if (match == null) return null;
+    final ref = match.group(1)!.trim();
+    return ref.isNotEmpty ? ref : null;
   }
 
   bool _looksLikeBibleReference(String text) {

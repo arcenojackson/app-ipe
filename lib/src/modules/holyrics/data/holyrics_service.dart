@@ -83,6 +83,57 @@ class HolyricsService {
     }
   }
 
+  // Cria uma nova música no banco do Holyrics e retorna o ID criado.
+  // Requer Holyrics Plan e permissão avançada habilitada em:
+  //   Arquivo > Configurações > Avançado > JavaScript > Permissões avançadas
+  // Lança Exception se o Holyrics retornar erro.
+  Future<String> createSong({
+    required String title,
+    required String artist,
+    String? lyrics,
+    String? tone,
+    bool minorTone = false,
+    String? bpm,
+  }) async {
+    final slides = _lyricsToSlides(lyrics);
+    final key = tone != null && tone.isNotEmpty
+        ? (minorTone ? '${tone}m' : tone)
+        : '';
+    final body = <String, dynamic>{
+      'title': title,
+      'artist': artist,
+      if (key.isNotEmpty) 'key': key,
+      if (bpm != null && double.tryParse(bpm) != null)
+        'bpm': double.parse(bpm),
+      if (slides.isNotEmpty) 'slides': slides,
+    };
+    final result = await _post('CreateSong', body, timeout: const Duration(seconds: 15));
+    if (result['status'] != 'ok') {
+      final error = result['error']?.toString() ?? 'resposta inesperada';
+      throw Exception('Holyrics recusou a criação: $error');
+    }
+    final data = result['data'];
+    if (data is! Map<String, dynamic>) {
+      throw Exception('Holyrics não retornou dados da música criada');
+    }
+    final id = data['id']?.toString();
+    if (id == null || id.isEmpty) {
+      throw Exception('Holyrics retornou ID vazio para a música criada');
+    }
+    return id;
+  }
+
+  List<Map<String, dynamic>> _lyricsToSlides(String? lyrics) {
+    if (lyrics == null || lyrics.trim().isEmpty) return [];
+    // Divide a letra em estrofes separadas por linha em branco
+    return lyrics
+        .split(RegExp(r'\n\s*\n'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .map((s) => {'text': s})
+        .toList();
+  }
+
   // Projeta uma música imediatamente na tela (uso ao vivo).
   // Busca pelo título no Holyrics e projeta pelo ID encontrado.
   Future<void> showSong(String songTitle) async {
@@ -109,7 +160,7 @@ class HolyricsService {
   //   {"type": "title",      "name": "Culto Domingo"}
   //   {"type": "song",       "id": "abc123"}
   //   {"type": "verse",      "references": "Sl 23.1"}
-  //   {"type": "plain_text", "text": "..."}
+  //   {"type": "plain_text", "name": "Título", "text": "..."}
   Future<void> addToPlaylist(List<Map<String, dynamic>> items) async {
     await _post(
       'AddToPlaylist',
