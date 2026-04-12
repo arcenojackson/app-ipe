@@ -239,8 +239,8 @@ class _HolyricsSettingsScreenState extends State<HolyricsSettingsScreen> {
                 '• Certifique-se de que o seu dispositivo móvel e o computador executando o Holyrics estejam na mesma rede Wi-Fi.\n'
                 '• O servidor da API Holyrics deve estar habilitado nas configurações do Holyrics.\n'
                 '• A porta da API deve estar acessível (não bloqueada pelo firewall).\n'
-                '• Esta configuração é armazenada localmente no seu dispositivo.\n'
-                '• Nenhum dado é enviado para servidores externos - toda a comunicação é local.',
+                '• Esta configuração é salva no servidor e compartilhada com todos os usuários do app.\n'
+                '• A comunicação com o Holyrics é feita localmente pela rede Wi-Fi.',
                 style: TextStyle(fontSize: 14),
               ),
             ],

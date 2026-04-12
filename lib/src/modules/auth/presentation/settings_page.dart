@@ -605,49 +605,51 @@ class _SettingsPageState extends State<SettingsPage> {
                       },
                     ),
 
-                    // Seção de Integrações (Holyrics) - penúltima seção
-                    Text(
-                      'Integrações',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    GlassContainer(
-                      padding: EdgeInsets.zero,
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.settings_input_component,
+                    // Seção de Integrações (Holyrics) - apenas Admin
+                    if (user?.isAdmin == true) ...[
+                      Text(
+                        'Integrações',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
                           color: Colors.white70,
                         ),
-                        title: const Text(
-                          'Holyrics',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        subtitle: Text(
-                          'Configurar integração local com Holyrics',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: Colors.white60,
-                          ),
-                        ),
-                        trailing: const Icon(
-                          Icons.chevron_right,
-                          color: Colors.white54,
-                        ),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const HolyricsSettingsScreen(),
-                            ),
-                          );
-                        },
                       ),
-                    ),
-                    const SizedBox(height: 24),
+                      const SizedBox(height: 12),
+                      GlassContainer(
+                        padding: EdgeInsets.zero,
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.settings_input_component,
+                            color: Colors.white70,
+                          ),
+                          title: const Text(
+                            'Holyrics',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Configurar integração local com Holyrics',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white60,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.chevron_right,
+                            color: Colors.white54,
+                          ),
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const HolyricsSettingsScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
 
                     // Seção de Conta
                     Text(
