@@ -50,7 +50,6 @@ class _EventViewerPageState extends State<EventViewerPage>
   EventTemplateModel? _template;
   final ChatRepository _chatRepository = ChatRepository();
   String? _currentUserId;
-  bool _holyricsConfigured = false;
   final HolyricsService _holyricsService = HolyricsService();
 
   @override
@@ -64,16 +63,9 @@ class _EventViewerPageState extends State<EventViewerPage>
     );
     _tabController.addListener(_onTabChanged);
     _loadData();
-    _checkHolyricsConfig();
-  }
-
-  Future<void> _checkHolyricsConfig() async {
-    final configured = await _holyricsService.isConfigured();
-    if (mounted) setState(() => _holyricsConfigured = configured);
   }
 
   void _onTabChanged() {
-    // Atualiza a barra de navegação do Holyrics ao trocar de aba
     if (mounted) setState(() {});
 
     // Quando a aba do chat (índice 3) é selecionada, marcar mensagens como lidas
@@ -170,9 +162,6 @@ class _EventViewerPageState extends State<EventViewerPage>
           ],
         ),
       ),
-      bottomNavigationBar: _holyricsConfigured && _tabController.index == 0
-          ? _buildHolyricsNavBar()
-          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _event == null
@@ -193,57 +182,6 @@ class _EventViewerPageState extends State<EventViewerPage>
                   const Center(child: Text('Carregando...')),
               ],
             ),
-    );
-  }
-
-  Widget _buildHolyricsNavBar() {
-    return SafeArea(
-      child: Container(
-        height: 56,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          border: Border(
-            top: BorderSide(color: Colors.white.withOpacity(0.1)),
-          ),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.cast_connected, size: 16, color: Colors.green),
-            const SizedBox(width: 8),
-            const Text(
-              'Holyrics',
-              style: TextStyle(fontSize: 12, color: Colors.green),
-            ),
-            const Spacer(),
-            TextButton.icon(
-              onPressed: () async {
-                try {
-                  await _holyricsService.actionPrevious();
-                } catch (e) {
-                  if (!mounted) return;
-                  showErrorToast(context, 'Erro ao voltar: $e');
-                }
-              },
-              icon: const Icon(Icons.skip_previous, size: 20),
-              label: const Text('Anterior'),
-            ),
-            const SizedBox(width: 8),
-            TextButton.icon(
-              onPressed: () async {
-                try {
-                  await _holyricsService.actionNext();
-                } catch (e) {
-                  if (!mounted) return;
-                  showErrorToast(context, 'Erro ao avançar: $e');
-                }
-              },
-              icon: const Icon(Icons.skip_next, size: 20),
-              label: const Text('Próxima'),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -781,7 +719,6 @@ class _EventViewerPageState extends State<EventViewerPage>
           builder: (context) => const HolyricsSettingsScreen(),
         ),
       );
-      await _checkHolyricsConfig();
       return;
     }
 
