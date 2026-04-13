@@ -144,14 +144,6 @@ class _EventViewerPageState extends State<EventViewerPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        actions: [
-          if (_event != null && _event!.steps.isNotEmpty)
-            IconButton(
-              icon: const Icon(Icons.send),
-              tooltip: 'Preparar liturgia no Holyrics',
-              onPressed: _isLoading || _event == null ? null : _sendToHolyrics,
-            ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: [
@@ -162,6 +154,15 @@ class _EventViewerPageState extends State<EventViewerPage>
           ],
         ),
       ),
+      floatingActionButton: _event != null &&
+              _event!.steps.isNotEmpty &&
+              _tabController.index == 0
+          ? FloatingActionButton.extended(
+              onPressed: _isLoading ? null : _sendToHolyrics,
+              icon: const Icon(Icons.cast_connected),
+              label: const Text('Enviar para Holyrics'),
+            )
+          : null,
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _event == null
