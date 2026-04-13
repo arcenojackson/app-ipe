@@ -921,7 +921,7 @@ class _EventViewerPageState extends State<EventViewerPage>
   Widget _buildChatAction(bool isUserAssigned) {
     if (!isUserAssigned || _event == null) {
       return IconButton(
-        icon: const Icon(Icons.chat_bubble_outline),
+        icon: const Icon(Icons.forum_outlined),
         tooltip: 'Chat',
         onPressed: () => _openChatModal(),
       );
@@ -935,7 +935,7 @@ class _EventViewerPageState extends State<EventViewerPage>
           alignment: Alignment.center,
           children: [
             IconButton(
-              icon: const Icon(Icons.chat_bubble_outline),
+              icon: const Icon(Icons.forum_outlined),
               tooltip: 'Chat',
               onPressed: () => _openChatModal(),
             ),
