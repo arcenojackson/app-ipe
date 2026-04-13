@@ -14,8 +14,9 @@ flutter pub get                    # Install dependencies
 flutter analyze                    # Static analysis
 flutter test                       # Run all tests
 flutter test path/to/file_test.dart --plain-name "test name"  # Run single test
-flutter build apk --release        # Android release build
-flutter build ios --release        # iOS release build (requires macOS + Xcode)
+flutter run --dart-define=PEXELS_API_KEY=lPOKBczwM78ipvUUO9zwbU2JTCevDxH23edZ8dIa8kYg6GUVVGit1eYn
+flutter build appbundle --release --dart-define=PEXELS_API_KEY=lPOKBczwM78ipvUUO9zwbU2JTCevDxH23edZ8dIa8kYg6GUVVGit1eYn  # Android release build
+flutter build ios --release --dart-define=PEXELS_API_KEY=lPOKBczwM78ipvUUO9zwbU2JTCevDxH23edZ8dIa8kYg6GUVVGit1eYn       # iOS release build (requires macOS + Xcode)
 dart format .                      # Format code
 ```
 
@@ -27,6 +28,12 @@ cd functions && npm run build      # Compile TS → JS
 firebase emulators:start --only functions  # Local testing
 firebase deploy --only functions   # Deploy to production
 ```
+
+### Firestore Rules
+```bash
+firebase deploy --only firestore:rules  # Deploy security rules
+```
+Rules file: `firestore.rules` (raiz do projeto)
 
 ## Architecture
 
@@ -64,6 +71,7 @@ Single entry point: `functions/src/index.ts`. Key triggers:
 - `services/{eventId}` — events with teams, people assignments, steps (music list)
 - `societies/{societyId}` — church groups with board members
 - `*/messages/{messageId}` — subcollections for chat messages under services and societies
+- `settings/holyrics` — configuração global da integração com Holyrics (ip, port, token); escrita restrita a Admins
 
 ## Key Patterns
 

@@ -1,0 +1,187 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+  
+    // Função auxiliar para verificar se o usuário é administrador
+   	function isAdmin() {
+      return request.auth != null && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.is_admin == true;
+    }
+
+    // Regras para usuários
+    match /users/{userId} {
+      // Qualquer usuário autenticado pode ler qualquer usuário (para listar equipe)
+      allow read: if request.auth != null;
+      
+      // Usuários podem atualizar apenas seus próprios dados
+      // Administradores podem atualizar qualquer usuário (especialmente is_admin)
+      allow update: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+      
+      // Usuários podem criar apenas seus próprios dados
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
+      // Apenas administradores podem deletar usuários
+      allow delete: if isAdmin();
+    }
+    
+    // Regras para convites
+    match /invites/{inviteId} {
+      // Permitir criação de convites por usuários autenticados
+      allow create: if request.auth != null;
+      
+      // Permitir leitura de convites pendentes pelo email do usuário
+      allow read: if request.auth != null;
+      
+      // Permitir atualização apenas pelo criador do convite ou pelo convidado
+      allow update: if request.auth != null && 
+        (resource.data.invitedBy == request.auth.token.email ||
+         resource.data.invitedEmail == request.auth.token.email);
+      
+      // Permitir exclusão apenas pelo criador do convite
+      allow delete: if request.auth != null && 
+        resource.data.invitedBy == request.auth.token.email;
+    }
+
+    match /services/{serviceId} {
+      // Permitir leitura se:
+      // 1. Usuário está na lista de people do service, OU
+      // 2. Usuário é o criador do service (userId), OU
+      // 3. Usuário é admin
+      allow read: if request.auth != null;
+
+      // Permitir criação de services pelo usuário autenticado
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+
+      // Permitir atualização/deleção apenas pelo criador ou admin
+      allow update, delete: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+        
+      // Regras para mensagens do chat dentro de cada evento
+      match /messages/{messageId} {
+        // Usuários vinculados ao evento podem ler todas as mensagens
+        // (incluindo histórico completo para usuários adicionados depois)
+        // Qualquer usuário autenticado pode criar mensagens
+        // (a verificação de vínculo com o evento será feita no cliente)
+        allow read, create: if request.auth != null;
+        
+        // Apenas o autor ou admin pode deletar
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.userId || isAdmin()
+        );
+      }
+      
+      // Regras para rastreamento de leitura de mensagens
+      match /user_reads/{userId} {
+        // Usuário pode ler/escrever apenas seu próprio registro de leitura
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }      
+    }
+    
+    match /services_templates/{serviceTemplateId} {
+      // Permitir leitura se:
+      // 2. Usuário é o criador do service_template (userId), OU
+      // 3. Usuário é admin
+      allow read: if request.auth != null;
+
+      // Permitir criação de service_template pelo usuário autenticado
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+
+      // Permitir atualização/deleção apenas pelo criador ou admin
+      allow update, delete: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+    
+    match /events/{eventId} {
+      // Permitir leitura para todos os usuários
+      allow read: if request.auth != null;
+
+      // Permitir criação de services pelo usuário autenticado e admin
+      allow create: if request.auth != null && isAdmin();
+
+      // Permitir atualização/deleção apenas pelo criador ou admin
+      allow update, delete: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+    }
+    
+    match /societies/{societyId} {
+      // Permitir leitura para todos os usuários
+      allow read: if request.auth != null;
+
+      // Permitir criação de society pelo usuário autenticado e admin
+      allow create: if request.auth != null && isAdmin();
+
+      // Permitir atualização/deleção apenas pelo criador ou admin
+      allow update, delete: if request.auth != null && 
+        (request.auth.uid == resource.data.userId || isAdmin());
+        
+      // Regras para mensagens do chat dentro de cada evento
+      match /messages/{messageId} {
+        // Usuários vinculados ao evento podem ler todas as mensagens
+        // (incluindo histórico completo para usuários adicionados depois)
+        // Qualquer usuário autenticado pode criar mensagens
+        // (a verificação de vínculo com o evento será feita no cliente)
+        allow read, create: if request.auth != null;
+        
+        // Apenas o autor ou admin pode deletar
+        allow update: if request.auth != null && (
+          request.auth.uid == resource.data.userId || isAdmin()
+        );
+      }
+      
+      // Regras para rastreamento de leitura de mensagens
+      match /user_reads/{userId} {
+        // Usuário pode ler/escrever apenas seu próprio registro de leitura
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      } 
+    }
+    
+    match /weeklyTeamAssignments/{weekNumber} {
+      // Qualquer usuário autenticado pode ler
+      allow read: if request.auth != null;
+
+      // Apenas administradores podem escrever
+      allow create, update: if request.auth != null 
+        && isAdmin();
+    }
+    
+    match /music_evaluation_forms/{formId} {
+      // Permitir leitura, criação e atualização para usuários autenticados
+      allow read, create, update, delete: if request.auth != null;
+      
+      // Subcoleção: respostas dos usuários
+      match /responses/{responseId} {
+        // Permitir leitura e criação para usuários autenticados
+        allow read, create: if request.auth != null;
+        
+        // Permitir atualização apenas para o próprio usuário
+        allow update: if request.auth != null;
+        
+        // Permitir exclusão apenas para o próprio usuário
+        allow delete: if request.auth != null;
+      }
+    }
+    
+    match /settings/{document} {                                                                                                 
+      // Qualquer usuário autenticado pode ler (necessário para carregar a config do Holyrics)                                   
+      allow read: if request.auth != null;                                                                                       
+
+      // Apenas Admins podem escrever                                                                                            
+      allow write: if request.auth != null                    
+        && isAdmin();                                
+    }
+
+
+    // Regras para músicas
+    match /musics/{musicId} {
+      // Todos os usuários autenticados podem ler músicas
+      allow read: if request.auth != null;
+
+      // Apenas administradores podem criar, atualizar ou excluir músicas
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}    
