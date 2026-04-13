@@ -50,16 +50,20 @@ class _EventViewerPageState extends State<EventViewerPage>
   EventTemplateModel? _template;
   final ChatRepository _chatRepository = ChatRepository();
   String? _currentUserId;
+  bool _shouldAutoOpenChat = false;
+  String? _chatInitialMessageId;
   final HolyricsService _holyricsService = HolyricsService();
 
   @override
   void initState() {
     super.initState();
     _currentUserId = FirebaseConfig.auth.currentUser?.uid;
+    _shouldAutoOpenChat = widget.initialTabIndex == 3;
+    _chatInitialMessageId = widget.initialMessageId;
     _tabController = TabController(
-      length: 4,
+      length: 3,
       vsync: this,
-      initialIndex: widget.initialTabIndex.clamp(0, 3),
+      initialIndex: widget.initialTabIndex.clamp(0, 2),
     );
     _tabController.addListener(_onTabChanged);
     _loadData();
@@ -67,57 +71,50 @@ class _EventViewerPageState extends State<EventViewerPage>
 
   void _onTabChanged() {
     if (mounted) setState(() {});
+  }
 
-    // Quando a aba do chat (índice 3) é selecionada, marcar mensagens como lidas
-    if (_tabController.index == 3 && _event != null && _currentUserId != null) {
-      final isUserAssigned = _event!.people.allPeopleIds.contains(
-        _currentUserId!,
-      );
-      if (isUserAssigned) {
-        // Aguardar um pouco para garantir que o chat foi carregado
-        Future.delayed(const Duration(milliseconds: 1000), () async {
-          if (mounted && _tabController.index == 3) {
-            try {
-              // Buscar todas as mensagens não deletadas (sem orderBy para evitar necessidade de índice)
-              final messagesSnapshot = await FirebaseConfig.firestore
-                  .collection('services')
-                  .doc(widget.eventId)
-                  .collection('messages')
-                  .where('isDeleted', isEqualTo: false)
-                  .get();
+  Future<void> _markChatMessagesAsRead() async {
+    if (_event == null || _currentUserId == null) return;
+    final isUserAssigned = _event!.people.allPeopleIds.contains(_currentUserId!);
+    if (!isUserAssigned) return;
 
-              if (messagesSnapshot.docs.isNotEmpty) {
-                // Encontrar a mensagem mais recente manualmente
-                var lastMessage = messagesSnapshot.docs.first;
-                var lastTimestamp =
-                    (lastMessage.data()['timestamp'] as Timestamp?)
-                        ?.millisecondsSinceEpoch ??
-                    0;
+    await Future.delayed(const Duration(milliseconds: 1000));
+    if (!mounted) return;
 
-                for (var doc in messagesSnapshot.docs) {
-                  final timestamp =
-                      (doc.data()['timestamp'] as Timestamp?)
-                          ?.millisecondsSinceEpoch ??
-                      0;
-                  if (timestamp > lastTimestamp) {
-                    lastTimestamp = timestamp;
-                    lastMessage = doc;
-                  }
-                }
+    try {
+      final messagesSnapshot = await FirebaseConfig.firestore
+          .collection('services')
+          .doc(widget.eventId)
+          .collection('messages')
+          .where('isDeleted', isEqualTo: false)
+          .get();
 
-                // Marcar todas como visualizadas e atualizar última lida
-                await _chatRepository.markAllMessagesAsViewed(widget.eventId);
-                await _chatRepository.setLastReadMessageId(
-                  widget.eventId,
-                  lastMessage.id,
-                );
-              }
-            } catch (e) {
-              // Ignorar erros silenciosamente
-            }
+      if (messagesSnapshot.docs.isNotEmpty) {
+        var lastMessage = messagesSnapshot.docs.first;
+        var lastTimestamp =
+            (lastMessage.data()['timestamp'] as Timestamp?)
+                ?.millisecondsSinceEpoch ??
+            0;
+
+        for (var doc in messagesSnapshot.docs) {
+          final timestamp =
+              (doc.data()['timestamp'] as Timestamp?)
+                  ?.millisecondsSinceEpoch ??
+              0;
+          if (timestamp > lastTimestamp) {
+            lastTimestamp = timestamp;
+            lastMessage = doc;
           }
-        });
+        }
+
+        await _chatRepository.markAllMessagesAsViewed(widget.eventId);
+        await _chatRepository.setLastReadMessageId(
+          widget.eventId,
+          lastMessage.id,
+        );
       }
+    } catch (_) {
+      // Ignorar erros silenciosamente
     }
   }
 
@@ -144,13 +141,15 @@ class _EventViewerPageState extends State<EventViewerPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
+        actions: [
+          if (_event != null) _buildChatAction(isUserAssigned),
+        ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: [
-            const Tab(text: 'Etapas'),
-            const Tab(text: 'Pessoas'),
-            const Tab(text: 'Equipes'),
-            _buildChatTab(isUserAssigned),
+          tabs: const [
+            Tab(text: 'Etapas'),
+            Tab(text: 'Pessoas'),
+            Tab(text: 'Equipes'),
           ],
         ),
       ),
@@ -173,14 +172,6 @@ class _EventViewerPageState extends State<EventViewerPage>
                 _buildStepsTab(),
                 _buildTeamTab(),
                 _buildTeamsTab(),
-                if (_event != null)
-                  EventChatTab(
-                    eventId: widget.eventId,
-                    event: _event!,
-                    initialMessageId: widget.initialMessageId,
-                  )
-                else
-                  const Center(child: Text('Carregando...')),
               ],
             ),
     );
@@ -685,6 +676,12 @@ class _EventViewerPageState extends State<EventViewerPage>
         _societies = societies;
         _template = template;
       });
+
+      if (_shouldAutoOpenChat && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _openChatModal(initialMessageId: _chatInitialMessageId);
+        });
+      }
     } catch (_) {
       setState(() {
         _event = null;
@@ -878,35 +875,75 @@ class _EventViewerPageState extends State<EventViewerPage>
     return biblePattern.hasMatch(text.trim());
   }
 
-  Widget _buildChatTab(bool isUserAssigned) {
-    // Se o usuário não está escalado, não mostrar indicador
+  void _openChatModal({String? initialMessageId}) {
+    if (_event == null) return;
+    _markChatMessagesAsRead();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.8,
+      ),
+      builder: (ctx) => Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            child: Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(ctx).pop(),
+                ),
+                const Text(
+                  'Chat',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Expanded(
+            child: EventChatTab(
+              eventId: widget.eventId,
+              event: _event!,
+              initialMessageId: initialMessageId,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChatAction(bool isUserAssigned) {
     if (!isUserAssigned || _event == null) {
-      return const Tab(text: 'Chat');
+      return IconButton(
+        icon: const Icon(Icons.chat_bubble_outline),
+        tooltip: 'Chat',
+        onPressed: () => _openChatModal(),
+      );
     }
 
     return StreamBuilder<int>(
       stream: _chatRepository.getUnreadMessageCount(widget.eventId),
       builder: (context, snapshot) {
-        // Se ainda está carregando, não mostrar indicador
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Tab(text: 'Chat');
-        }
-
-        final unreadCount = snapshot.data ?? 0;
-        final hasUnread = unreadCount > 0;
-
-        // Se a aba do chat está ativa, não mostrar indicador (mensagens serão marcadas como lidas)
-        final isChatTabActive = _tabController.index == 3;
-
-        return Tab(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('Chat'),
-              if (hasUnread && !isChatTabActive) ...[
-                const SizedBox(width: 6),
-                Container(
+        final hasUnread = (snapshot.data ?? 0) > 0;
+        return Stack(
+          alignment: Alignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.chat_bubble_outline),
+              tooltip: 'Chat',
+              onPressed: () => _openChatModal(),
+            ),
+            if (hasUnread)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
                   width: 8,
                   height: 8,
                   decoration: const BoxDecoration(
@@ -914,11 +951,11 @@ class _EventViewerPageState extends State<EventViewerPage>
                     shape: BoxShape.circle,
                   ),
                 ),
-              ],
-            ],
-          ),
+              ),
+          ],
         );
       },
     );
   }
+
 }
