@@ -37,7 +37,7 @@ class HolyricsService {
             headers: {'Content-Type': 'application/json'},
             body: '{}',
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 2));
       return response.statusCode == 200;
     } catch (e) {
       return false;

@@ -722,6 +722,13 @@ class _EventViewerPageState extends State<EventViewerPage>
       return;
     }
 
+    final connected = await _holyricsService.testConnection();
+    if (!mounted) return;
+    if (!connected) {
+      showErrorToast(context, 'Não foi possível se conectar ao Holyrics');
+      return;
+    }
+
     if (!mounted) return;
     showDialog(
       context: context,
