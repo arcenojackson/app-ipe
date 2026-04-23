@@ -784,6 +784,9 @@ class _EventEditorPageState extends State<EventEditorPage>
   }
 
   Future<void> _manageTeam() async {
+    // Ler currentUser antes de qualquer await
+    final currentUser = context.read<AppState>().currentUser;
+
     // Recarregar usuários
     try {
       final peopleRepository = context.read<PeopleRepository>();
@@ -799,7 +802,6 @@ class _EventEditorPageState extends State<EventEditorPage>
     }
 
     // Verificar se o usuário atual é da Diretoria da ELO
-    final currentUser = context.read<AppState>().currentUser;
     final eloSociety = _societies.firstWhere(
       (s) => s.name == 'ELO',
       orElse: () => SocietyModel(

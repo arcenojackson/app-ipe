@@ -293,7 +293,9 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
                               Icon(Icons.search_off, size: 48, color: Colors.white38),
                               const SizedBox(height: 16),
                               Text(
-                                widget.filterByELO
+                                _showAllUsers
+                                    ? 'Nenhum resultado encontrado'
+                                    : widget.filterByELO
                                     ? 'Nenhum membro da ELO com disponibilidade encontrado'
                                     : widget.filterBySociety != null
                                     ? 'Nenhum membro de ${widget.filterBySociety} encontrado'
