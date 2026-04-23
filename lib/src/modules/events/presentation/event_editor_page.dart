@@ -12,6 +12,7 @@ import '../models/event_template.dart';
 import '../../people/presentation/widgets/people_selector_sheet.dart';
 import '../../societies/data/societies_repository.dart';
 import '../../societies/models/society.dart';
+import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import 'widgets/step_editor_sheet.dart';
 
@@ -797,6 +798,20 @@ class _EventEditorPageState extends State<EventEditorPage>
       return;
     }
 
+    // Verificar se o usuário atual é da Diretoria da ELO
+    final currentUser = context.read<AppState>().currentUser;
+    final eloSociety = _societies.firstWhere(
+      (s) => s.name == 'ELO',
+      orElse: () => SocietyModel(
+        id: '',
+        name: '',
+        description: '',
+        color: 0xFF2F4F2F,
+        userId: '',
+      ),
+    );
+    final canAddExternal = eloSociety.allBoardIds.contains(currentUser?.id);
+
     String? currentStep = 'type_selector';
     String? selectedType; // 'elo', 'soundImage', 'pregador', 'dirigente'
     String? selectedInstrument; // Apenas se selectedType == 'elo'
@@ -898,6 +913,7 @@ class _EventEditorPageState extends State<EventEditorPage>
             canGoBack: canGoBack,
             instrument: instrumentParam,
             showTalkBack: showTalkBack,
+            canAddExternal: currentStep == 'people_selector_elo' ? canAddExternal : false,
           ),
         );
 
