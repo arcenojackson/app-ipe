@@ -245,6 +245,38 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
             ),
           ),
           const SizedBox(height: 16),
+          // Banner "Todos os usuários" (visible only in expanded mode)
+          if (_showAllUsers) ...[
+            Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.group, size: 16, color: Colors.white60),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Todos os usuários',
+                      style: TextStyle(color: Colors.white60, fontSize: 13),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 16, color: Colors.white60),
+                    onPressed: () {
+                      setState(() => _showAllUsers = false);
+                      _filterPeople();
+                    },
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
+            ),
+          ],
           SizedBox(
             height: 400,
             child: _isLoading
@@ -330,6 +362,35 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
                   ),
           ),
           const SizedBox(height: 16),
+          // Discrete link (only for ELO board members, only when filter is active)
+          if (widget.filterByELO && widget.canAddExternal && !_showAllUsers) ...[
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() => _showAllUsers = true);
+                  _filterPeople();
+                },
+                icon: const Icon(
+                  Icons.person_add_outlined,
+                  size: 16,
+                  color: Colors.white38,
+                ),
+                label: const Text(
+                  '+ Incluir outra pessoa',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 13,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white38,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton(
