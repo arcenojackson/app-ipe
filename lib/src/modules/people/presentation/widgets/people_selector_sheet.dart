@@ -245,121 +245,128 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          // Banner "Todos os usuários" (visible only in expanded mode)
-          if (_showAllUsers) ...[
-            Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.group, size: 16, color: Colors.white60),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Todos os usuários',
-                      style: TextStyle(color: Colors.white60, fontSize: 13),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 16, color: Colors.white60),
-                    onPressed: () {
-                      setState(() => _showAllUsers = false);
-                      _filterPeople();
-                    },
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-            ),
-          ],
           SizedBox(
             height: 400,
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredPeople.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+            child: Column(
+              children: [
+                // Banner "Todos os usuários" (visible only in expanded mode)
+                if (_showAllUsers) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
                       children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.white38),
-                        const SizedBox(height: 16),
-                        Text(
-                          widget.filterByELO
-                              ? 'Nenhum membro da ELO com disponibilidade encontrado'
-                              : widget.filterBySociety != null
-                              ? 'Nenhum membro de ${widget.filterBySociety} encontrado'
-                              : 'Nenhum resultado encontrado',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: Colors.white60),
-                          textAlign: TextAlign.center,
+                        const Icon(Icons.group, size: 16, color: Colors.white60),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Todos os usuários',
+                            style: TextStyle(color: Colors.white60, fontSize: 13),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16, color: Colors.white60),
+                          onPressed: () {
+                            setState(() => _showAllUsers = false);
+                            _filterPeople();
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                         ),
                       ],
                     ),
-                  )
-                : ListView.separated(
-                    itemCount: _filteredPeople.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final person = _filteredPeople[index];
-                      final selected = _selectedIds.contains(person.id);
-                      final talkBack = _talkBackSelections[person.id] ?? false;
-
-                      return Column(
-                        children: [
-                          CheckboxListTile(
-                            value: selected,
-                            onChanged: (value) {
-                              setState(() {
-                                if (value == true) {
-                                  _selectedIds = [..._selectedIds, person.id];
-                                  if (!widget.showTalkBack) {
-                                    _talkBackSelections[person.id] = false;
-                                  }
-                                } else {
-                                  _selectedIds = _selectedIds
-                                      .where((id) => id != person.id)
-                                      .toList();
-                                  _talkBackSelections.remove(person.id);
-                                }
-                              });
-                            },
-                            title: Text(person.name),
-                            subtitle: Text(person.email),
-                          ),
-                          if (selected &&
-                              widget.showTalkBack &&
-                              widget.instrument != null)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 72,
-                                right: 16,
-                                bottom: 8,
-                              ),
-                              child: CheckboxListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                value: talkBack,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _talkBackSelections[person.id] =
-                                        value ?? false;
-                                  });
-                                },
-                                title: Text(
-                                  'Talk Back',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
                   ),
+                ],
+                // List takes remaining space
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _filteredPeople.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off, size: 48, color: Colors.white38),
+                              const SizedBox(height: 16),
+                              Text(
+                                widget.filterByELO
+                                    ? 'Nenhum membro da ELO com disponibilidade encontrado'
+                                    : widget.filterBySociety != null
+                                    ? 'Nenhum membro de ${widget.filterBySociety} encontrado'
+                                    : 'Nenhum resultado encontrado',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: Colors.white60),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _filteredPeople.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final person = _filteredPeople[index];
+                            final selected = _selectedIds.contains(person.id);
+                            final talkBack = _talkBackSelections[person.id] ?? false;
+
+                            return Column(
+                              children: [
+                                CheckboxListTile(
+                                  value: selected,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      if (value == true) {
+                                        _selectedIds = [..._selectedIds, person.id];
+                                        if (!widget.showTalkBack) {
+                                          _talkBackSelections[person.id] = false;
+                                        }
+                                      } else {
+                                        _selectedIds = _selectedIds
+                                            .where((id) => id != person.id)
+                                            .toList();
+                                        _talkBackSelections.remove(person.id);
+                                      }
+                                    });
+                                  },
+                                  title: Text(person.name),
+                                  subtitle: Text(person.email),
+                                ),
+                                if (selected &&
+                                    widget.showTalkBack &&
+                                    widget.instrument != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 72,
+                                      right: 16,
+                                      bottom: 8,
+                                    ),
+                                    child: CheckboxListTile(
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      value: talkBack,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _talkBackSelections[person.id] =
+                                              value ?? false;
+                                        });
+                                      },
+                                      title: Text(
+                                        'Talk Back',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
           // Discrete link (only for ELO board members, only when filter is active)
