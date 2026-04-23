@@ -19,6 +19,7 @@ class PeopleSelectorSheet extends StatefulWidget {
     this.showTalkBack = false,
     this.title,
     this.canGoBack = false,
+    this.canAddExternal = false,
   });
 
   final List<UserModel> people;
@@ -32,6 +33,7 @@ class PeopleSelectorSheet extends StatefulWidget {
   final bool showTalkBack; // Se deve mostrar checkbox de Talk Back
   final String? title;
   final bool canGoBack;
+  final bool canAddExternal;
 
   @override
   State<PeopleSelectorSheet> createState() => _PeopleSelectorSheetState();
@@ -44,6 +46,7 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
   String _searchQuery = '';
   List<UserModel> _filteredPeople = [];
   bool _isLoading = true;
+  bool _showAllUsers = false;
   final Map<String, bool> _talkBackSelections = {}; // Map<userId, isTalkBack>
 
   @override
@@ -69,6 +72,24 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
   }
 
   Future<void> _filterPeople() async {
+    // Expanded mode: list all users without ELO/society filter
+    if (_showAllUsers) {
+      setState(() {
+        _isLoading = false;
+        if (_searchQuery.isEmpty) {
+          _filteredPeople = widget.people;
+        } else {
+          _filteredPeople = widget.people.where((person) {
+            final name = person.name.toLowerCase();
+            final email = person.email.toLowerCase();
+            return name.contains(_searchQuery) || email.contains(_searchQuery);
+          }).toList();
+        }
+        _filteredPeople.sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
+      });
+      return;
+    }
+
     // Se não precisa filtrar por sociedade, usar filtro simples
     if (!widget.filterByELO && widget.filterBySociety == null) {
       setState(() {
