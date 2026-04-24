@@ -197,7 +197,7 @@ class _MusicsSectionState extends State<MusicsSection> {
                           final music = filteredMusics[index];
                           return _MusicCard(
                             music: music,
-                            isAdmin: widget.isAdmin,
+                            canManage: widget.isAdmin,
                             onOpen: () => _openMusic(music),
                             onEdit: () => _onEditMusic(music),
                             onDelete: () => _onDeleteMusic(music),
@@ -359,7 +359,7 @@ class _MusicsSectionState extends State<MusicsSection> {
 class _MusicCard extends StatelessWidget {
   const _MusicCard({
     required this.music,
-    required this.isAdmin,
+    required this.canManage,
     required this.onOpen,
     required this.onEdit,
     required this.onDelete,
@@ -367,7 +367,7 @@ class _MusicCard extends StatelessWidget {
   });
 
   final MusicModel music;
-  final bool isAdmin;
+  final bool canManage;
   final VoidCallback onOpen;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -441,11 +441,11 @@ class _MusicCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (isAdmin)
+            if (canManage)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (isAdmin && music.status == MusicStatus.avaliar)
+                  if (canManage && music.status == MusicStatus.avaliar)
                     IconButton(
                       tooltip: 'Enviar para avaliação',
                       icon: const Icon(Icons.send_outlined, size: 20),
