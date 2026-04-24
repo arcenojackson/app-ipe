@@ -450,14 +450,14 @@ class _MusicFormSheetState extends State<MusicFormSheet> {
           music.copyWith(status: MusicStatus.emAvaliacao),
         );
         if (mounted) {
-          Navigator.of(context).pop(created);
           showSuccessToast(context, 'Música adicionada com sucesso!');
+          Navigator.of(context).pop(created);
         }
       } else {
         await repository.update(music);
         if (mounted) {
-          Navigator.of(context).pop(true);
           showSuccessToast(context, 'Música atualizada com sucesso!');
+          Navigator.of(context).pop(true);
         }
       }
     } catch (error) {
