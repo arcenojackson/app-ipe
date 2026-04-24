@@ -3,10 +3,14 @@ import 'package:provider/provider.dart';
 
 import '../../events/presentation/widgets/music_view_dialog.dart';
 import '../../music_evaluations/data/music_evaluations_repository.dart';
+import '../../music_evaluations/presentation/music_decision_page.dart';
+import '../../societies/data/societies_repository.dart';
+import '../../../shared/state/app_state.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../data/musics_repository.dart';
 import '../models/music.dart';
+import '../models/music_status.dart';
 import 'widgets/music_form_sheet.dart';
 
 class MusicsSection extends StatefulWidget {
@@ -23,11 +27,35 @@ class _MusicsSectionState extends State<MusicsSection> {
   List<MusicModel> _musics = const [];
   String _search = '';
   String? _error;
+  bool _isBoardMember = false;
+  int _pendingDecisionsCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadMusics();
+    _checkUserRoles();
+  }
+
+  Future<void> _checkUserRoles() async {
+    final user = context.read<AppState>().currentUser;
+    if (user == null) return;
+    try {
+      final eloSociety = await context
+          .read<SocietiesRepository>()
+          .fetchByName('ELO');
+      if (!mounted) return;
+      final isBoard = eloSociety?.allBoardIds.contains(user.id) ?? false;
+      if (!isBoard) return;
+      final count = await context
+          .read<MusicEvaluationsRepository>()
+          .countPendingDecisions();
+      if (!mounted) return;
+      setState(() {
+        _isBoardMember = true;
+        _pendingDecisionsCount = count;
+      });
+    } catch (_) {}
   }
 
   @override
@@ -57,6 +85,53 @@ class _MusicsSectionState extends State<MusicsSection> {
             onChanged: (value) => setState(() => _search = value),
           ),
         ),
+        if (_isBoardMember && _pendingDecisionsCount > 0)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => const MusicDecisionPage(),
+                ),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.amber.withValues(alpha: 0.4),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.pending_actions,
+                      color: Colors.amber,
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Aguardando decisão ($_pendingDecisionsCount)',
+                      style: const TextStyle(
+                        color: Colors.amber,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    const Icon(
+                      Icons.chevron_right,
+                      color: Colors.amber,
+                      size: 18,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         const SizedBox(height: 20),
         Expanded(
           child: Stack(
@@ -126,6 +201,8 @@ class _MusicsSectionState extends State<MusicsSection> {
                             onOpen: () => _openMusic(music),
                             onEdit: () => _onEditMusic(music),
                             onDelete: () => _onDeleteMusic(music),
+                            onSendToEvaluation: () =>
+                                _onSendToEvaluation(music),
                           );
                         },
                       ),
@@ -239,6 +316,44 @@ class _MusicsSectionState extends State<MusicsSection> {
       await _loadMusics();
     }
   }
+
+  Future<void> _onSendToEvaluation(MusicModel music) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Enviar para avaliação'),
+        content: Text(
+          'Deseja enviar "${music.title}" para o Fórum de Avaliação?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Enviar'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    try {
+      await context.read<MusicsRepository>().sendToEvaluation(music.id);
+      await context
+          .read<MusicEvaluationsRepository>()
+          .createFormsForMusic(music.copyWith(status: MusicStatus.emAvaliacao));
+      if (mounted) {
+        showSuccessToast(context, '"${music.title}" enviada para avaliação.');
+        await _loadMusics();
+      }
+    } catch (_) {
+      if (mounted) {
+        showErrorToast(context, 'Erro ao enviar para avaliação.');
+      }
+    }
+  }
 }
 
 class _MusicCard extends StatelessWidget {
@@ -248,6 +363,7 @@ class _MusicCard extends StatelessWidget {
     required this.onOpen,
     required this.onEdit,
     required this.onDelete,
+    required this.onSendToEvaluation,
   });
 
   final MusicModel music;
@@ -255,6 +371,7 @@ class _MusicCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onSendToEvaluation;
 
   @override
   Widget build(BuildContext context) {
@@ -319,6 +436,8 @@ class _MusicCard extends StatelessWidget {
                           .toList(),
                     ),
                   ],
+                  const SizedBox(height: 8),
+                  _StatusBadge(status: music.status),
                 ],
               ),
             ),
@@ -326,6 +445,12 @@ class _MusicCard extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (isAdmin && music.status == MusicStatus.avaliar)
+                    IconButton(
+                      tooltip: 'Enviar para avaliação',
+                      icon: const Icon(Icons.send_outlined, size: 20),
+                      onPressed: onSendToEvaluation,
+                    ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined, size: 20),
                     onPressed: onEdit,
@@ -339,6 +464,38 @@ class _MusicCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.status});
+
+  final MusicStatus status;
+
+  @override
+  Widget build(BuildContext context) {
+    final (color, icon) = switch (status) {
+      MusicStatus.avaliar => (Colors.amber, Icons.star_outline),
+      MusicStatus.emAvaliacao => (Colors.blue, Icons.hourglass_top),
+      MusicStatus.aprovada => (Colors.green, Icons.check_circle_outline),
+      MusicStatus.reprovada => (Colors.red, Icons.cancel_outlined),
+    };
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 12),
+        const SizedBox(width: 4),
+        Text(
+          status.label,
+          style: TextStyle(
+            color: color,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
