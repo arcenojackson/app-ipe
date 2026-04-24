@@ -8,6 +8,7 @@ import '../../events/presentation/agenda_section.dart';
 import '../../events/presentation/planning_section.dart';
 import '../../events/presentation/calendar_page.dart';
 import '../../musics/presentation/musics_section.dart';
+import '../../societies/data/societies_repository.dart';
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/platform_utils.dart';
 import '../../../shared/widgets/glass_container.dart';
@@ -35,6 +36,7 @@ class _HomeShellState extends State<HomeShell> {
   bool _planningHasEvents = false;
   bool _agendaHasEvents = false;
   bool _isUpdateAvailable = false;
+  bool _isMinistroElo = false;
   late final Upgrader _upgrader;
 
   @override
@@ -42,6 +44,26 @@ class _HomeShellState extends State<HomeShell> {
     super.initState();
     _upgrader = Upgrader(debugLogging: true);
     _checkForUpdates();
+    _checkMinistroStatus();
+  }
+
+  Future<void> _checkMinistroStatus() async {
+    final user = context.read<AppState>().currentUser;
+    if (user == null) return;
+    try {
+      final eloSociety = await context
+          .read<SocietiesRepository>()
+          .fetchByName('ELO');
+      if (!mounted) return;
+      final isBoard = eloSociety?.allBoardIds.contains(user.id) ?? false;
+      setState(() {
+        _isMinistroElo = user.isAdminUser || isBoard;
+      });
+    } catch (_) {
+      setState(() {
+        _isMinistroElo = user.isAdminUser;
+      });
+    }
   }
 
   Future<void> _checkForUpdates() async {
@@ -411,7 +433,9 @@ class _HomeShellState extends State<HomeShell> {
         subtitle: 'Organize suas músicas',
         description:
             'Gerencie letras, cifras e versões oficiais para cada evento.',
-        builder: (context) => MusicsSection(isAdmin: user.isAdmin),
+        builder: (context) => MusicsSection(
+          canManage: _isMinistroElo,
+        ),
       ),
     ];
 

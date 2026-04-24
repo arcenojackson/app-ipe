@@ -14,9 +14,9 @@ import '../models/music_status.dart';
 import 'widgets/music_form_sheet.dart';
 
 class MusicsSection extends StatefulWidget {
-  const MusicsSection({super.key, required this.isAdmin});
+  const MusicsSection({super.key, required this.canManage});
 
-  final bool isAdmin;
+  final bool canManage;
 
   @override
   State<MusicsSection> createState() => _MusicsSectionState();
@@ -147,7 +147,7 @@ class _MusicsSectionState extends State<MusicsSection> {
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
                         padding: EdgeInsets.only(
-                          bottom: widget.isAdmin ? 160 : 120,
+                          bottom: widget.canManage ? 160 : 120,
                         ),
                         children: [
                           const SizedBox(height: 120),
@@ -170,7 +170,7 @@ class _MusicsSectionState extends State<MusicsSection> {
                           parent: AlwaysScrollableScrollPhysics(),
                         ),
                         padding: EdgeInsets.only(
-                          bottom: widget.isAdmin ? 160 : 120,
+                          bottom: widget.canManage ? 160 : 120,
                         ),
                         children: const [
                           SizedBox(height: 120),
@@ -189,7 +189,7 @@ class _MusicsSectionState extends State<MusicsSection> {
                     : ListView.separated(
                         physics: const BouncingScrollPhysics(),
                         padding: EdgeInsets.only(
-                          bottom: widget.isAdmin ? 160 : 120,
+                          bottom: widget.canManage ? 160 : 120,
                         ),
                         itemCount: filteredMusics.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 16),
@@ -197,7 +197,7 @@ class _MusicsSectionState extends State<MusicsSection> {
                           final music = filteredMusics[index];
                           return _MusicCard(
                             music: music,
-                            canManage: widget.isAdmin,
+                            canManage: widget.canManage,
                             onOpen: () => _openMusic(music),
                             onEdit: () => _onEditMusic(music),
                             onDelete: () => _onDeleteMusic(music),
@@ -207,7 +207,7 @@ class _MusicsSectionState extends State<MusicsSection> {
                         },
                       ),
               ),
-              if (widget.isAdmin)
+              if (widget.canManage)
                 Positioned(
                   bottom: 130,
                   right: 0,
