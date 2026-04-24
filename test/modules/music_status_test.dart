@@ -23,6 +23,10 @@ void main() {
       expect(MusicStatus.fromString('reprovada'), MusicStatus.reprovada);
     });
 
+    test('converte "avaliar" corretamente', () {
+      expect(MusicStatus.fromString('avaliar'), MusicStatus.avaliar);
+    });
+
     test('value e label estão corretos para cada status', () {
       expect(MusicStatus.emAvaliacao.value, 'em_avaliacao');
       expect(MusicStatus.emAvaliacao.label, 'Em avaliação');
