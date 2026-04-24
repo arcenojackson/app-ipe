@@ -694,90 +694,98 @@ class MusicEvaluationsRepository {
     final eloSociety = await _societiesRepository.fetchByName('ELO');
     if (eloSociety == null) return;
 
-    final forumUsers = eloSociety.forumUsersByCategory ?? {};
-    final now = DateTime.now();
+    try {
+      final forumUsers = eloSociety.forumUsersByCategory ?? {};
+      final now = DateTime.now();
 
-    for (final category in EvaluationCategory.values) {
-      final allowedUserIds = List<String>.from(forumUsers[category.name] ?? []);
-      final evalMusic = EvaluationMusicModel(
-        id: music.id,
-        title: music.title,
-        artist: music.artist,
-        youtubeUrl: music.youtube ?? '',
-        order: 0,
-      );
-      final docRef = _firestore.collection('music_evaluation_forms').doc();
-      final form = EvaluationFormModel(
-        id: docRef.id,
-        title: '${music.title} – ${category.label}',
-        category: category,
-        createdBy: currentUserId,
-        createdAt: now,
-        updatedAt: now,
-        allowedUserIds: allowedUserIds,
-        status: EvaluationFormStatus.active,
-        musics: [evalMusic],
-        musicLibraryId: music.id,
-      );
-      await docRef.set(form.toJson());
+      for (final category in EvaluationCategory.values) {
+        final allowedUserIds = List<String>.from(forumUsers[category.name] ?? []);
+        final evalMusic = EvaluationMusicModel(
+          id: music.id,
+          title: music.title,
+          artist: music.artist,
+          youtubeUrl: music.youtube ?? '',
+          order: 0,
+        );
+        final docRef = _firestore.collection('music_evaluation_forms').doc();
+        final form = EvaluationFormModel(
+          id: docRef.id,
+          title: '${music.title} – ${category.label}',
+          category: category,
+          createdBy: currentUserId,
+          createdAt: now,
+          updatedAt: now,
+          allowedUserIds: allowedUserIds,
+          status: EvaluationFormStatus.active,
+          musics: [evalMusic],
+          musicLibraryId: music.id,
+        );
+        await docRef.set(form.toJson());
+      }
+    } catch (e) {
+      throw AppException(message: 'Erro ao criar formulários de avaliação: $e');
     }
   }
 
   /// Retorna músicas com todos os 3 forms fechados, prontas para decisão da diretoria.
   Future<List<MusicWithEvaluations>> fetchPendingDecisions() async {
-    final snapshot = await _firestore
-        .collection('music_evaluation_forms')
-        .where('status', isEqualTo: EvaluationFormStatus.closed.name)
-        .get();
+    try {
+      final snapshot = await _firestore
+          .collection('music_evaluation_forms')
+          .where('status', isEqualTo: EvaluationFormStatus.closed.name)
+          .get();
 
-    final formsByMusicId = <String, List<EvaluationFormModel>>{};
-    for (final doc in snapshot.docs) {
-      final data = Map<String, dynamic>.from(doc.data());
-      data['id'] = doc.id;
-      final form = EvaluationFormModel.fromJson(data);
-      if (form.musicLibraryId == null) continue;
-      formsByMusicId.putIfAbsent(form.musicLibraryId!, () => []).add(form);
-    }
-
-    final eligibleMusicIds = formsByMusicId.entries
-        .where((e) => e.value.length >= EvaluationCategory.values.length)
-        .map((e) => e.key)
-        .toList();
-
-    if (eligibleMusicIds.isEmpty) return [];
-
-    final results = <MusicWithEvaluations>[];
-    for (final musicId in eligibleMusicIds) {
-      final musicDoc = await _firestore.collection('musics').doc(musicId).get();
-      if (!musicDoc.exists) continue;
-      final musicData = Map<String, dynamic>.from(musicDoc.data()!);
-      musicData['id'] = musicDoc.id;
-      final music = MusicModel.fromJson(musicData);
-      if (music.status != MusicStatus.emAvaliacao) continue;
-
-      final forms = formsByMusicId[musicId]!;
-      final allResponses = <EvaluationResponseModel>[];
-      for (final form in forms) {
-        final responseSnap = await _firestore
-            .collection('music_evaluation_forms')
-            .doc(form.id)
-            .collection('responses')
-            .get();
-        allResponses.addAll(responseSnap.docs.map((d) {
-          final rData = Map<String, dynamic>.from(d.data());
-          rData['id'] = d.id;
-          return EvaluationResponseModel.fromJson(rData);
-        }));
+      final formsByMusicId = <String, List<EvaluationFormModel>>{};
+      for (final doc in snapshot.docs) {
+        final data = Map<String, dynamic>.from(doc.data());
+        data['id'] = doc.id;
+        final form = EvaluationFormModel.fromJson(data);
+        if (form.musicLibraryId == null) continue;
+        formsByMusicId.putIfAbsent(form.musicLibraryId!, () => []).add(form);
       }
 
-      results.add(MusicWithEvaluations(
-        music: music,
-        forms: forms,
-        responses: allResponses,
-      ));
-    }
+      final eligibleMusicIds = formsByMusicId.entries
+          .where((e) => e.value.length >= EvaluationCategory.values.length)
+          .map((e) => e.key)
+          .toList();
 
-    return results;
+      if (eligibleMusicIds.isEmpty) return [];
+
+      final results = <MusicWithEvaluations>[];
+      for (final musicId in eligibleMusicIds) {
+        final musicDoc = await _firestore.collection('musics').doc(musicId).get();
+        if (!musicDoc.exists) continue;
+        final musicData = Map<String, dynamic>.from(musicDoc.data()!);
+        musicData['id'] = musicDoc.id;
+        final music = MusicModel.fromJson(musicData);
+        if (music.status != MusicStatus.emAvaliacao) continue;
+
+        final forms = formsByMusicId[musicId]!;
+        final allResponses = <EvaluationResponseModel>[];
+        for (final form in forms) {
+          final responseSnap = await _firestore
+              .collection('music_evaluation_forms')
+              .doc(form.id)
+              .collection('responses')
+              .get();
+          allResponses.addAll(responseSnap.docs.map((d) {
+            final rData = Map<String, dynamic>.from(d.data());
+            rData['id'] = d.id;
+            return EvaluationResponseModel.fromJson(rData);
+          }));
+        }
+
+        results.add(MusicWithEvaluations(
+          music: music,
+          forms: forms,
+          responses: allResponses,
+        ));
+      }
+
+      return results;
+    } catch (e) {
+      throw AppException(message: 'Erro ao buscar músicas pendentes de decisão: $e');
+    }
   }
 
   /// Conta músicas prontas para decisão (para badge na tela Músicas).
