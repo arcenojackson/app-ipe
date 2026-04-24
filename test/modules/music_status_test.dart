@@ -29,10 +29,14 @@ void main() {
     });
 
     test('value e label estão corretos para cada status', () {
+      expect(MusicStatus.avaliar.value, 'avaliar');
+      expect(MusicStatus.avaliar.label, 'Avaliar');
       expect(MusicStatus.emAvaliacao.value, 'em_avaliacao');
       expect(MusicStatus.emAvaliacao.label, 'Em avaliação');
       expect(MusicStatus.aprovada.value, 'aprovada');
+      expect(MusicStatus.aprovada.label, 'Aprovada');
       expect(MusicStatus.reprovada.value, 'reprovada');
+      expect(MusicStatus.reprovada.label, 'Reprovada');
     });
   });
 
