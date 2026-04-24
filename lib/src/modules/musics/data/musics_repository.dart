@@ -9,6 +9,7 @@ import '../../../core/network/api_client.dart';
 import '../../../core/utils/app_exception.dart';
 import '../models/category.dart';
 import '../models/music.dart';
+import '../models/music_status.dart';
 import '../models/youtube_search_result.dart';
 
 class MusicsRepository {
@@ -231,6 +232,26 @@ class MusicsRepository {
       }
     } catch (e) {
       throw AppException(message: 'Erro ao remover data da música: $e');
+    }
+  }
+
+  Future<void> sendToEvaluation(String musicId) async {
+    try {
+      await _firestore.collection('musics').doc(musicId).update({
+        'status': MusicStatus.emAvaliacao.value,
+      });
+    } catch (e) {
+      throw AppException(message: 'Erro ao enviar música para avaliação: $e');
+    }
+  }
+
+  Future<void> setFinalStatus(String musicId, MusicStatus status) async {
+    try {
+      await _firestore.collection('musics').doc(musicId).update({
+        'status': status.value,
+      });
+    } catch (e) {
+      throw AppException(message: 'Erro ao definir status final: $e');
     }
   }
 }
