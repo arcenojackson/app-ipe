@@ -35,6 +35,7 @@ class EvaluationFormModel {
     required this.allowedUserIds,
     required this.status,
     required this.musics,
+    this.musicLibraryId,
     this.description,
   });
 
@@ -48,6 +49,7 @@ class EvaluationFormModel {
   final List<String> allowedUserIds;
   final EvaluationFormStatus status;
   final List<EvaluationMusicModel> musics;
+  final String? musicLibraryId;
 
   factory EvaluationFormModel.fromJson(Map<String, dynamic> json) {
     final categoryStr = json['category']?.toString() ?? '';
@@ -78,6 +80,7 @@ class EvaluationFormModel {
           const [],
       status: status,
       musics: musics,
+      musicLibraryId: json['musicLibraryId']?.toString(),
     );
   }
 
@@ -91,6 +94,7 @@ class EvaluationFormModel {
         'allowedUserIds': allowedUserIds,
         'status': status.name,
         'musics': musics.map((m) => m.toJson()).toList(),
+        if (musicLibraryId != null) 'musicLibraryId': musicLibraryId,
       };
 
   EvaluationFormModel copyWith({
@@ -104,6 +108,7 @@ class EvaluationFormModel {
     List<String>? allowedUserIds,
     EvaluationFormStatus? status,
     List<EvaluationMusicModel>? musics,
+    String? musicLibraryId,
   }) {
     return EvaluationFormModel(
       id: id ?? this.id,
@@ -116,6 +121,7 @@ class EvaluationFormModel {
       allowedUserIds: allowedUserIds ?? this.allowedUserIds,
       status: status ?? this.status,
       musics: musics ?? this.musics,
+      musicLibraryId: musicLibraryId ?? this.musicLibraryId,
     );
   }
 }
