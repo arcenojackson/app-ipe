@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../data/musics_repository.dart';
 import '../../models/category.dart';
 import '../../models/music.dart';
+import '../../models/music_status.dart';
 import '../../models/youtube_search_result.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../../shared/utils/platform_utils.dart';
@@ -445,9 +446,11 @@ class _MusicFormSheetState extends State<MusicFormSheet> {
         category: _selectedCategories.join('; '),
       );
       if (widget.music == null) {
-        await repository.create(music);
+        final created = await repository.create(
+          music.copyWith(status: MusicStatus.emAvaliacao),
+        );
         if (mounted) {
-          Navigator.of(context).pop(true);
+          Navigator.of(context).pop(created);
           showSuccessToast(context, 'Música adicionada com sucesso!');
         }
       } else {

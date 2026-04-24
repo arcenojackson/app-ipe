@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../events/presentation/widgets/music_view_dialog.dart';
+import '../../music_evaluations/data/music_evaluations_repository.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../data/musics_repository.dart';
@@ -176,12 +177,27 @@ class _MusicsSectionState extends State<MusicsSection> {
   }
 
   Future<void> _onCreateMusic() async {
-    final created = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<Object?>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const MusicFormSheet(),
     );
-    if (created == true) await _loadMusics();
+    if (result is! MusicModel) return;
+
+    try {
+      await context
+          .read<MusicEvaluationsRepository>()
+          .createFormsForMusic(result);
+    } catch (_) {
+      if (mounted) {
+        showErrorToast(
+          context,
+          'Música salva, mas houve um erro ao criar os formulários de avaliação.',
+        );
+      }
+    }
+
+    await _loadMusics();
   }
 
   Future<void> _onEditMusic(MusicModel music) async {
