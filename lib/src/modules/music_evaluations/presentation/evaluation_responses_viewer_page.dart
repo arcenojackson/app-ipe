@@ -8,6 +8,7 @@ import '../../auth/models/user.dart';
 import '../data/music_evaluations_repository.dart';
 import '../models/evaluation_form.dart';
 import '../models/evaluation_response.dart';
+import 'music_decision_page.dart';
 
 class EvaluationResponsesViewerPage extends StatefulWidget {
   const EvaluationResponsesViewerPage({super.key, required this.formId});
@@ -25,6 +26,7 @@ class _EvaluationResponsesViewerPageState
   EvaluationFormModel? _form;
   List<EvaluationResponseModel> _allResponses = [];
   UserModel? _currentUser;
+  bool _isBoardMember = false;
 
   @override
   void initState() {
@@ -67,10 +69,13 @@ class _EvaluationResponsesViewerPageState
         widget.formId,
       );
 
+      final isBoardMember = await repository.isELOBoardMember(user);
+
       setState(() {
         _form = form;
         _allResponses = allResponses;
         _currentUser = user;
+        _isBoardMember = isBoardMember;
         _isLoading = false;
       });
     } catch (e) {
@@ -113,6 +118,49 @@ class _EvaluationResponsesViewerPageState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Chip "Ver decisão final" para diretoria quando form fechado e vinculado à biblioteca
+          if (_isBoardMember &&
+              _form!.status == EvaluationFormStatus.closed &&
+              _form!.musicLibraryId != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: GestureDetector(
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const MusicDecisionPage(),
+                  ),
+                ),
+                child: GlassContainer(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.pending_actions,
+                        color: Colors.amber,
+                        size: 18,
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Ver decisão final desta música',
+                        style: TextStyle(
+                          color: Colors.amber,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        Icons.chevron_right,
+                        color: Colors.amber,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // Total de respostas
           GlassContainer(
             padding: const EdgeInsets.all(16),
