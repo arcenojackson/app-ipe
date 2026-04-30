@@ -81,8 +81,8 @@ class _EvaluationResponsesViewerPageState
     } catch (e) {
       if (mounted) {
         showErrorToast(context, 'Erro ao carregar respostas: ${e.toString()}');
+        setState(() => _isLoading = false);
       }
-      setState(() => _isLoading = false);
     }
   }
 
@@ -144,7 +144,7 @@ class _EvaluationResponsesViewerPageState
                       ),
                       const SizedBox(width: 8),
                       const Text(
-                        'Ver decisão final desta música',
+                        'Ver músicas aguardando decisão',
                         style: TextStyle(
                           color: Colors.amber,
                           fontWeight: FontWeight.w600,
