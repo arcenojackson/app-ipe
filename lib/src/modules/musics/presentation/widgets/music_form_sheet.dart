@@ -446,6 +446,21 @@ class _MusicFormSheetState extends State<MusicFormSheet> {
         category: _selectedCategories.join('; '),
       );
       if (widget.music == null) {
+        final duplicate = await repository.findDuplicate(
+          title: music.title,
+          youtube: music.youtube,
+          cipher: music.cipher,
+        );
+        if (duplicate != null) {
+          if (mounted) {
+            showErrorToast(
+              context,
+              'Já existe uma música com o mesmo ${duplicate.field}: "${duplicate.music.title}"',
+            );
+            setState(() => _isSubmitting = false);
+          }
+          return;
+        }
         final created = await repository.create(
           music.copyWith(status: MusicStatus.emAvaliacao),
         );

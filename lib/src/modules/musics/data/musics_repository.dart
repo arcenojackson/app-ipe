@@ -129,6 +129,39 @@ class MusicsRepository {
     }
   }
 
+  /// Returns the existing music that conflicts, along with which field matched.
+  /// [excludeId] is used on updates to ignore the music being edited.
+  Future<({MusicModel music, String field})?> findDuplicate({
+    required String title,
+    String? youtube,
+    required String cipher,
+    String? excludeId,
+  }) async {
+    final all = await fetchAll();
+    final normTitle = title.trim().toLowerCase();
+    final normYoutube = (youtube?.trim().isNotEmpty == true) ? youtube!.trim() : null;
+    final normCipher = cipher.trim();
+
+    for (final existing in all) {
+      if (excludeId != null && existing.id == excludeId) continue;
+
+      if (existing.title.trim().toLowerCase() == normTitle) {
+        return (music: existing, field: 'título');
+      }
+      if (normYoutube != null &&
+          existing.youtube?.trim().isNotEmpty == true &&
+          existing.youtube!.trim() == normYoutube) {
+        return (music: existing, field: 'URL do YouTube');
+      }
+      if (normCipher.isNotEmpty &&
+          existing.cipher.trim().isNotEmpty &&
+          existing.cipher.trim() == normCipher) {
+        return (music: existing, field: 'link da cifra');
+      }
+    }
+    return null;
+  }
+
   Future<MusicModel> create(MusicModel music) async {
     try {
       final musicData = Map<String, dynamic>.from(music.toJson());

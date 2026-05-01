@@ -113,6 +113,85 @@ class _MusicDecisionCard extends StatelessWidget {
   final MusicWithEvaluations item;
   final Future<void> Function(MusicWithEvaluations, MusicStatus) onDecide;
 
+  static void _showFullComment(
+    BuildContext context,
+    String userName,
+    EvaluationCategory category,
+    int rating,
+    String comment,
+    Color categoryColor,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        builder: (_, controller) => Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E1E2E),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            border: Border(top: BorderSide(color: categoryColor.withValues(alpha: 0.4), width: 1.5)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: ListView(
+            controller: controller,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: categoryColor.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      category.label,
+                      style: TextStyle(color: categoryColor, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      userName,
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: List.generate(
+                  5,
+                  (i) => Icon(i < rating ? Icons.star : Icons.star_outline, size: 18, color: Colors.amber),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                comment,
+                style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -164,69 +243,82 @@ class _MusicDecisionCard extends StatelessWidget {
                     EvaluationCategory.congregational => Colors.teal,
                     EvaluationCategory.musical => Colors.orange,
                   };
-                  return Container(
-                    width: 200,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: categoryColor.withValues(alpha: 0.3),
+                  return GestureDetector(
+                    onTap: r.comment != null && r.comment!.isNotEmpty
+                        ? () => _showFullComment(context, r.userName, r.category, r.rating, r.comment!, categoryColor)
+                        : null,
+                    child: Container(
+                      width: 200,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: categoryColor.withValues(alpha: 0.3),
+                        ),
                       ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: categoryColor.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            r.category.label,
-                            style: TextStyle(
-                              color: categoryColor,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          r.userName,
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: List.generate(
-                            5,
-                            (si) => Icon(
-                              si < r.rating ? Icons.star : Icons.star_outline,
-                              size: 14,
-                              color: Colors.amber,
+                            decoration: BoxDecoration(
+                              color: categoryColor.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
                             ),
-                          ),
-                        ),
-                        if (r.comment != null && r.comment!.isNotEmpty) ...[
-                          const SizedBox(height: 6),
-                          Expanded(
                             child: Text(
-                              r.comment!,
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: Colors.white70),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
+                              r.category.label,
+                              style: TextStyle(
+                                color: categoryColor,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            r.userName,
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: List.generate(
+                              5,
+                              (si) => Icon(
+                                si < r.rating ? Icons.star : Icons.star_outline,
+                                size: 14,
+                                color: Colors.amber,
+                              ),
+                            ),
+                          ),
+                          if (r.comment != null && r.comment!.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Expanded(
+                              child: Text(
+                                r.comment!,
+                                style: theme.textTheme.bodySmall
+                                    ?.copyWith(color: Colors.white70),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Toque para ver mais',
+                              style: TextStyle(
+                                color: categoryColor.withValues(alpha: 0.7),
+                                fontSize: 9,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   );
                 },

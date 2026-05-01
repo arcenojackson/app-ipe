@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
+import 'package:provider/provider.dart';
+
+import '../../../music_evaluations/data/music_evaluations_repository.dart';
+import '../../../music_evaluations/models/evaluation_category.dart';
+import '../../../music_evaluations/models/music_with_evaluations.dart';
 import '../../../musics/models/music.dart';
+import '../../../musics/models/music_status.dart';
 import '../../../../shared/utils/app_toast.dart';
 
 class MusicViewDialog extends StatefulWidget {
@@ -231,7 +237,171 @@ class _MusicViewDialogState extends State<MusicViewDialog> {
             Text('Observações', style: Theme.of(context).textTheme.titleMedium),
             Text(widget.music.obs!),
           ],
+          if (widget.music.status == MusicStatus.aprovada ||
+              widget.music.status == MusicStatus.reprovada) ...[
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => _showEvaluationsSheet(context),
+              icon: const Icon(Icons.rate_review_outlined),
+              label: const Text('Ver avaliações'),
+              style: FilledButton.styleFrom(backgroundColor: Colors.indigo),
+            ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Future<void> _showEvaluationsSheet(BuildContext context) async {
+    MusicWithEvaluations? data;
+    try {
+      data = await context
+          .read<MusicEvaluationsRepository>()
+          .fetchEvaluationsForMusic(widget.music);
+    } catch (_) {
+      if (context.mounted) showErrorToast(context, 'Erro ao carregar avaliações.');
+      return;
+    }
+
+    if (!context.mounted) return;
+
+    if (data == null || data.responses.isEmpty) {
+      showErrorToast(context, 'Nenhuma avaliação encontrada para esta música.');
+      return;
+    }
+
+    final enrichedResponses = <({
+      String userName,
+      EvaluationCategory category,
+      int rating,
+      String? comment,
+    })>[];
+    for (final form in data.forms) {
+      for (final r in data.responses.where((r) => r.formId == form.id)) {
+        enrichedResponses.add((
+          userName: r.userName,
+          category: form.category,
+          rating: r.rating,
+          comment: r.comment,
+        ));
+      }
+    }
+
+    if (!context.mounted) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.85,
+        builder: (ctx, controller) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF1E1E2E),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.rate_review_outlined, color: Colors.indigo),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Avaliações',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 160,
+                child: ListView.separated(
+                  controller: controller,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: enrichedResponses.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (_, i) {
+                    final r = enrichedResponses[i];
+                    final categoryColor = switch (r.category) {
+                      EvaluationCategory.theological => Colors.purple,
+                      EvaluationCategory.congregational => Colors.teal,
+                      EvaluationCategory.musical => Colors.orange,
+                    };
+                    return Container(
+                      width: 200,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: categoryColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: categoryColor.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              r.category.label,
+                              style: TextStyle(color: categoryColor, fontSize: 10, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            r.userName,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 12),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: List.generate(5, (si) => Icon(
+                              si < r.rating ? Icons.star : Icons.star_outline,
+                              size: 14,
+                              color: Colors.amber,
+                            )),
+                          ),
+                          if (r.comment != null && r.comment!.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Expanded(
+                              child: Text(
+                                r.comment!,
+                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -243,6 +243,8 @@ class _MusicsSectionState extends State<MusicsSection> {
   }
 
   Future<void> _openMusic(MusicModel music) async {
+    // ignore: avoid_print
+    print('[MusicsSection] music.id = ${music.id}');
     final fullMusic = await context.read<MusicsRepository>().fetchById(
       music.id,
     );

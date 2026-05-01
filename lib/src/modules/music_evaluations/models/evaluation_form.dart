@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'evaluation_category.dart';
-import 'evaluation_music.dart';
 
 enum EvaluationFormStatus {
   draft('draft', 'Rascunho'),
@@ -34,7 +33,6 @@ class EvaluationFormModel {
     required this.updatedAt,
     required this.allowedUserIds,
     required this.status,
-    required this.musics,
     this.musicLibraryId,
     this.description,
   });
@@ -48,7 +46,6 @@ class EvaluationFormModel {
   final DateTime updatedAt;
   final List<String> allowedUserIds;
   final EvaluationFormStatus status;
-  final List<EvaluationMusicModel> musics;
   final String? musicLibraryId;
 
   factory EvaluationFormModel.fromJson(Map<String, dynamic> json) {
@@ -59,12 +56,6 @@ class EvaluationFormModel {
     final statusStr = json['status']?.toString() ?? 'draft';
     final status = EvaluationFormStatus.fromString(statusStr) ??
         EvaluationFormStatus.draft;
-
-    final musicsData = json['musics'] as List<dynamic>? ?? [];
-    final musics = musicsData
-        .map((m) => EvaluationMusicModel.fromJson(m as Map<String, dynamic>))
-        .toList()
-      ..sort((a, b) => a.order.compareTo(b.order));
 
     return EvaluationFormModel(
       id: json['id']?.toString() ?? '',
@@ -79,7 +70,6 @@ class EvaluationFormModel {
               .toList() ??
           const [],
       status: status,
-      musics: musics,
       musicLibraryId: json['musicLibraryId']?.toString(),
     );
   }
@@ -93,7 +83,6 @@ class EvaluationFormModel {
         'updatedAt': Timestamp.fromDate(updatedAt),
         'allowedUserIds': allowedUserIds,
         'status': status.name,
-        'musics': musics.map((m) => m.toJson()).toList(),
         if (musicLibraryId != null) 'musicLibraryId': musicLibraryId,
       };
 
@@ -107,7 +96,6 @@ class EvaluationFormModel {
     DateTime? updatedAt,
     List<String>? allowedUserIds,
     EvaluationFormStatus? status,
-    List<EvaluationMusicModel>? musics,
     String? musicLibraryId,
   }) {
     return EvaluationFormModel(
@@ -120,7 +108,6 @@ class EvaluationFormModel {
       updatedAt: updatedAt ?? this.updatedAt,
       allowedUserIds: allowedUserIds ?? this.allowedUserIds,
       status: status ?? this.status,
-      musics: musics ?? this.musics,
       musicLibraryId: musicLibraryId ?? this.musicLibraryId,
     );
   }

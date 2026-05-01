@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../auth/models/user.dart';
 import '../../musics/data/musics_repository.dart';
 import '../../musics/models/music.dart';
+import '../../musics/models/music_status.dart';
 import '../../people/data/people_repository.dart';
 import '../data/events_repository.dart';
 import '../models/event.dart';
@@ -711,7 +712,7 @@ class _EventEditorPageState extends State<EventEditorPage>
         _steps = List.of(event.steps);
         _selectedPeople = event.people;
         _selectedTeams = event.teams;
-        _musics = musics;
+        _musics = musics.where((m) => m.status != MusicStatus.reprovada).toList();
         _people = people;
         _societies = societies;
         _template = template;
