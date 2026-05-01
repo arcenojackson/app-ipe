@@ -53,4 +53,5 @@ upload-keystore.jks
 # Secrets do app (NUNCA commitar!)
 lib/src/core/config/app_secrets.dart
 plexels_key.txt
-.superpowers/.worktrees/
+.superpowers/
+.claude/
