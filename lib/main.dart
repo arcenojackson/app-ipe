@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -39,8 +40,10 @@ void main() async {
 
   await appState.bootstrap();
 
-  // Inicializar serviço de notificações
-  await NotificationService().initialize();
+  // Firebase Messaging não tem suporte web — notificações ignoradas na web
+  if (!kIsWeb) {
+    await NotificationService().initialize();
+  }
 
   runApp(
     MultiProvider(
