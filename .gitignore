@@ -54,3 +54,4 @@ upload-keystore.jks
 lib/src/core/config/app_secrets.dart
 plexels_key.txt
 .superpowers/
+.claude/

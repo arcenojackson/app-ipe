@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../auth/models/user.dart';
 import '../../musics/data/musics_repository.dart';
 import '../../musics/models/music.dart';
+import '../../musics/models/music_status.dart';
 import '../../people/data/people_repository.dart';
 import '../data/events_repository.dart';
 import '../models/event.dart';
@@ -12,6 +13,7 @@ import '../models/event_template.dart';
 import '../../people/presentation/widgets/people_selector_sheet.dart';
 import '../../societies/data/societies_repository.dart';
 import '../../societies/models/society.dart';
+import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import 'widgets/step_editor_sheet.dart';
 
@@ -710,7 +712,7 @@ class _EventEditorPageState extends State<EventEditorPage>
         _steps = List.of(event.steps);
         _selectedPeople = event.people;
         _selectedTeams = event.teams;
-        _musics = musics;
+        _musics = musics.where((m) => m.status != MusicStatus.reprovada).toList();
         _people = people;
         _societies = societies;
         _template = template;
@@ -783,6 +785,9 @@ class _EventEditorPageState extends State<EventEditorPage>
   }
 
   Future<void> _manageTeam() async {
+    // Ler currentUser antes de qualquer await
+    final currentUser = context.read<AppState>().currentUser;
+
     // Recarregar usuários
     try {
       final peopleRepository = context.read<PeopleRepository>();
@@ -796,6 +801,19 @@ class _EventEditorPageState extends State<EventEditorPage>
       }
       return;
     }
+
+    // Verificar se o usuário atual é da Diretoria da ELO
+    final eloSociety = _societies.firstWhere(
+      (s) => s.name == 'ELO',
+      orElse: () => SocietyModel(
+        id: '',
+        name: '',
+        description: '',
+        color: 0xFF2F4F2F,
+        userId: '',
+      ),
+    );
+    final canAddExternal = eloSociety.allBoardIds.contains(currentUser?.id);
 
     String? currentStep = 'type_selector';
     String? selectedType; // 'elo', 'soundImage', 'pregador', 'dirigente'
@@ -898,6 +916,7 @@ class _EventEditorPageState extends State<EventEditorPage>
             canGoBack: canGoBack,
             instrument: instrumentParam,
             showTalkBack: showTalkBack,
+            canAddExternal: currentStep == 'people_selector_elo' ? canAddExternal : false,
           ),
         );
 

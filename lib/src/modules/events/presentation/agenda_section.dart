@@ -167,7 +167,7 @@ class _AgendaSectionState extends State<AgendaSection> {
     if (!_isELOMember) return false;
 
     final now = DateTime.now();
-    return now.day >= 5 && now.day <= 28;
+    return now.day >= 1;
   }
 
   Future<void> _openAvailabilityModal(BuildContext context) async {

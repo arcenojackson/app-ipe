@@ -10,8 +10,8 @@ import '../../societies/data/societies_repository.dart';
 import '../data/music_evaluations_repository.dart';
 import '../models/evaluation_category.dart';
 import '../models/evaluation_form.dart';
-import 'evaluation_form_editor_page.dart';
 import 'evaluation_form_viewer_page.dart';
+import 'music_decision_page.dart';
 import 'evaluation_responses_viewer_page.dart';
 import 'widgets/category_description_card.dart';
 
@@ -30,6 +30,7 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
   List<EvaluationCategory> _availableCategories = [];
   UserModel? _currentUser;
   bool _canViewResponses = false;
+  int _pendingDecisionsCount = 0;
   Set<String> _respondedFormIds =
       {}; // IDs dos formulários que o usuário já respondeu
   Map<String, int> _responseCountsByFormId =
@@ -65,8 +66,15 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
 
       // Verificar se pode visualizar respostas
       final canView = await repository.canViewResponses(user);
+      int pendingCount = 0;
+      if (canView) {
+        try {
+          pendingCount = await repository.countPendingDecisions();
+        } catch (_) {}
+      }
       setState(() {
         _canViewResponses = canView;
+        _pendingDecisionsCount = pendingCount;
       });
 
       // Determinar categorias disponíveis
@@ -129,15 +137,8 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
               user.id,
             );
             // Verificar se o usuário respondeu todas as músicas do formulário
-            if (form.musics.isNotEmpty && userResponses.isNotEmpty) {
-              final musicIds = form.musics.map((m) => m.id).toSet();
-              final respondedMusicIds = userResponses
-                  .map((r) => r.musicId)
-                  .toSet();
-              // Se o usuário respondeu todas as músicas, marcar como respondido
-              if (musicIds.every((id) => respondedMusicIds.contains(id))) {
-                respondedFormIds.add(form.id);
-              }
+            if (userResponses.isNotEmpty) {
+              respondedFormIds.add(form.id);
             }
 
             // Se o usuário pode ver respostas (diretoria), buscar o número total de respostas
@@ -184,19 +185,6 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
 
   Future<void> _refresh() async {
     await _loadData();
-  }
-
-  Future<void> _createForm(EvaluationCategory category) async {
-    final result = await Navigator.of(context).push<EvaluationFormModel?>(
-      MaterialPageRoute(
-        builder: (_) =>
-            const EvaluationFormEditorPage(), // Novo formulário não precisa de categoria
-      ),
-    );
-
-    if (result != null) {
-      await _refresh();
-    }
   }
 
   Future<void> _viewForm(EvaluationFormModel form) async {
@@ -260,25 +248,28 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
           : _availableCategories.isNotEmpty
           ? _buildCategoryTab(_availableCategories.first)
           : const Center(child: CircularProgressIndicator()),
-      floatingActionButton:
-          _currentUser != null && _tabController != null && _canViewResponses
-          ? FloatingActionButton(
-              onPressed: () {
-                if (_tabController == null || _availableCategories.isEmpty)
-                  return;
-                final category = _availableCategories.length > 1
-                    ? _availableCategories[_tabController!.index]
-                    : _availableCategories.first;
-                _createForm(category);
-              },
-              child: const Icon(Icons.add),
+      floatingActionButton: _canViewResponses
+          ? FloatingActionButton.extended(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const MusicDecisionPage()),
+              ),
+              backgroundColor: Colors.amber.shade700,
+              icon: const Icon(Icons.pending_actions, color: Colors.white),
+              label: Text(
+                _pendingDecisionsCount > 0
+                    ? 'Aguardando decisão ($_pendingDecisionsCount)'
+                    : 'Aguardando decisão',
+                style: const TextStyle(color: Colors.white),
+              ),
             )
           : null,
     );
   }
 
   Widget _buildCategoryTab(EvaluationCategory category) {
-    final forms = _formsByCategory[category] ?? [];
+    final forms = (_formsByCategory[category] ?? [])
+        .where((f) => f.status != EvaluationFormStatus.closed)
+        .toList();
 
     return RefreshIndicator(
       onRefresh: _refresh,
@@ -309,16 +300,6 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
                         context,
                       ).textTheme.bodyLarge?.copyWith(color: Colors.white70),
                     ),
-                    if (_canViewResponses) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        'Toque no botão + para criar um novo formulário',
-                        style: Theme.of(
-                          context,
-                        ).textTheme.bodySmall?.copyWith(color: Colors.white60),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -328,61 +309,6 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
         ],
       ),
     );
-  }
-
-  Future<bool> _canDeleteForm(EvaluationFormModel form) async {
-    if (_currentUser == null) return false;
-
-    // Apenas membros da diretoria ELO podem excluir
-    try {
-      final societiesRepository = context.read<SocietiesRepository>();
-      final eloSociety = await societiesRepository.fetchByName('ELO');
-      if (eloSociety != null) {
-        return eloSociety.allBoardIds.contains(_currentUser!.id);
-      }
-    } catch (e) {
-      // Em caso de erro, não permitir exclusão
-    }
-
-    return false;
-  }
-
-  Future<void> _deleteForm(EvaluationFormModel form) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Excluir formulário'),
-        content: Text(
-          'Tem certeza que deseja excluir o formulário "${form.title}"? Esta ação não pode ser desfeita.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Excluir'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    try {
-      final repository = context.read<MusicEvaluationsRepository>();
-      await repository.deleteForm(form.id);
-      if (mounted) {
-        showSuccessToast(context, 'Formulário excluído com sucesso!');
-        await _refresh();
-      }
-    } catch (e) {
-      if (mounted) {
-        showErrorToast(context, 'Erro ao excluir formulário: ${e.toString()}');
-      }
-    }
   }
 
   Future<bool> _isUserLinkedToCategory(EvaluationCategory category) async {
@@ -542,20 +468,6 @@ class _EvaluationsListPageState extends State<EvaluationsListPage>
                       icon: const Icon(Icons.visibility),
                       label: const Text('Abrir'),
                       onPressed: () => _viewForm(form),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                },
-              ),
-              const SizedBox(width: 8),
-              FutureBuilder<bool>(
-                future: _canDeleteForm(form),
-                builder: (context, snapshot) {
-                  if (snapshot.data == true) {
-                    return IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _deleteForm(form),
-                      tooltip: 'Excluir formulário',
                     );
                   }
                   return const SizedBox.shrink();

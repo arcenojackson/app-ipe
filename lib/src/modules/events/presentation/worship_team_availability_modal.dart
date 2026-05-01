@@ -25,24 +25,21 @@ class _WorshipTeamAvailabilityModalState
     extends State<WorshipTeamAvailabilityModal> {
   final Set<DateTime> _selectedSundays = {};
   Map<DateTime, int> _availabilityCounts = {};
+  Map<DateTime, List<String>> _availabilityNames = {};
   bool _isLoading = false;
   bool _isSaving = false;
 
-  /// Define o papel do usuário para exibição do contador: ministro ou vocal
-  String? get _userRoleLabel {
-    final elo = widget.eloSociety;
-    if (elo == null) return null;
-    if (elo.ministrosIds.contains(widget.userId)) return 'ministros';
-    if (elo.vocaisIds.contains(widget.userId)) return 'vocais';
-    return null;
-  }
+  List<String> get _ministrosIds => widget.eloSociety?.ministrosIds ?? [];
 
-  List<String>? get _roleUserIds {
+  List<String> get _allMemberIds {
     final elo = widget.eloSociety;
-    if (elo == null) return null;
-    if (elo.ministrosIds.contains(widget.userId)) return elo.ministrosIds;
-    if (elo.vocaisIds.contains(widget.userId)) return elo.vocaisIds;
-    return null;
+    if (elo == null) return [];
+    return {
+      ...elo.membersIds,
+      ...elo.boardIds,
+      ...elo.vocaisIds,
+      ...elo.ministrosIds,
+    }.toList();
   }
 
   @override
@@ -72,22 +69,125 @@ class _WorshipTeamAvailabilityModalState
     }
   }
 
-  /// Carrega a contagem de disponibilidade por domingo (ministros ou vocais)
+  /// Carrega a contagem (apenas ministros) e os nomes (todos os membros) por domingo
   Future<void> _loadAvailabilityCounts() async {
-    final userIds = _roleUserIds;
-    if (userIds == null || userIds.isEmpty) return;
+    final sundays = _getNextMonthSundays();
+    if (sundays.isEmpty) return;
 
     try {
       final repository = context.read<EventsRepository>();
-      final sundays = _getNextMonthSundays();
-      final counts = await repository.getWorshipTeamAvailabilityCountByDate(
-        userIds,
-        sundays,
-      );
-      if (mounted) setState(() => _availabilityCounts = counts);
+      final futures = <Future>[];
+
+      if (_ministrosIds.isNotEmpty) {
+        futures.add(repository.getWorshipTeamAvailabilityCountByDate(_ministrosIds, sundays));
+      } else {
+        futures.add(Future.value(<DateTime, int>{}));
+      }
+
+      if (_allMemberIds.isNotEmpty) {
+        futures.add(repository.getWorshipTeamAvailabilityNamesByDate(_allMemberIds, sundays));
+      } else {
+        futures.add(Future.value(<DateTime, List<String>>{}));
+      }
+
+      final results = await Future.wait(futures);
+      if (mounted) {
+        setState(() {
+          _availabilityCounts = results[0] as Map<DateTime, int>;
+          _availabilityNames = results[1] as Map<DateTime, List<String>>;
+        });
+      }
     } catch (e) {
       // Silenciar erro - contador é opcional
     }
+  }
+
+  void _showNamesForDate(DateTime date, List<String> names) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (_, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF0D1220),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Column(
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.fromLTRB(0, 12, 0, 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                child: Text(
+                  'Disponíveis em ${_formatDate(date)}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              const Divider(color: Colors.white24, height: 1),
+              Expanded(
+                child: names.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Ninguém informou disponibilidade para este dia.',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white60),
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
+                        itemCount: names.length,
+                        itemBuilder: (_, i) {
+                          final name = names[i];
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              children: [
+                                CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
+                                  child: Text(
+                                    name.isNotEmpty ? name[0].toUpperCase() : '?',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: Theme.of(context).colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(
+                                  name,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Obtém todos os domingos do mês seguinte
@@ -111,14 +211,9 @@ class _WorshipTeamAvailabilityModalState
     return DateFormat('dd/MM/yyyy').format(date);
   }
 
-  /// Formata o contador com concordância singular/plural
-  String _formatCountLabel(int count, String role) {
-    if (role == 'ministros') {
-      return count == 1
-          ? '1 ministro disponível'
-          : '$count ministros disponíveis';
-    }
-    return count == 1 ? '1 vocal disponível' : '$count vocais disponíveis';
+  /// Formata o contador de ministros com concordância singular/plural
+  String _formatCountLabel(int count) {
+    return count == 1 ? '1 ministro disponível' : '$count ministros disponíveis';
   }
 
   /// Salva a disponibilidade no Firestore
@@ -300,38 +395,73 @@ class _WorshipTeamAvailabilityModalState
                                 const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         _formatDate(sunday),
-                                        style: theme.textTheme.bodyLarge
-                                            ?.copyWith(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.w500,
-                                            ),
+                                        style: theme.textTheme.bodyLarge?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
-                                      if (_userRoleLabel != null &&
-                                          _availabilityCounts.containsKey(
-                                            normalizedSunday,
-                                          )) ...[
+                                      if (_availabilityCounts.containsKey(normalizedSunday)) ...[
                                         const SizedBox(height: 4),
                                         Text(
                                           _formatCountLabel(
-                                            _availabilityCounts[normalizedSunday] ??
-                                                0,
-                                            _userRoleLabel!,
+                                            _availabilityCounts[normalizedSunday] ?? 0,
                                           ),
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                color: Colors.white60,
-                                                fontSize: 12,
-                                              ),
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            color: Colors.white60,
+                                            fontSize: 12,
+                                          ),
                                         ),
                                       ],
                                     ],
                                   ),
                                 ),
+                                if (_availabilityCounts.containsKey(normalizedSunday))
+                                  GestureDetector(
+                                    onTap: () => _showNamesForDate(
+                                      normalizedSunday,
+                                      _availabilityNames[normalizedSunday] ?? [],
+                                    ),
+                                    child: Stack(
+                                      clipBehavior: Clip.none,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Icon(
+                                            Icons.group_outlined,
+                                            size: 26,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        ),
+                                        Positioned(
+                                          top: -6,
+                                          right: -6,
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: theme.colorScheme.primary,
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            child: Text(
+                                              '${_availabilityNames[normalizedSunday]?.length ?? 0}',
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                               ],
                             ),
                           ),

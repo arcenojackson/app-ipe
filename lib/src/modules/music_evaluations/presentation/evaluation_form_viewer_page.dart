@@ -5,6 +5,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../../auth/models/user.dart';
+import '../../musics/data/musics_repository.dart';
+import '../../musics/models/music.dart';
 import '../data/music_evaluations_repository.dart';
 import '../models/evaluation_form.dart';
 import '../models/evaluation_response.dart';
@@ -33,6 +35,8 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
   int _selectedRating = 0;
   WebViewController? _webViewController;
   String? _embedUrl;
+  String? _musicLyrics;
+  MusicModel? _libraryMusic;
 
   @override
   void initState() {
@@ -60,8 +64,11 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
 
       final repository = context.read<MusicEvaluationsRepository>();
 
-      // Verificar se pode acessar o formulário
-      final canAccess = await repository.canAccessForm(widget.formId, user.id);
+      // Carregar formulário
+      final form = await repository.fetchFormById(widget.formId);
+
+      // Verificar se pode acessar a categoria do formulário
+      final canAccess = await repository.canAccessCategory(user, form.category);
       if (!canAccess) {
         if (mounted) {
           showErrorToast(
@@ -73,40 +80,38 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
         return;
       }
 
-      // Carregar formulário
-      final form = await repository.fetchFormById(widget.formId);
-
       // Carregar resposta do usuário para a música (só há uma música por formulário)
       final userResponses = await repository.fetchUserResponsesForForm(
         widget.formId,
         user.id,
       );
 
-      EvaluationResponseModel? existingResponse;
-      if (form.musics.isNotEmpty) {
-        final music = form.musics.first;
-        final matchingResponses = userResponses.where(
-          (r) => r.musicId == music.id,
-        );
-        existingResponse = matchingResponses.isNotEmpty
-            ? matchingResponses.first
-            : null;
+      final existingResponse = userResponses.isNotEmpty ? userResponses.first : null;
+
+      MusicModel? libraryMusic;
+      if (form.musicLibraryId != null) {
+        try {
+          libraryMusic = await context
+              .read<MusicsRepository>()
+              .fetchById(form.musicLibraryId!);
+          if (libraryMusic.youtube?.isNotEmpty == true) {
+            _initializeYoutubePlayer(libraryMusic.youtube!);
+          }
+        } catch (_) {}
       }
 
       setState(() {
         _form = form;
         _currentUser = user;
         _existingResponse = existingResponse;
+        _libraryMusic = libraryMusic;
+        _musicLyrics = libraryMusic?.lyrics?.isNotEmpty == true ? libraryMusic!.lyrics : null;
         _isLoading = false;
       });
 
-      // Inicializar valores do formulário e player do YouTube
       if (existingResponse != null) {
         _selectedRating = existingResponse.rating;
         _commentController.text = existingResponse.comment ?? '';
-      }
-      if (form.musics.isNotEmpty) {
-        _initializeYoutubePlayer(form.musics.first.youtubeUrl);
       }
     } catch (e) {
       // Exibir erro completo no console para facilitar cópia do link do índice
@@ -180,7 +185,7 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
       return;
     }
 
-    if (_form == null || _form!.musics.isEmpty || _currentUser == null) return;
+    if (_form == null || _form!.musicLibraryId == null || _currentUser == null) return;
 
     setState(() {
       _isSaving = true;
@@ -188,14 +193,13 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
 
     try {
       final repository = context.read<MusicEvaluationsRepository>();
-      final music = _form!.musics.first;
 
       final response = EvaluationResponseModel(
         id: _existingResponse?.id ?? '',
         formId: _form!.id,
         userId: _currentUser!.id,
         userName: _currentUser!.name,
-        musicId: music.id,
+        musicId: _form!.musicLibraryId!,
         rating: _selectedRating,
         comment: _commentController.text.trim().isEmpty
             ? null
@@ -223,16 +227,66 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
     }
   }
 
+  void _showLyricsModal(BuildContext context, String title, String lyrics) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: SafeArea(
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.of(ctx).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      lyrics,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontSize: 18,
+                        height: 1.6,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_isLoading || _form == null || _form!.musics.isEmpty) {
+    if (_isLoading || _form == null || _form!.musicLibraryId == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Formulário')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-
-    final music = _form!.musics.first;
 
     return Scaffold(
       appBar: AppBar(title: Text(_form!.title)),
@@ -256,16 +310,16 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        music.title,
+                        _libraryMusic?.title ?? _form!.title,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      if (music.artist != null) ...[
+                      if (_libraryMusic?.artist.isNotEmpty == true) ...[
                         const SizedBox(height: 4),
                         Text(
-                          music.artist!,
+                          _libraryMusic!.artist,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: Colors.white70),
                         ),
@@ -300,6 +354,14 @@ class _EvaluationFormViewerPageState extends State<EvaluationFormViewerPage> {
                     ),
                   ),
                 ),
+              if (_musicLyrics != null) ...[
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: () => _showLyricsModal(context, _libraryMusic?.title ?? _form!.title, _musicLyrics!),
+                  icon: const Icon(Icons.music_note),
+                  label: const Text('Exibir letra'),
+                ),
+              ],
               const SizedBox(height: 24),
 
               // Seleção de nota

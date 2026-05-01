@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../data/musics_repository.dart';
 import '../../models/category.dart';
 import '../../models/music.dart';
+import '../../models/music_status.dart';
 import '../../models/youtube_search_result.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../../shared/utils/platform_utils.dart';
@@ -445,16 +446,33 @@ class _MusicFormSheetState extends State<MusicFormSheet> {
         category: _selectedCategories.join('; '),
       );
       if (widget.music == null) {
-        await repository.create(music);
+        final duplicate = await repository.findDuplicate(
+          title: music.title,
+          youtube: music.youtube,
+          cipher: music.cipher,
+        );
+        if (duplicate != null) {
+          if (mounted) {
+            showErrorToast(
+              context,
+              'Já existe uma música com o mesmo ${duplicate.field}: "${duplicate.music.title}"',
+            );
+            setState(() => _isSubmitting = false);
+          }
+          return;
+        }
+        final created = await repository.create(
+          music.copyWith(status: MusicStatus.emAvaliacao),
+        );
         if (mounted) {
-          Navigator.of(context).pop(true);
           showSuccessToast(context, 'Música adicionada com sucesso!');
+          Navigator.of(context).pop(created);
         }
       } else {
         await repository.update(music);
         if (mounted) {
-          Navigator.of(context).pop(true);
           showSuccessToast(context, 'Música atualizada com sucesso!');
+          Navigator.of(context).pop(true);
         }
       }
     } catch (error) {

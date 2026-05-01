@@ -19,6 +19,7 @@ class PeopleSelectorSheet extends StatefulWidget {
     this.showTalkBack = false,
     this.title,
     this.canGoBack = false,
+    this.canAddExternal = false,
   });
 
   final List<UserModel> people;
@@ -32,6 +33,7 @@ class PeopleSelectorSheet extends StatefulWidget {
   final bool showTalkBack; // Se deve mostrar checkbox de Talk Back
   final String? title;
   final bool canGoBack;
+  final bool canAddExternal;
 
   @override
   State<PeopleSelectorSheet> createState() => _PeopleSelectorSheetState();
@@ -44,6 +46,7 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
   String _searchQuery = '';
   List<UserModel> _filteredPeople = [];
   bool _isLoading = true;
+  bool _showAllUsers = false;
   final Map<String, bool> _talkBackSelections = {}; // Map<userId, isTalkBack>
 
   @override
@@ -69,6 +72,24 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
   }
 
   Future<void> _filterPeople() async {
+    // Expanded mode: list all users without ELO/society filter
+    if (_showAllUsers) {
+      setState(() {
+        _isLoading = false;
+        if (_searchQuery.isEmpty) {
+          _filteredPeople = widget.people;
+        } else {
+          _filteredPeople = widget.people.where((person) {
+            final name = person.name.toLowerCase();
+            final email = person.email.toLowerCase();
+            return name.contains(_searchQuery) || email.contains(_searchQuery);
+          }).toList();
+        }
+        _filteredPeople.sort((a, b) => compareNamesIgnoreAccents(a.name, b.name));
+      });
+      return;
+    }
+
     // Se não precisa filtrar por sociedade, usar filtro simples
     if (!widget.filterByELO && widget.filterBySociety == null) {
       setState(() {
@@ -226,89 +247,159 @@ class _PeopleSelectorSheetState extends State<PeopleSelectorSheet> {
           const SizedBox(height: 16),
           SizedBox(
             height: 400,
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredPeople.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
+            child: Column(
+              children: [
+                // Banner "Todos os usuários" (visible only in expanded mode)
+                if (_showAllUsers) ...[
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
                       children: [
-                        Icon(Icons.search_off, size: 48, color: Colors.white38),
-                        const SizedBox(height: 16),
-                        Text(
-                          widget.filterByELO
-                              ? 'Nenhum membro da ELO com disponibilidade encontrado'
-                              : widget.filterBySociety != null
-                              ? 'Nenhum membro de ${widget.filterBySociety} encontrado'
-                              : 'Nenhum resultado encontrado',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: Colors.white60),
-                          textAlign: TextAlign.center,
+                        const Icon(Icons.group, size: 16, color: Colors.white60),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Todos os usuários',
+                            style: TextStyle(color: Colors.white60, fontSize: 13),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 16, color: Colors.white60),
+                          onPressed: () {
+                            setState(() => _showAllUsers = false);
+                            _filterPeople();
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                         ),
                       ],
                     ),
-                  )
-                : ListView.separated(
-                    itemCount: _filteredPeople.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1),
-                    itemBuilder: (context, index) {
-                      final person = _filteredPeople[index];
-                      final selected = _selectedIds.contains(person.id);
-                      final talkBack = _talkBackSelections[person.id] ?? false;
-
-                      return Column(
-                        children: [
-                          CheckboxListTile(
-                            value: selected,
-                            onChanged: (value) {
-                              setState(() {
-                                if (value == true) {
-                                  _selectedIds = [..._selectedIds, person.id];
-                                  if (!widget.showTalkBack) {
-                                    _talkBackSelections[person.id] = false;
-                                  }
-                                } else {
-                                  _selectedIds = _selectedIds
-                                      .where((id) => id != person.id)
-                                      .toList();
-                                  _talkBackSelections.remove(person.id);
-                                }
-                              });
-                            },
-                            title: Text(person.name),
-                            subtitle: Text(person.email),
-                          ),
-                          if (selected &&
-                              widget.showTalkBack &&
-                              widget.instrument != null)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 72,
-                                right: 16,
-                                bottom: 8,
-                              ),
-                              child: CheckboxListTile(
-                                dense: true,
-                                contentPadding: EdgeInsets.zero,
-                                value: talkBack,
-                                onChanged: (value) {
-                                  setState(() {
-                                    _talkBackSelections[person.id] =
-                                        value ?? false;
-                                  });
-                                },
-                                title: Text(
-                                  'Talk Back',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ),
-                            ),
-                        ],
-                      );
-                    },
                   ),
+                ],
+                // List takes remaining space
+                Expanded(
+                  child: _isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : _filteredPeople.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off, size: 48, color: Colors.white38),
+                              const SizedBox(height: 16),
+                              Text(
+                                _showAllUsers
+                                    ? 'Nenhum resultado encontrado'
+                                    : widget.filterByELO
+                                    ? 'Nenhum membro da ELO com disponibilidade encontrado'
+                                    : widget.filterBySociety != null
+                                    ? 'Nenhum membro de ${widget.filterBySociety} encontrado'
+                                    : 'Nenhum resultado encontrado',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(color: Colors.white60),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: _filteredPeople.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (context, index) {
+                            final person = _filteredPeople[index];
+                            final selected = _selectedIds.contains(person.id);
+                            final talkBack = _talkBackSelections[person.id] ?? false;
+
+                            return Column(
+                              children: [
+                                CheckboxListTile(
+                                  value: selected,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      if (value == true) {
+                                        _selectedIds = [..._selectedIds, person.id];
+                                        if (!widget.showTalkBack) {
+                                          _talkBackSelections[person.id] = false;
+                                        }
+                                      } else {
+                                        _selectedIds = _selectedIds
+                                            .where((id) => id != person.id)
+                                            .toList();
+                                        _talkBackSelections.remove(person.id);
+                                      }
+                                    });
+                                  },
+                                  title: Text(person.name),
+                                  subtitle: Text(person.email),
+                                ),
+                                if (selected &&
+                                    widget.showTalkBack &&
+                                    widget.instrument != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 72,
+                                      right: 16,
+                                      bottom: 8,
+                                    ),
+                                    child: CheckboxListTile(
+                                      dense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      value: talkBack,
+                                      onChanged: (value) {
+                                        setState(() {
+                                          _talkBackSelections[person.id] =
+                                              value ?? false;
+                                        });
+                                      },
+                                      title: Text(
+                                        'Talk Back',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 16),
+          // Discrete link (only for ELO board members, only when filter is active)
+          if (widget.filterByELO && widget.canAddExternal && !_showAllUsers) ...[
+            Center(
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() => _showAllUsers = true);
+                  _filterPeople();
+                },
+                icon: const Icon(
+                  Icons.person_add_outlined,
+                  size: 16,
+                  color: Colors.white38,
+                ),
+                label: const Text(
+                  '+ Incluir outra pessoa',
+                  style: TextStyle(
+                    color: Colors.white38,
+                    fontSize: 13,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white38,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton(

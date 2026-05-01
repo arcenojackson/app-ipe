@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'music_status.dart';
 
 class MusicModel {
   const MusicModel({
@@ -15,6 +16,7 @@ class MusicModel {
     this.minorTone = false,
     this.category = '',
     this.selectedTimes = const [],
+    this.status = MusicStatus.avaliar,
   });
 
   final String id;
@@ -30,6 +32,7 @@ class MusicModel {
   final bool minorTone;
   final String category;
   final List<String> selectedTimes;
+  final MusicStatus status;
 
   factory MusicModel.fromJson(Map<String, dynamic> json) {
     return MusicModel(
@@ -56,6 +59,7 @@ class MusicModel {
               return e.toString();
             }).toList()
           : const [],
+      status: MusicStatus.fromString(json['status']?.toString()),
     );
   }
 
@@ -73,6 +77,7 @@ class MusicModel {
     'minorTone': minorTone,
     'category': category,
     'selected_times': selectedTimes,
+    'status': status.value,
   };
 
   MusicModel copyWith({
@@ -89,6 +94,7 @@ class MusicModel {
     bool? minorTone,
     String? category,
     List<String>? selectedTimes,
+    MusicStatus? status,
   }) {
     return MusicModel(
       id: id ?? this.id,
@@ -104,6 +110,7 @@ class MusicModel {
       minorTone: minorTone ?? this.minorTone,
       category: category ?? this.category,
       selectedTimes: selectedTimes ?? this.selectedTimes,
+      status: status ?? this.status,
     );
   }
 }

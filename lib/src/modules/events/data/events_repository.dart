@@ -1037,6 +1037,48 @@ class EventsRepository {
   }
 
   /// Retorna a quantidade de pessoas disponíveis por domingo, para uma lista de usuários (ex: vocais ou ministros)
+  /// Retorna os nomes dos usuários disponíveis por data (para exibição na modal)
+  Future<Map<DateTime, List<String>>> getWorshipTeamAvailabilityNamesByDate(
+    List<String> userIds,
+    List<DateTime> sundays,
+  ) async {
+    if (userIds.isEmpty || sundays.isEmpty) {
+      return {for (final d in sundays) d: []};
+    }
+
+    try {
+      final availabilities = await Future.wait(
+        userIds.map((id) => fetchWorshipTeamAvailability(id)),
+      );
+
+      final nameDocs = await Future.wait(
+        userIds.map((id) => _firestore.collection('users').doc(id).get()),
+      );
+      final names = nameDocs.map((doc) {
+        final data = doc.data();
+        return (data?['name'] as String?) ?? '';
+      }).toList();
+
+      final Map<DateTime, List<String>> result = {};
+      for (final sunday in sundays) {
+        final normalized = DateTime(sunday.year, sunday.month, sunday.day);
+        final available = <String>[];
+        for (var i = 0; i < userIds.length; i++) {
+          final hasDate = availabilities[i].any(
+            (d) => d.year == normalized.year && d.month == normalized.month && d.day == normalized.day,
+          );
+          if (hasDate && names[i].isNotEmpty) available.add(names[i]);
+        }
+        result[normalized] = available;
+      }
+      return result;
+    } catch (e) {
+      throw AppException(
+        message: 'Erro ao buscar nomes de disponibilidade: ${e.toString()}',
+      );
+    }
+  }
+
   /// Permite exibir o contador na modal de disponibilidade conforme o papel do usuário
   Future<Map<DateTime, int>> getWorshipTeamAvailabilityCountByDate(
     List<String> userIds,
