@@ -26,16 +26,18 @@ class FirebaseConfig {
       _auth = FirebaseAuth.instance;
       _firestore = FirebaseFirestore.instance;
       _analytics = FirebaseAnalytics.instance;
-      _crashlytics = FirebaseCrashlytics.instance;
 
-      await _crashlytics!.setCrashlyticsCollectionEnabled(true);
       await _analytics!.setAnalyticsCollectionEnabled(true);
+
+      if (!kIsWeb) {
+        _crashlytics = FirebaseCrashlytics.instance;
+        await _crashlytics!.setCrashlyticsCollectionEnabled(true);
+      }
 
       _auth!.authStateChanges().listen((User? user) {
         if (user != null) {
-          // Usuário autenticado - logs gerenciados pelo Crashlytics em produção
           if (kDebugMode) {
-          print('✅ Usuário logado: ${user.email} (${user.uid})');
+            print('✅ Usuário logado: ${user.email} (${user.uid})');
           }
         }
       });
