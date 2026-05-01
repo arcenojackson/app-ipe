@@ -109,31 +109,38 @@ class AuthRepository {
 
   Future<UserModel> signInWithGoogle() async {
     try {
-      // Trigger the authentication flow
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      final UserCredential userCredential;
 
-      if (googleUser == null) {
-        throw AppException(message: 'Login com Google cancelado pelo usuário');
-      }
+      if (kIsWeb) {
+        // Na web usa signInWithPopup diretamente — google_sign_in não retorna idToken no browser
+        final googleProvider = GoogleAuthProvider()
+          ..addScope('email')
+          ..addScope('profile');
+        userCredential = await _auth.signInWithPopup(googleProvider);
+      } else {
+        // Mobile: fluxo nativo via google_sign_in
+        final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
-      // Obtain the auth details from the request
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+        if (googleUser == null) {
+          throw AppException(message: 'Login com Google cancelado pelo usuário');
+        }
 
-      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
-        throw AppException(
-          message: 'Falha ao obter tokens de autenticação do Google',
+        final GoogleSignInAuthentication googleAuth =
+            await googleUser.authentication;
+
+        if (googleAuth.idToken == null) {
+          throw AppException(
+            message: 'Falha ao obter tokens de autenticação do Google',
+          );
+        }
+
+        final credential = GoogleAuthProvider.credential(
+          accessToken: googleAuth.accessToken,
+          idToken: googleAuth.idToken,
         );
+
+        userCredential = await _auth.signInWithCredential(credential);
       }
-
-      // Create a new credential
-      final credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      // Sign in to Firebase with the Google credential
-      final userCredential = await _auth.signInWithCredential(credential);
 
       // Verificar se o usuário já existe no Firestore
       var userModel = await _getUserFromFirestore(userCredential.user!.uid);
