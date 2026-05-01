@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,11 +33,11 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
   }
 
   String _getAppStoreLink() {
-    if (Platform.isIOS) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       // TODO: Substituir com o ID real do App Store após publicação
       // Link será: https://apps.apple.com/app/app-ipe/id[SEU_APP_ID]
       return 'https://apps.apple.com/app/app-ipe';
-    } else if (Platform.isAndroid) {
+    } else if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return 'https://play.google.com/store/apps/details?id=com.ipe.app';
     }
     return 'https://apps.apple.com/app/app-ipe'; // Fallback
@@ -100,14 +100,14 @@ class _InvitePersonSheetState extends State<InvitePersonSheet> {
         canLaunch = await canLaunchUrl(uri);
       } catch (e) {
         // Se canLaunchUrl falhar, no Android ainda tentamos abrir
-        if (Platform.isAndroid) {
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
           canLaunch = true;
         }
       }
       
       // No Android 11+, canLaunchUrl pode retornar false mesmo com WhatsApp instalado
       // devido a restrições de visibilidade de pacotes, então tentamos abrir mesmo assim
-      bool shouldTryLaunch = canLaunch || Platform.isAndroid;
+      bool shouldTryLaunch = canLaunch || !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
       
       if (shouldTryLaunch) {
         bool launchSuccess = false;

@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -122,7 +122,7 @@ class _CalendarEventFormSheetState extends State<CalendarEventFormSheet> {
         padding: EdgeInsets.only(
           bottom:
               MediaQuery.of(context).viewInsets.bottom +
-              (Platform.isAndroid
+              (!kIsWeb && defaultTargetPlatform == TargetPlatform.android
                   ? 16 // Padding reduzido no Android para subir a modal
                   : PlatformUtils.getModalBottomPadding(context)),
           left: 24,

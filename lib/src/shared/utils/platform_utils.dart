@@ -1,13 +1,13 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 /// Utilitário para detectar informações sobre a plataforma e navegação do sistema
 class PlatformUtils {
   /// Verifica se o app está rodando no Android
-  static bool get isAndroid => Platform.isAndroid;
+  static bool get isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
   /// Verifica se o app está rodando no iOS
-  static bool get isIOS => Platform.isIOS;
+  static bool get isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   /// Obtém o tipo de navegação do sistema Android
   /// Retorna:

@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -400,7 +400,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   // Botão Continuar com Apple (apenas iOS)
-                  if (Platform.isIOS) ...[
+                  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) ...[
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,

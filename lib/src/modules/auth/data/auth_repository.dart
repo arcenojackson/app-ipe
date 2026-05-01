@@ -1,4 +1,4 @@
-import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -166,7 +166,7 @@ class AuthRepository {
   Future<UserModel> signInWithApple() async {
     try {
       // Verificar se está rodando no iOS
-      if (!Platform.isIOS) {
+      if (kIsWeb || defaultTargetPlatform != TargetPlatform.iOS) {
         throw AppException(
           message: 'Sign In with Apple está disponível apenas no iOS',
         );
