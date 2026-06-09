@@ -842,18 +842,10 @@ class _CalendarPageState extends State<CalendarPage> {
                     if (_viewMode == CalendarViewMode.month) {
                       return Column(
                         children: [
-                          // Calendário com altura limitada
-                          Flexible(
-                            flex: 1,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                maxHeight: constraints.maxHeight * 0.42,
-                              ),
-                              child: _buildCalendarView(),
-                            ),
-                          ),
+                          // Calendário ocupa altura natural (varia por meses com 5 ou 6 semanas)
+                          _buildCalendarView(),
                           // Lista de eventos - ocupa o restante do espaço
-                          Expanded(flex: 1, child: _buildEventList()),
+                          Expanded(child: _buildEventList()),
                         ],
                       );
                     } else {
