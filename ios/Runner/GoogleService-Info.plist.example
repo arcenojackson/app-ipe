@@ -3,23 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>890190525302-numq83pisle4l2ek0i7viksol3or26i6.apps.googleusercontent.com</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.890190525302-numq83pisle4l2ek0i7viksol3or26i6</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>890190525302-hbgsivb0a09i10smcnjr6t90pqrj23qm.apps.googleusercontent.com</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>API_KEY</key>
-	<string>AIzaSyC8_TvQ4tlhyOcfuk5s9gceubQyCiGOYs0</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>GCM_SENDER_ID</key>
-	<string>890190525302</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.ipe.app</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>PROJECT_ID</key>
-	<string>app-ipe</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>STORAGE_BUCKET</key>
-	<string>app-ipe.firebasestorage.app</string>
+	<string>YOUR_VALUE_HERE</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -31,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:890190525302:ios:15db011bd5fd64aa988057</string>
+	<string>YOUR_VALUE_HERE</string>
 </dict>
 </plist>
