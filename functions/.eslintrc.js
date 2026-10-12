@@ -20,6 +20,8 @@ module.exports = {
   ignorePatterns: [
     "/lib/**/*", // Ignore built files.
     "/generated/**/*", // Ignore generated files.
+    "/test/**/*", // Testes rodam no Vitest, fora do tsconfig de build.
+    "/scripts/**/*", // Scripts manuais de manutenção.
   ],
   plugins: [
     "@typescript-eslint",

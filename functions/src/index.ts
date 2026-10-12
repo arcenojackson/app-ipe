@@ -1818,3 +1818,5 @@ export const sendEloAvailabilityReminder = functions
       });
     }
   });
+
+export {syncTeachingClaimsOnUserWrite} from "./teaching/syncClaims";
