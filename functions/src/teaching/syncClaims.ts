@@ -3,6 +3,7 @@ import * as admin from "firebase-admin";
 import {
   claimsEqual,
   computeTeachingClaims,
+  currentTeachingClaims,
   mergeTeachingClaims,
 } from "./claims";
 
@@ -16,24 +17,48 @@ export interface ClaimsAuth {
   ): Promise<void>;
 }
 
+export interface DocSnapshotLike {
+  exists: boolean;
+  data(): UserData | undefined;
+}
+
+/**
+ * Converte um snapshot de documento nos seus dados (ou undefined).
+ * @param {DocSnapshotLike} snapshot - snapshot do documento
+ * @return {UserData | undefined} dados do documento, se existir
+ */
+export function readSnapshotData(
+  snapshot: DocSnapshotLike
+): UserData | undefined {
+  return snapshot.exists ? snapshot.data() : undefined;
+}
+
 /**
  * Copia teaching_role e is_admin de users/{uid} para as custom claims do
- * usuário, só quando algo que afeta o acesso mudou.
+ * usuário. O evento só serve para decidir se vale a pena sincronizar; a
+ * fonte da verdade é o documento atual, relido via readUser, para que
+ * eventos atrasados ou repetidos fora de ordem não restaurem claims antigas.
  * @param {ClaimsAuth} auth - cliente do Firebase Auth (injetável em testes)
  * @param {string} uid - id do usuário
  * @param {UserData | undefined} before - documento antes da escrita
  * @param {UserData | undefined} after - documento depois da escrita
+ * @param {Function} readUser - lê o documento users/{uid} atual
  * @return {Promise<string>} "updated" quando gravou, "skipped" caso contrário
  */
 export async function syncTeachingClaims(
   auth: ClaimsAuth,
   uid: string,
   before: UserData | undefined,
-  after: UserData | undefined
+  after: UserData | undefined,
+  readUser: (uid: string) => Promise<UserData | undefined>
 ): Promise<"updated" | "skipped"> {
-  const beforeClaims = computeTeachingClaims(before);
-  const afterClaims = computeTeachingClaims(after);
-  if (claimsEqual(beforeClaims, afterClaims)) return "skipped";
+  if (
+    claimsEqual(computeTeachingClaims(before), computeTeachingClaims(after))
+  ) {
+    return "skipped";
+  }
+
+  const desired = computeTeachingClaims(await readUser(uid));
 
   let existing: Record<string, unknown> | undefined;
   try {
@@ -46,10 +71,11 @@ export async function syncTeachingClaims(
     throw error;
   }
 
-  await auth.setCustomUserClaims(
-    uid,
-    mergeTeachingClaims(existing, afterClaims)
-  );
+  if (claimsEqual(desired, currentTeachingClaims(existing))) {
+    return "skipped";
+  }
+
+  await auth.setCustomUserClaims(uid, mergeTeachingClaims(existing, desired));
   return "updated";
 }
 
@@ -62,8 +88,10 @@ export const syncTeachingClaimsOnUserWrite = functions
       await syncTeachingClaims(
         admin.auth(),
         userId,
-        change.before.exists ? change.before.data() : undefined,
-        change.after.exists ? change.after.data() : undefined
+        readSnapshotData(change.before),
+        readSnapshotData(change.after),
+        async (uid) =>
+          readSnapshotData(await admin.firestore().doc(`users/${uid}`).get())
       );
     } catch (error) {
       console.error("Erro ao sincronizar claims de ensino:", error);

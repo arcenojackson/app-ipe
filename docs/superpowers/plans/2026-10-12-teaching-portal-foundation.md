@@ -2626,10 +2626,11 @@ Esperado: deploy concluído, a função aparece em `firebase functions:list --pr
 O script grava claims no Auth de produção. Confirmar com o usuário. Pré-requisito: credenciais da conta de serviço (`export GOOGLE_APPLICATION_CREDENTIALS=<caminho do JSON>`) ou `gcloud auth application-default login`.
 
 ```bash
-cd functions && npx tsx scripts/backfill-teaching-claims.ts
+cd functions
+npm run backfill-claims
 ```
 
-Esperado: `Claims gravadas: N. Falhas: 0.` com N igual ao número de admins e professores já marcados.
+Esperado: uma linha `Atualizadas: N. Sem mudança: M. Sem conta no Auth: K. Falhas: 0.`, com `Falhas: 0`; N conta os usuários cujas claims foram corrigidas (admins e professores ainda sem claim, ou quem perdeu o papel e ainda tinha a claim). Rodar de novo deve dar `Atualizadas: 0`.
 
 - [ ] **Step 5: 🔒 Deploy das regras do Firestore e do Storage**
 
