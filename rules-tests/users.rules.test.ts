@@ -4,7 +4,7 @@ import {
   assertSucceeds,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import {doc, getDoc, setDoc, updateDoc} from "firebase/firestore";
+import {deleteField, doc, getDoc, setDoc, updateDoc} from "firebase/firestore";
 import {createEnv} from "./env";
 
 let env: RulesTestEnvironment;
@@ -24,6 +24,11 @@ beforeEach(async () => {
     await setDoc(doc(db, "users/admin1"), {name: "Admin", is_admin: true});
     await setDoc(doc(db, "users/user1"), {name: "Ana", is_admin: false});
     await setDoc(doc(db, "users/user2"), {name: "Bia", is_admin: false});
+    await setDoc(doc(db, "users/teacher1"), {
+      name: "Téo",
+      is_admin: false,
+      teaching_role: "teacher",
+    });
   });
 });
 
@@ -85,5 +90,23 @@ describe("regras de users", () => {
   it("admin continua alternando is_admin (comportamento atual do app)", async () => {
     const db = env.authenticatedContext("admin1").firestore();
     await assertSucceeds(updateDoc(doc(db, "users/user1"), {is_admin: true}));
+  });
+
+  describe("professor editando o próprio documento", () => {
+    it("atualiza campos não protegidos", async () => {
+      const db = env.authenticatedContext("teacher1").firestore();
+      await assertSucceeds(updateDoc(doc(db, "users/teacher1"), {fcmToken: "tok"}));
+      await assertSucceeds(updateDoc(doc(db, "users/teacher1"), {name: "Téo Silva"}));
+    });
+
+    it("NÃO muda o próprio teaching_role para curator", async () => {
+      const db = env.authenticatedContext("teacher1").firestore();
+      await assertFails(updateDoc(doc(db, "users/teacher1"), {teaching_role: "curator"}));
+    });
+
+    it("NÃO apaga o campo teaching_role", async () => {
+      const db = env.authenticatedContext("teacher1").firestore();
+      await assertFails(updateDoc(doc(db, "users/teacher1"), {teaching_role: deleteField()}));
+    });
   });
 });
