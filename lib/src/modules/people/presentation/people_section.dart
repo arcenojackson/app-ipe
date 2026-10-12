@@ -7,6 +7,7 @@ import '../../../shared/utils/app_toast.dart';
 import '../../../shared/utils/sort_utils.dart';
 import '../../../shared/state/app_state.dart';
 import '../data/people_repository.dart';
+import '../models/teaching_role_menu_option.dart';
 import 'widgets/invite_person_sheet.dart';
 
 class PeopleSection extends StatefulWidget {
@@ -60,6 +61,23 @@ class _PeopleSectionState extends State<PeopleSection> {
     }
 
     return null;
+  }
+
+  Widget? _buildTeachingRoleLabel(UserModel person, ThemeData theme) {
+    final text = switch (person.teachingRole) {
+      TeachingRole.teacher => 'Professor',
+      TeachingRole.curator => 'Curador',
+      TeachingRole.none => null,
+    };
+    if (text == null) return null;
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(text),
+    );
   }
 
   @override
@@ -131,6 +149,7 @@ class _PeopleSectionState extends State<PeopleSection> {
                   itemBuilder: (context, index) {
                     final person = _people[index];
                     final statusLabel = _buildStatusLabel(person, theme);
+                    final teachingLabel = _buildTeachingRoleLabel(person, theme);
                     final showMenu =
                         widget.currentUser.isAdmin &&
                         person.id != widget.currentUser.id &&
@@ -177,6 +196,10 @@ class _PeopleSectionState extends State<PeopleSection> {
                           ),
                           const SizedBox(width: 16),
                           // Mostrar labels de status (sempre que existir)
+                          if (teachingLabel != null) ...[
+                            teachingLabel,
+                            const SizedBox(width: 8),
+                          ],
                           if (statusLabel != null) ...[
                             statusLabel,
                             const SizedBox(width: 8),
@@ -263,6 +286,44 @@ class _PeopleSectionState extends State<PeopleSection> {
                                   );
                                 }
 
+                                // Papel de ensino (apenas para usuários aprovados)
+                                if (!person.isPending) {
+                                  for (final option in teachingRoleMenuOptions(
+                                    person.teachingRole,
+                                  )) {
+                                    final isRemove =
+                                        option.target == TeachingRole.none;
+                                    final color = isRemove
+                                        ? Colors.orange.shade400
+                                        : null;
+                                    items.add(
+                                      PopupMenuItem(
+                                        value: option.value,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              isRemove
+                                                  ? Icons.person_remove_outlined
+                                                  : Icons.school_outlined,
+                                              color:
+                                                  color ??
+                                                  theme.colorScheme.primary,
+                                              size: 20,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              option.label,
+                                              style: TextStyle(
+                                                color: color ?? Colors.white,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                }
+
                                 // Divisor antes de excluir
                                 items.add(const PopupMenuDivider());
 
@@ -296,14 +357,22 @@ class _PeopleSectionState extends State<PeopleSection> {
                                   _showDeleteConfirmation(person);
                                 } else if (value == 'approve') {
                                   _approveUser(person);
-                                } else {
+                                } else if (value == 'add' || value == 'remove') {
                                   _toggleAdmin(person, value == 'add');
+                                } else {
+                                  final role =
+                                      TeachingRoleMenuOption.targetFromMenuValue(
+                                        value,
+                                      );
+                                  if (role != null) {
+                                    _setTeachingRole(person, role);
+                                  }
                                 }
                               },
                               child: const Icon(Icons.more_horiz_rounded),
                             )
                           // Espaço para alinhar a label quando não há menu
-                          else if (statusLabel != null)
+                          else if (statusLabel != null || teachingLabel != null)
                             const SizedBox(width: 25),
                         ],
                       ),
@@ -368,6 +437,34 @@ class _PeopleSectionState extends State<PeopleSection> {
         final errorMessage = error.toString().contains('permission')
             ? 'Sem permissão para atualizar usuário. Verifique as regras do Firestore.'
             : 'Erro ao atualizar o usuário: ${error.toString()}';
+        showErrorToast(context, errorMessage);
+      }
+    }
+  }
+
+  Future<void> _setTeachingRole(UserModel user, TeachingRole role) async {
+    try {
+      await context.read<PeopleRepository>().setTeachingRole(
+        userId: user.id,
+        role: role,
+      );
+      if (mounted) {
+        showSuccessToast(
+          context,
+          switch (role) {
+            TeachingRole.teacher => '${user.name} agora é professor.',
+            TeachingRole.curator => '${user.name} agora é curador.',
+            TeachingRole.none =>
+              '${user.name} não faz mais parte dos professores.',
+          },
+        );
+        await _loadPeople();
+      }
+    } catch (error) {
+      if (mounted) {
+        final errorMessage = error.toString().contains('permission')
+            ? 'Sem permissão para atualizar usuário. Verifique as regras do Firestore.'
+            : 'Erro ao atualizar o papel de ensino: ${error.toString()}';
         showErrorToast(context, errorMessage);
       }
     }
