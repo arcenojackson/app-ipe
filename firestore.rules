@@ -9,35 +9,19 @@ service cloud.firestore {
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.is_admin == true;
     }
 
-    // Campos de acesso: só administradores podem alterar (viram custom claims)
-    function touchesProtectedFields() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasAny(['is_admin', 'isAdmin', 'teaching_role']);
-    }
-
-    function validTeachingRole() {
-      return request.resource.data.get('teaching_role', 'none')
-        in ['none', 'teacher', 'curator'];
-    }
-
     // Regras para usuários
     match /users/{userId} {
       // Qualquer usuário autenticado pode ler qualquer usuário (para listar equipe)
       allow read: if request.auth != null;
-
-      // O usuário edita o próprio perfil, exceto os campos de acesso.
-      // Administradores podem editar qualquer usuário (is_admin, teaching_role).
-      allow update: if request.auth != null && validTeachingRole() &&
-        (isAdmin() ||
-          (request.auth.uid == userId && !touchesProtectedFields()));
-
-      // O usuário cria apenas o próprio documento, sem privilégios.
-      allow create: if request.auth != null &&
-        request.auth.uid == userId &&
-        request.resource.data.get('is_admin', false) == false &&
-        request.resource.data.get('isAdmin', false) == false &&
-        !('teaching_role' in request.resource.data);
-
+      
+      // Usuários podem atualizar apenas seus próprios dados
+      // Administradores podem atualizar qualquer usuário (especialmente is_admin)
+      allow update: if request.auth != null && 
+        (request.auth.uid == userId || isAdmin());
+      
+      // Usuários podem criar apenas seus próprios dados
+      allow create: if request.auth != null && request.auth.uid == userId;
+      
       // Apenas administradores podem deletar usuários
       allow delete: if isAdmin();
     }
