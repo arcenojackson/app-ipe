@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Portal de Ensino IPE
 
-## Getting Started
+Portal web (Next.js) da área de ensino da IPE. Usa o mesmo projeto Firebase
+(`app-ipe`) e a mesma conta do app Flutter.
 
-First, run the development server:
+## Rodar localmente
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+1. `cp .env.example .env.local` e preencha com `firebase apps:sdkconfig WEB <APP_ID> --project app-ipe`.
+2. `npm install`
+3. `npm run dev` → http://localhost:3000
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Scripts: `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`.
+O `build` precisa das variáveis `NEXT_PUBLIC_FIREBASE_*` definidas.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Estrutura
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `src/core/` — casca compartilhada: Firebase, autenticação, acesso por claims,
+  registro de módulos, componentes de UI.
+- `src/modules/<módulo>/` — um módulo por área (hoje só `teaching`), com `module.ts`,
+  `data/` e `pages/`.
+- `src/app/` — rotas do Next.js; as de módulos são finas e só reexportam a página do módulo.
+- `src/styles/tokens.css` — tokens visuais. A fonte de verdade é
+  `lib/src/shared/theme/app_theme.dart`; `tokens.test.ts` falha se divergirem.
 
-## Learn More
+## Como adicionar um módulo
 
-To learn more about Next.js, take a look at the following resources:
+1. Criar `src/modules/<id>/module.ts` exportando um `PortalModule`
+   (`basePath`, `access` e `navItems`).
+2. Registrá-lo em `src/core/modules/registry.ts` (`portalModules`).
+3. Criar as rotas finas em `src/app/(portal)/<basePath>/`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Menu e guarda de acesso passam a valer sozinhos.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Acesso
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `none` não entra; `teacher` lê a biblioteca e usa o fórum; `curator` também aprova;
+  `admin` (campo `is_admin`) tem acesso total e é quem gerencia o grupo.
+- Papéis vêm de custom claims (`teaching_role`, `admin`), copiadas de `users/{uid}`
+  pela Cloud Function `syncTeachingClaimsOnUserWrite`.
+- Limite conhecido: quem perde o papel pode manter acesso ao Storage por até 1 hora
+  se já estiver com a sessão aberta (o token só renova então).
+- Professor cuja conta do app usa apenas Sign in with Apple ainda não consegue entrar
+  no portal: a Apple na web não está configurada (há suporte a e-mail/senha e Google).
