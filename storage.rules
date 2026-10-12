@@ -37,8 +37,18 @@ service firebase.storage {
     match /teaching/materials/{materialId}/{fileName} {
       allow read: if hasTeachingAccess();
 
-      // 100 MB por arquivo
-      allow create, update: if hasTeachingAccess() &&
+      // 100 MB por arquivo. Qualquer professor cria arquivos novos.
+      // O emulador avalia o envio sobre um objeto existente como `create`
+      // (com `resource` preenchido); por isso, sobrescrever exige curador/admin
+      // também aqui. Objeto novo (`resource == null`): qualquer professor.
+      allow create: if hasTeachingAccess() &&
+        (resource == null || isCuratorOrAdmin()) &&
+        request.resource.size <= 100 * 1024 * 1024 &&
+        allowedContentType();
+
+      // Sobrescrever equivale a apagar: só curador/admin. A substituição pelo
+      // autor virá com o controle de propriedade em etapa posterior.
+      allow update: if isCuratorOrAdmin() &&
         request.resource.size <= 100 * 1024 * 1024 &&
         allowedContentType();
 

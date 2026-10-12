@@ -81,6 +81,35 @@ describe("regras do Storage — teaching/materials", () => {
     await assertSucceeds(deleteObject(ref(admin(), "teaching/materials/m8/a.pdf")));
   });
 
+  it("professor NÃO sobrescreve arquivo existente", async () => {
+    const p = "teaching/materials/m9/a.pdf";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), p), bytes, pdf);
+    });
+    await assertFails(uploadBytes(ref(teacher(), p), new Uint8Array([9]), pdf));
+  });
+
+  it("curador sobrescreve arquivo existente", async () => {
+    const p = "teaching/materials/m10/a.pdf";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), p), bytes, pdf);
+    });
+    await assertSucceeds(uploadBytes(ref(curator(), p), new Uint8Array([9]), pdf));
+  });
+
+  it("admin sobrescreve arquivo existente", async () => {
+    const p = "teaching/materials/m11/a.pdf";
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await uploadBytes(ref(ctx.storage(), p), bytes, pdf);
+    });
+    await assertSucceeds(uploadBytes(ref(admin(), p), new Uint8Array([9]), pdf));
+  });
+
+  it("curador e admin criam arquivo novo", async () => {
+    await assertSucceeds(uploadBytes(ref(curator(), "teaching/materials/m12/a.pdf"), bytes, pdf));
+    await assertSucceeds(uploadBytes(ref(admin(), "teaching/materials/m13/a.pdf"), bytes, pdf));
+  });
+
   it("outros caminhos do bucket seguem negados", async () => {
     await assertFails(uploadBytes(ref(teacher(), "outros/a.pdf"), bytes, pdf));
   });
