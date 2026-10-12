@@ -1,4 +1,4 @@
-import {fireEvent, render, screen, waitFor} from "@testing-library/react";
+import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import type {MemberRow} from "../data/memberRows";
 import GroupAdminPage from "./GroupAdminPage";
@@ -54,6 +54,32 @@ describe("GroupAdminPage", () => {
       "Não foi possível salvar o papel de Ana. Tente novamente."
     );
     expect(screen.getByLabelText("Papel de Ana")).toHaveValue("none");
+  });
+
+  it("desabilita o select enquanto a gravação está em andamento", async () => {
+    let resolve!: () => void;
+    repo.setTeachingRole.mockReturnValue(new Promise<void>((r) => (resolve = r)));
+    render(<GroupAdminPage />);
+    await screen.findByText("Ana");
+    fireEvent.change(screen.getByLabelText("Papel de Ana"), {target: {value: "curator"}});
+    expect(screen.getByLabelText("Papel de Ana")).toBeDisabled();
+    expect(screen.getByLabelText("Papel de Bia")).toBeEnabled();
+    await act(async () => resolve());
+    expect(screen.getByLabelText("Papel de Ana")).toBeEnabled();
+    expect(screen.getByLabelText("Papel de Ana")).toHaveValue("curator");
+  });
+
+  it("reabilita o select com o papel anterior quando a gravação falha", async () => {
+    let reject!: (e: Error) => void;
+    repo.setTeachingRole.mockReturnValue(new Promise<void>((_, rj) => (reject = rj)));
+    render(<GroupAdminPage />);
+    await screen.findByText("Ana");
+    fireEvent.change(screen.getByLabelText("Papel de Ana"), {target: {value: "teacher"}});
+    expect(screen.getByLabelText("Papel de Ana")).toBeDisabled();
+    await act(async () => reject(new Error("permission-denied")));
+    expect(screen.getByLabelText("Papel de Ana")).toBeEnabled();
+    expect(screen.getByLabelText("Papel de Ana")).toHaveValue("none");
+    expect(screen.getByRole("alert")).toBeInTheDocument();
   });
 
   it("mostra erro quando a lista não carrega", async () => {

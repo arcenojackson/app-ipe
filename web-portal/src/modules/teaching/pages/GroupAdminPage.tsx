@@ -15,6 +15,7 @@ export default function GroupAdminPage() {
   const [members, setMembers] = useState<MemberRow[] | null>(null);
   const [term, setTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let active = true;
@@ -34,15 +35,27 @@ export default function GroupAdminPage() {
     );
   }
 
+  function markSaving(id: string, on: boolean) {
+    setSaving((current) => {
+      const next = new Set(current);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }
+
   async function onChangeRole(member: MemberRow, role: TeachingRoleValue) {
     const previous = member.teachingRole;
     setError(null);
     patch(member.id, role);
+    markSaving(member.id, true);
     try {
       await setTeachingRole(member.id, role);
     } catch {
       patch(member.id, previous);
       setError(`Não foi possível salvar o papel de ${member.name}. Tente novamente.`);
+    } finally {
+      markSaving(member.id, false);
     }
   }
 
@@ -76,6 +89,7 @@ export default function GroupAdminPage() {
               <select
                 aria-label={`Papel de ${member.name}`}
                 value={member.teachingRole}
+                disabled={saving.has(member.id)}
                 onChange={(e) => void onChangeRole(member, e.target.value as TeachingRoleValue)}
                 className="rounded-input border border-white/5 bg-surface px-3 py-2 text-on-surface focus:border-primary focus:outline-none"
               >
