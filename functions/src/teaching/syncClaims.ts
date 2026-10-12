@@ -53,8 +53,9 @@ export async function syncTeachingClaims(
   return "updated";
 }
 
-export const syncTeachingClaimsOnUserWrite = functions.firestore
-  .document("users/{userId}")
+export const syncTeachingClaimsOnUserWrite = functions
+  .runWith({failurePolicy: true})
+  .firestore.document("users/{userId}")
   .onWrite(async (change, context) => {
     const {userId} = context.params;
     try {
@@ -66,6 +67,11 @@ export const syncTeachingClaimsOnUserWrite = functions.firestore
       );
     } catch (error) {
       console.error("Erro ao sincronizar claims de ensino:", error);
+      // A operação é idempotente (recalcula as claims a partir do
+      // documento), então repetir o evento é seguro. Relançar permite o
+      // retry em falhas transitórias do Auth, para que uma revogação de
+      // papel não deixe de ser aplicada.
+      throw error;
     }
     return null;
   });

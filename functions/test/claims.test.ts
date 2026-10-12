@@ -2,8 +2,34 @@ import {describe, expect, it} from "vitest";
 import {
   claimsEqual,
   computeTeachingClaims,
+  currentTeachingClaims,
   mergeTeachingClaims,
 } from "../src/teaching/claims";
+
+describe("currentTeachingClaims", () => {
+  it("claims vazias ou indefinidas não geram nada", () => {
+    expect(currentTeachingClaims(undefined)).toEqual({});
+    expect(currentTeachingClaims({})).toEqual({});
+  });
+
+  it("lê admin e teaching_role válidos", () => {
+    expect(currentTeachingClaims({admin: true, teaching_role: "curator"}))
+      .toEqual({admin: true, teaching_role: "curator"});
+    expect(currentTeachingClaims({teaching_role: "teacher"}))
+      .toEqual({teaching_role: "teacher"});
+  });
+
+  it("ignora valores inválidos", () => {
+    expect(currentTeachingClaims({admin: "true", teaching_role: "god"}))
+      .toEqual({});
+    expect(currentTeachingClaims({admin: false, teaching_role: 3}))
+      .toEqual({});
+  });
+
+  it("ignora claims de outros sistemas", () => {
+    expect(currentTeachingClaims({foo: 1, is_admin: true})).toEqual({});
+  });
+});
 
 describe("computeTeachingClaims", () => {
   it("sem documento não há claims", () => {

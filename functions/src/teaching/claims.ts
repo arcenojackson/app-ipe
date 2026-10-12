@@ -25,6 +25,23 @@ export function computeTeachingClaims(
 }
 
 /**
+ * Extrai as claims de ensino atualmente gravadas no usuário do Auth,
+ * ignorando valores inválidos e claims de outros sistemas.
+ * @param {Record<string, unknown> | undefined} customClaims - claims atuais
+ * @return {TeachingClaims} claims de ensino válidas presentes
+ */
+export function currentTeachingClaims(
+  customClaims: Record<string, unknown> | undefined
+): TeachingClaims {
+  const claims: TeachingClaims = {};
+  if (!customClaims) return claims;
+  if (customClaims.admin === true) claims.admin = true;
+  const role = customClaims.teaching_role;
+  if (role === "teacher" || role === "curator") claims.teaching_role = role;
+  return claims;
+}
+
+/**
  * Compara dois conjuntos de claims de ensino.
  * @param {TeachingClaims} a - primeiro conjunto
  * @param {TeachingClaims} b - segundo conjunto
