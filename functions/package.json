@@ -6,6 +6,7 @@
     "build:watch": "tsc --watch",
     "test": "vitest run",
     "backfill-claims": "tsx scripts/backfill-teaching-claims.ts",
+    "backfill-claims:dry": "tsx scripts/backfill-teaching-claims.ts --dry-run",
     "serve": "npm run build && firebase emulators:start --only functions",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
