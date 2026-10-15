@@ -40,14 +40,14 @@ Todo voto passa por Cloud Function. O cliente só lê. Os dados ficam em **cole�
 
 - **App Flutter**: menu "Eleições" (só admins). Cria e conduz a eleição, aprova convidados, copia o link do QR, vê resultados e a ata.
 - **Portal Next.js**: módulo `src/modules/elections/` e a rota pública `src/app/(public)/votar/[id]`, fora do grupo `(portal)`, que exige login e papel. É a página de voto.
-- **Cloud Functions** (`functions/src/elections/`): `electionCheckIn`, `electionApprove`, `electionOpenRound`, `electionCastVote`, `electionCloseRound`, `electionApplyBoard`, `electionClose`.
+- **Cloud Functions** (`functions/src/elections/`): `electionSetStatus` (abrir/encerrar a eleição), `electionCheckIn`, `electionReviewVoter` (aprovar/recusar), `electionOpenRound`, `electionCastVote`, `electionCloseRound`, `electionApplyBoard`, mais o gatilho `electionVoteRecorded` (contador ao vivo "X de Y votaram").
 
 Identidade do eleitor na web: conta do app (Firebase Auth) ou Firebase Anonymous Auth para convidados. O `voterKey` é sempre o uid. Conta só-Apple não entra na web (limite já aceito no portal).
 
 ## 4. Dados
 
-- `elections/{id}`: `societyId`, `title`, `scheduledAt`, `status` (`draft` | `open` | `closed`), `positions[]`, `createdBy`.
-- `elections/{id}/rounds/{rid}`: `position`, `candidates[]` (userId e nome), `type` (`normal` | `single` | `runoff`), `status` (`pending` | `open` | `closed`), `votedCount`, `result` (preenchido só ao fechar: contagens, vencedor ou empate, divergência).
+- `elections/{id}`: `societyId`, `societyName`, `title`, `scheduledAt`, `status` (`draft` | `open` | `closed`), `positions[]`, `createdBy`, `createdAt`, `openedAt`, `closedAt`, `boardAppliedAt`.
+- `elections/{id}/rounds/{rid}`: `position`, `candidates[]` (userId e nome), `type` (`normal` | `single` | `runoff`), `status` (`pending` | `open` | `closed`), `createdAt`, `openedAt`, `closedAt`, `votedCount`, `result` (preenchido só ao fechar: contagens, vencedor ou empate, divergência). `votedCount` é só informativo: o gatilho `electionVoteRecorded` o incrementa a cada novo `voted`, e o encerramento grava o valor exato. O voto **não** escreve no documento da rodada (testes mostraram que isso faz os eleitores e o encerramento disputarem o mesmo documento).
 - `elections/{id}/voters/{uid}`: `name`, `email`, `kind` (`member` | `guest`), `status` (`pending` | `approved` | `rejected`), `approvedBy`, datas.
 - `elections/{id}/rounds/{rid}/voted/{uid}`: só marca "já votou nesta rodada".
 - `elections/{id}/rounds/{rid}/ballots/{randomId}`: a escolha (candidato, `yes`, `no` ou `blank`). **Sem identidade e sem timestamp.**
@@ -79,8 +79,9 @@ Sigilo e voto único: `voted` diz que a pessoa votou; `ballots` guarda o que foi
 ## 6. Segurança e regras do Firestore
 
 Bloco novo `elections`, aditivo:
-- Admin (`isAdmin()` existente) cria a eleição e edita candidatos, **só em rodadas `pending`**.
-- Eleição e rodadas: leitura para qualquer usuário autenticado (inclusive anônimo).
+- Admin (`isAdmin()` existente) cria a eleição (sempre como `draft`) e edita candidatos, **só em rodadas `pending`**; só cria rodadas `pending` e não muda `status` pelo cliente.
+- Documento da eleição: o `get` é público (a página de voto o lê antes do login; ele só guarda título, nome da sociedade, status e cargos) e o `list` exige login. Rodadas: leitura para qualquer usuário autenticado (inclusive anônimo).
+- `voted`: o eleitor lê só o próprio documento.
 - `voters`: o eleitor lê só o próprio documento; o admin lê todos.
 - `events`: leitura só do admin.
 - `ballots`: nenhuma leitura pelo cliente. `voted`, `events` e transições de estado: só Functions.
