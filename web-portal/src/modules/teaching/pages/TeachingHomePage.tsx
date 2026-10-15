@@ -3,16 +3,13 @@
 import Link from "next/link";
 import {useAuth} from "@/core/auth/AuthContext";
 import {Card} from "@/core/ui/Card";
+import {teachingRoleLabel} from "../roleLabel";
 
 export default function TeachingHomePage() {
   const {state} = useAuth();
   if (state.status !== "signedIn") return null;
   const {claims, user} = state;
-  const roleLabel = claims.admin
-    ? "Administrador"
-    : claims.teachingRole === "curator"
-      ? "Curador"
-      : "Professor";
+  const roleLabel = teachingRoleLabel(claims);
 
   return (
     <div className="space-y-4">
