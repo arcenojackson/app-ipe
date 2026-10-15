@@ -55,13 +55,21 @@ export function VotePage({electionId}: {electionId: string}) {
 
   // Quem entrou com a conta do app não digita nada: o servidor decide se é
   // membro (liberado) ou convidado (pendente).
+  // Se falhar (ex.: conta sem nome cadastrado), cai no formulário de nome e
+  // e-mail em vez de ficar preso em "Verificando...".
+  const [autoFailed, setAutoFailed] = useState(false);
   const needsAutoCheckIn =
-    !!user && !user.isAnonymous && voter === null && election?.status === "open";
+    !!user &&
+    !user.isAnonymous &&
+    !autoFailed &&
+    voter === null &&
+    election?.status === "open";
   useEffect(() => {
     if (!needsAutoCheckIn || autoCheckIn.current) return;
     autoCheckIn.current = true;
     checkIn(electionId).catch((e) => {
       autoCheckIn.current = false;
+      setAutoFailed(true);
       setError(errorMessage(e));
     });
   }, [needsAutoCheckIn, electionId]);
@@ -108,8 +116,8 @@ export function VotePage({electionId}: {electionId: string}) {
         {view.kind === "join" && (
           <JoinStep
             electionId={electionId}
-            anonymousSession={!!user?.isAnonymous}
-            verifying={!!user && !user.isAnonymous}
+            hasSession={!!user}
+            verifying={!!user && !user.isAnonymous && !autoFailed}
           />
         )}
         {view.kind === "pending" && (

@@ -97,6 +97,21 @@ describe("VotePage", () => {
     await waitFor(() => expect(api.checkIn).toHaveBeenCalledWith("e1"));
   });
 
+  it("conta sem nome cadastrado: se o check-in automático falha, pede nome e e-mail", async () => {
+    auth.state = signedIn(false);
+    api.voter = null;
+    api.checkIn.mockRejectedValueOnce(new Error("Informe seu nome."));
+    render(<VotePage electionId="e1" />);
+    expect(await screen.findByLabelText("Seu nome")).toBeInTheDocument();
+    expect(screen.queryByText("Verificando sua presença...")).not.toBeInTheDocument();
+    // Já há sessão: o formulário não cria outra conta anônima.
+    fireEvent.change(screen.getByLabelText("Seu nome"), {target: {value: "Maria"}});
+    fireEvent.change(screen.getByLabelText("Seu e-mail"), {target: {value: "maria@x.org"}});
+    fireEvent.click(screen.getByRole("button", {name: "Continuar"}));
+    await waitFor(() => expect(api.checkIn).toHaveBeenLastCalledWith("e1", {name: "Maria", email: "maria@x.org"}));
+    expect(api.signInGuest).not.toHaveBeenCalled();
+  });
+
   it("anônimo sem check-in vê só o formulário de convidado", () => {
     auth.state = signedIn(true);
     api.voter = null;

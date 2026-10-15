@@ -16,14 +16,17 @@ type Mode = "choose" | "login" | "guest";
 
 interface Props {
   electionId: string;
-  /** Já há sessão anônima sem check-in: só falta o formulário de convidado. */
-  anonymousSession: boolean;
+  /**
+   * Já há uma sessão (anônima, ou conta sem nome cadastrado) sem check-in:
+   * só falta o formulário de nome e e-mail, sem criar outra sessão.
+   */
+  hasSession: boolean;
   /** Sessão com conta do app: o check-in automático está em andamento. */
   verifying: boolean;
 }
 
-export function JoinStep({electionId, anonymousSession, verifying}: Props) {
-  const [mode, setMode] = useState<Mode>(anonymousSession ? "guest" : "choose");
+export function JoinStep({electionId, hasSession, verifying}: Props) {
+  const [mode, setMode] = useState<Mode>(hasSession ? "guest" : "choose");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -94,7 +97,7 @@ export function JoinStep({electionId, anonymousSession, verifying}: Props) {
       onSubmit={(event: FormEvent) => {
         event.preventDefault();
         void run(async () => {
-          if (!anonymousSession) await signInGuest();
+          if (!hasSession) await signInGuest();
           await checkIn(electionId, {name: name.trim(), email: guestEmail.trim()});
         });
       }}
@@ -103,7 +106,7 @@ export function JoinStep({electionId, anonymousSession, verifying}: Props) {
       <TextField id="guest-email" label="Seu e-mail" type="email" required value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
       <Button type="submit" disabled={busy} className="w-full">Continuar</Button>
-      {!anonymousSession && (
+      {!hasSession && (
         <Button type="button" variant="text" className="w-full" onClick={() => { setError(null); setMode("choose"); }}>
           Voltar
         </Button>
