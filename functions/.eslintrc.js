@@ -22,6 +22,7 @@ module.exports = {
     "/generated/**/*", // Ignore generated files.
     "/test/**/*", // Testes rodam no Vitest, fora do tsconfig de build.
     "/scripts/**/*", // Scripts manuais de manutenção.
+    "/integration/**/*", // Testes de integração (emulador), fora do tsconfig.
   ],
   plugins: [
     "@typescript-eslint",

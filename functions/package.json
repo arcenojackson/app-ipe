@@ -5,6 +5,7 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test": "vitest run",
+    "test:integration": "firebase emulators:exec --only firestore --project demo-ipe-elections \"vitest run --config vitest.integration.config.mts\"",
     "backfill-claims": "tsx scripts/backfill-teaching-claims.ts",
     "backfill-claims:dry": "tsx scripts/backfill-teaching-claims.ts --dry-run",
     "serve": "npm run build && firebase emulators:start --only functions",
@@ -28,6 +29,7 @@
     "eslint-config-google": "^0.14.0",
     "eslint-plugin-import": "^2.25.4",
     "firebase-functions-test": "^3.1.0",
+    "firebase-tools": "^14.27.0",
     "tsx": "^4.23.15",
     "typescript": "^5.7.3",
     "vitest": "^5.0.4"
