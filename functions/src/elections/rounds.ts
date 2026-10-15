@@ -81,14 +81,14 @@ export const bumpVotedCount = async (
   electionId: string,
   roundId: string
 ): Promise<void> => {
-  try {
-    await db.doc(`elections/${electionId}/rounds/${roundId}`).update({
-      votedCount: FieldValue.increment(1),
-    });
-  } catch (error) {
-    // 5 = NOT_FOUND: a rodada foi removida; não há contador para atualizar.
-    if ((error as {code?: number}).code !== 5) throw error;
-  }
+  const ref = db.doc(`elections/${electionId}/rounds/${roundId}`);
+  // Só enquanto a rodada está aberta: um gatilho atrasado não pode inflar o
+  // valor exato que o encerramento gravou.
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists || snap.get("status") !== "open") return;
+    tx.update(ref, {votedCount: FieldValue.increment(1)});
+  });
 };
 
 // Registra o voto. `voted/{uid}` (quem votou) e `ballots/{randomId}` (o que

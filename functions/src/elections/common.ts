@@ -18,6 +18,16 @@ export interface ElectionDoc {
   [key: string]: unknown;
 }
 
+// Sessão anônima (convidado da página de voto) nunca opera como admin, mesmo
+// que exista um `users/{uid}` com is_admin gravado para esse uid.
+export const assertNotAnonymous = (isAnonymous: boolean): void => {
+  if (isAnonymous) {
+    throw fail(
+      "permission-denied", "Entre com uma conta do app para fazer isso."
+    );
+  }
+};
+
 // Só `users/{uid}.is_admin === true` vale (mesma fonte de isAdmin()).
 export const assertAdmin = async (
   db: Firestore,

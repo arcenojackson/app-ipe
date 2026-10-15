@@ -43,10 +43,12 @@ const anon = () => env.authenticatedContext("anon9", {firebase: {sign_in_provide
 const noAuth = () => env.unauthenticatedContext().firestore();
 
 describe("elections", () => {
-  it("get do documento é público; list exige login", async () => {
+  it("get do documento é público; list só para admin", async () => {
     await assertSucceeds(getDoc(doc(noAuth(), "elections/open1")));
     await assertFails(getDocs(collection(noAuth(), "elections")));
-    await assertSucceeds(getDocs(collection(user(), "elections")));
+    await assertFails(getDocs(collection(anon(), "elections")));
+    await assertFails(getDocs(collection(user(), "elections")));
+    await assertSucceeds(getDocs(collection(admin(), "elections")));
   });
 
   it("admin cria rascunho; outros e status diferente de draft, não", async () => {

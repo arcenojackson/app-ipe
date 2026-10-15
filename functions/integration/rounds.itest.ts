@@ -178,6 +178,12 @@ describe("bumpVotedCount (gatilho de contador ao vivo)", () => {
     expect((await round("r1")).votedCount).toBe(2);
   });
 
+  it("não mexe no contador de rodada já encerrada (gatilho atrasado)", async () => {
+    await seedRound("r1", {status: "closed", votedCount: 3});
+    await bumpVotedCount(db, ELECTION, "r1");
+    expect((await round("r1")).votedCount).toBe(3);
+  });
+
   it("ignora rodada que não existe mais", async () => {
     await expect(bumpVotedCount(db, ELECTION, "sumiu")).resolves.toBeUndefined();
   });

@@ -109,11 +109,18 @@ describe("applyBoard", () => {
     expect((await board()).presidente).toEqual(["m3"]);
   });
 
-  it("board em formato antigo (lista) vira mapa só com os eleitos", async () => {
-    await db.doc("societies/s1").update({board: ["a", "b"]});
+  it("board vazio em formato de lista (padrão de sociedade nova) vira mapa", async () => {
+    await db.doc("societies/s1").update({board: []});
     await closedRound("r1", "vice", "m2", 1);
     await applyBoard(db, ADMIN, {electionId: ELECTION});
     expect(await board()).toEqual({vice: ["m2"]});
+  });
+
+  it("board antigo com pessoas (lista) é recusado, sem perder ninguém", async () => {
+    await db.doc("societies/s1").update({board: ["a", "b"]});
+    await closedRound("r1", "vice", "m2", 1);
+    await expectCode(applyBoard(db, ADMIN, {electionId: ELECTION}), "failed-precondition");
+    expect(await board()).toEqual(["a", "b"]);
   });
 
   it("não duplica cargo gravado como 'Presidente'", async () => {

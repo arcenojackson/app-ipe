@@ -24,6 +24,14 @@ export const applyBoard = async (
   await db.runTransaction(async (tx) => {
     const society = await tx.get(societyRef);
     if (!society.exists) throw fail("not-found", "Sociedade não encontrada.");
+    const current = society.get("board");
+    if (Array.isArray(current) && current.length > 0) {
+      throw fail(
+        "failed-precondition",
+        "A diretoria desta sociedade está no formato antigo (sem cargos). " +
+          "Defina os cargos em Sociedades antes de aplicar a eleição."
+      );
+    }
     tx.update(societyRef, {
       board: applyWinners(society.get("board"), winners),
     });

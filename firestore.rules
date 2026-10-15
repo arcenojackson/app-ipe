@@ -190,7 +190,8 @@ service cloud.firestore {
     match /elections/{electionId} {
       // O documento não guarda nada secreto; a página de voto o lê antes do login.
       allow get: if true;
-      allow list: if request.auth != null;
+      // Só o admin lista eleições; a página de voto usa get com o id do link.
+      allow list: if isAdmin();
 
       allow create: if isAdmin() && request.resource.data.status == 'draft';
       allow update: if isAdmin()
