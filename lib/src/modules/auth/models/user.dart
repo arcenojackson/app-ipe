@@ -1,3 +1,25 @@
+/// Papel de ensino do usuário no portal web (curador também é professor).
+enum TeachingRole {
+  none('none'),
+  teacher('teacher'),
+  curator('curator');
+
+  const TeachingRole(this.value);
+
+  /// Valor gravado em `users/{uid}.teaching_role`.
+  final String value;
+
+  /// Valor ausente, desconhecido ou de tipo errado resulta em [none].
+  static TeachingRole fromValue(Object? raw) {
+    if (raw is String) {
+      for (final role in TeachingRole.values) {
+        if (role.value == raw) return role;
+      }
+    }
+    return TeachingRole.none;
+  }
+}
+
 class UserModel {
   const UserModel({
     required this.id,
@@ -6,6 +28,7 @@ class UserModel {
     required this.isAdmin,
     required this.isPending,
     this.disabledNotifications = const [],
+    this.teachingRole = TeachingRole.none,
   });
 
   final String id;
@@ -13,7 +36,9 @@ class UserModel {
   final String email;
   final bool isAdmin;
   final bool isPending;
-  final List<String> disabledNotifications; // IDs das notificações desabilitadas
+  final List<String>
+  disabledNotifications; // IDs das notificações desabilitadas
+  final TeachingRole teachingRole;
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
@@ -22,10 +47,12 @@ class UserModel {
       email: json['email']?.toString() ?? '',
       isAdmin: json['is_admin'] == true || json['isAdmin'] == true,
       isPending: json['is_pending'] == true || json['isPending'] == true,
-      disabledNotifications: (json['disabled_notifications'] as List<dynamic>?)
+      disabledNotifications:
+          (json['disabled_notifications'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
           const [],
+      teachingRole: TeachingRole.fromValue(json['teaching_role']),
     );
   }
 
@@ -35,7 +62,9 @@ class UserModel {
     'email': email,
     'is_admin': isAdmin,
     'is_pending': isPending,
-    if (disabledNotifications.isNotEmpty) 'disabled_notifications': disabledNotifications,
+    if (disabledNotifications.isNotEmpty)
+      'disabled_notifications': disabledNotifications,
+    if (teachingRole != TeachingRole.none) 'teaching_role': teachingRole.value,
   };
 
   UserModel copyWith({
@@ -45,6 +74,7 @@ class UserModel {
     bool? isAdmin,
     bool? isPending,
     List<String>? disabledNotifications,
+    TeachingRole? teachingRole,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -52,7 +82,9 @@ class UserModel {
       email: email ?? this.email,
       isAdmin: isAdmin ?? this.isAdmin,
       isPending: isPending ?? this.isPending,
-      disabledNotifications: disabledNotifications ?? this.disabledNotifications,
+      disabledNotifications:
+          disabledNotifications ?? this.disabledNotifications,
+      teachingRole: teachingRole ?? this.teachingRole,
     );
   }
 

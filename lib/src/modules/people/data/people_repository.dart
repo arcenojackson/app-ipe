@@ -100,9 +100,22 @@ class PeopleRepository {
     }
   }
 
-  Future<void> approveUser({
+  Future<void> setTeachingRole({
     required String userId,
+    required TeachingRole role,
   }) async {
+    try {
+      await _firestore.collection('users').doc(userId).update({
+        'teaching_role': role.value,
+      });
+    } catch (e) {
+      throw AppException(
+        message: 'Falha ao atualizar o papel de ensino: ${e.toString()}',
+      );
+    }
+  }
+
+  Future<void> approveUser({required String userId}) async {
     try {
       // Atualizar no Firestore diretamente - aprovar usuário (remover is_pending)
       await _firestore.collection('users').doc(userId).update({
@@ -127,9 +140,7 @@ class PeopleRepository {
     }
   }
 
-  Future<void> deleteUser({
-    required String userId,
-  }) async {
+  Future<void> deleteUser({required String userId}) async {
     try {
       // Excluir do Firestore diretamente
       await _firestore.collection('users').doc(userId).delete();

@@ -1,0 +1,28 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme inline {
+  --color-background: var(--ipe-background);
+  --color-surface: var(--ipe-surface);
+  --color-surface-elevated: var(--ipe-surface-elevated);
+  --color-primary: var(--ipe-primary);
+  --color-secondary: var(--ipe-secondary);
+  --color-error: var(--ipe-error);
+  --color-on-surface: var(--ipe-on-surface);
+  --color-on-primary: var(--ipe-on-primary);
+  --radius-card: var(--ipe-radius-card);
+  --radius-input: var(--ipe-radius-input);
+  --radius-button: var(--ipe-radius-button);
+  --radius-dialog: var(--ipe-radius-dialog);
+  --radius-glass: var(--ipe-radius-glass);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--ipe-background);
+  color: var(--ipe-on-surface);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}

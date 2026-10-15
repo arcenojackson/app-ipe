@@ -1,0 +1,18 @@
+/* Tokens visuais do portal. A fonte de verdade é lib/src/shared/theme/app_theme.dart
+   (conferido por tokens.test.ts). */
+:root {
+  --ipe-background: #0b0f19;
+  --ipe-surface: #111828;
+  --ipe-surface-elevated: #1b2435;
+  --ipe-primary: #2f4f2f;
+  --ipe-secondary: #6b8e23;
+  --ipe-error: #ff5470;
+  --ipe-on-surface: #ffffff;
+  --ipe-on-primary: #ffffff;
+
+  --ipe-radius-card: 18px;
+  --ipe-radius-input: 18px;
+  --ipe-radius-button: 18px;
+  --ipe-radius-dialog: 28px;
+  --ipe-radius-glass: 24px;
+}
