@@ -1,7 +1,41 @@
 import {FieldValue, type Firestore} from "firebase-admin/firestore";
+import {applyWinners} from "./board";
 import {
-  assertAdmin, fail, getElection, logEvent, requireString,
+  assertAdmin, fail, getElection, logEvent, requireString, summarizeRound,
 } from "./common";
+import {pickWinners} from "./winners";
+
+export const applyBoard = async (
+  db: Firestore,
+  uid: string,
+  data: unknown
+): Promise<{winners: Record<string, string>}> => {
+  await assertAdmin(db, uid);
+  const electionId = requireString(data, "electionId");
+  const election = await getElection(db, electionId);
+
+  const rounds = await db.collection(`elections/${electionId}/rounds`).get();
+  const winners = pickWinners(rounds.docs.map(summarizeRound));
+  if (Object.keys(winners).length === 0) {
+    throw fail("failed-precondition", "Nenhum cargo foi decidido ainda.");
+  }
+
+  const societyRef = db.doc(`societies/${election.societyId}`);
+  await db.runTransaction(async (tx) => {
+    const society = await tx.get(societyRef);
+    if (!society.exists) throw fail("not-found", "Sociedade não encontrada.");
+    tx.update(societyRef, {
+      board: applyWinners(society.get("board"), winners),
+    });
+    tx.update(db.doc(`elections/${electionId}`), {
+      boardAppliedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  await logEvent(db, electionId, {
+    type: "board_applied", actorId: uid, winners,
+  });
+  return {winners};
+};
 
 export const setElectionStatus = async (
   db: Firestore,

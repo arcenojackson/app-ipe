@@ -1820,3 +1820,13 @@ export const sendEloAvailabilityReminder = functions
   });
 
 export {syncTeachingClaimsOnUserWrite} from "./teaching/syncClaims";
+export {
+  electionApplyBoard,
+  electionCastVote,
+  electionCheckIn,
+  electionCloseRound,
+  electionOpenRound,
+  electionReviewVoter,
+  electionSetStatus,
+  electionVoteRecorded,
+} from "./elections";
