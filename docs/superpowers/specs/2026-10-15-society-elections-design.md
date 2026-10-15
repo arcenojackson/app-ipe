@@ -80,15 +80,19 @@ Sigilo e voto único: `voted` diz que a pessoa votou; `ballots` guarda o que foi
 
 Bloco novo `elections`, aditivo:
 - Admin (`isAdmin()` existente) cria a eleição (sempre como `draft`) e edita candidatos, **só em rodadas `pending`**; só cria rodadas `pending` e não muda `status` pelo cliente.
-- Documento da eleição: o `get` é público (a página de voto o lê antes do login; ele só guarda título, nome da sociedade, status e cargos) e o `list` exige login. Rodadas: leitura para qualquer usuário autenticado (inclusive anônimo).
+- Documento da eleição: o `get` é público (a página de voto o lê antes do login; ele só guarda título, nome da sociedade, status e cargos) e o `list` é só do admin (a página de voto usa `get` com o id do link). Rodadas: leitura para qualquer usuário autenticado (inclusive anônimo).
 - `voted`: o eleitor lê só o próprio documento.
 - `voters`: o eleitor lê só o próprio documento; o admin lê todos.
 - `events`: leitura só do admin.
 - `ballots`: nenhuma leitura pelo cliente. `voted`, `events` e transições de estado: só Functions.
 
-As Functions validam o admin lendo `users/{uid}.is_admin` (a mesma fonte de `isAdmin()`), usam transações e tornam o voto idempotente.
+As Functions validam o admin lendo `users/{uid}.is_admin` (a mesma fonte de `isAdmin()`), **recusam sessões anônimas nas operações de admin**, usam transações e tornam o voto idempotente.
+
+"Aplicar diretoria" recusa, com mensagem clara, uma sociedade cuja diretoria ainda está no formato antigo (lista de ids sem cargos) e não vazia, para não perder ninguém em silêncio; uma lista vazia (padrão de sociedade nova) é convertida normalmente.
 
 ### Riscos aceitos
+
+0. **Login anônimo dá `request.auth != null` a qualquer visitante.** As regras antigas do projeto (`users`, `invites`, `settings`, chats etc.) usam `request.auth != null` e a regra de `users` deixa criar o próprio documento com qualquer campo. O app já tem cadastro aberto (`createUserWithEmailAndPassword`), então esse acesso já existia para quem cria uma conta; o convidado anônimo remove só o atrito do cadastro. As Functions de eleição não aceitam token anônimo como admin. Decisão do usuário pendente antes de ativar o provedor Anônimo em produção (ver relatório da execução).
 1. A regra atual de `users` permite que qualquer logado marque `is_admin` no próprio documento. Aqui isso permitiria abrir e fechar eleições. Por decisão anterior, as regras de `users` não são apertadas.
 2. O sigilo vale contra a interface e contra o admin. Quem tivesse acesso administrativo bruto ao Firestore poderia tentar casar `voted` com `ballots` pelo horário interno de criação dos documentos. Mitigado com ids aleatórios e sem timestamps nos votos, mas não eliminado.
 3. Se a resposta do voto se perder na rede, o recibo não pode ser reexibido, porque não pode ficar ligado ao eleitor.
