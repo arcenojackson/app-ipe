@@ -54,5 +54,13 @@ Set<String> duplicateVoterIds(List<ElectionVoter> voters) {
   };
 }
 
+/// Título sugerido ao criar uma eleição.
+String defaultElectionTitle(String societyName, int year) {
+  final name = societyName.trim();
+  return name.isEmpty
+      ? 'Eleição da diretoria $year'
+      : 'Eleição da diretoria $name $year';
+}
+
 String buildVoteLink(String electionId) =>
     '$portalBaseUrl/votar/$electionId';

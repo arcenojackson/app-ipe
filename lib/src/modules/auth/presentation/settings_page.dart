@@ -6,6 +6,7 @@ import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../../../shared/widgets/glass_container.dart';
 import 'package:ipe_flutter/src/modules/holyrics/presentation/holyrics_settings_screen.dart';
+import '../../elections/presentation/elections_page.dart';
 import '../../events/presentation/event_history_page.dart';
 import '../../events/presentation/event_template_page.dart';
 import '../../events/presentation/calendar_page.dart';
@@ -380,6 +381,35 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                               onTap: () =>
                                   _navigateToWeeklyAssignments(context),
+                            ),
+                            const Divider(height: 1, color: Colors.white12),
+                            ListTile(
+                              leading: const Icon(
+                                Icons.how_to_vote,
+                                color: Colors.white70,
+                              ),
+                              title: const Text(
+                                'Eleições',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Eleição de diretoria das sociedades',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: Colors.white60,
+                                ),
+                              ),
+                              trailing: const Icon(
+                                Icons.chevron_right,
+                                color: Colors.white54,
+                              ),
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ElectionsPage(),
+                                ),
+                              ),
                             ),
                           ],
                         ],
