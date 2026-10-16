@@ -9,6 +9,7 @@ export type ChangeOutcome =
   | "resubmitted"
   | "moved"
   | "move_reverted"
+  | "move_invalid"
   | "delete_requested"
   | "deleted_empty_folder";
 
@@ -72,6 +73,17 @@ export async function processItemChange(
   // 1) Movimento
   if (before.parentId !== after.parentId) {
     if (await moveIsValid(deps.db, after)) return "moved";
+    // Só desfaz se o destino do revert for válido; senão o desfazer
+    // reacionaria este handler em ciclo infinito.
+    const revertTarget = {...after, parentId: before.parentId};
+    if (!(await moveIsValid(deps.db, revertTarget))) {
+      console.error(
+        `Movimento inválido e pai anterior também inválido: item ${after.id}` +
+        ` (pai anterior ${before.parentId}, pai atual ${after.parentId});` +
+        " nada foi revertido."
+      );
+      return "move_invalid";
+    }
     await deps.db.updateItem(after.id, {parentId: before.parentId});
     const mover = after.updatedBy;
     if (mover) {
@@ -95,7 +107,15 @@ export async function processItemChange(
     after.status === "in_review" &&
     after.version === before.version + 1;
   if (resubmitted) {
-    await deps.storage.deleteItemFiles(after.id, after.storagePath);
+    if (after.type === "file" && !after.storagePath) {
+      // Sem keepPath a limpeza apagaria também o arquivo atual.
+      console.error(
+        `Reenvio de arquivo sem storagePath: item ${after.id}; ` +
+        "limpeza do Storage ignorada."
+      );
+    } else {
+      await deps.storage.deleteItemFiles(after.id, after.storagePath);
+    }
     await notifyCurators(
       deps,
       after,

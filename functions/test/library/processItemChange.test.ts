@@ -66,6 +66,47 @@ describe("processItemChange — movimento", () => {
   });
 });
 
+describe("processItemChange — movimento (fix round 1)", () => {
+  it("se o pai antigo também é inválido, não escreve nem avisa", async () => {
+    const before = folder("A", "gone");
+    const after = {...folder("A", "C"), updatedBy: "c2"};
+    const t = makeDeps({items: [after, folder("B", "A"), folder("C", "B")], curators: ["c1", "c2"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("move_invalid");
+    expect((await t.db.getItem("A"))?.parentId).toBe("C");
+    expect(t.notifier.sent).toEqual([]);
+  });
+
+  it("o evento do revert termina: reprocessá-lo devolve moved", async () => {
+    const before = folder("A", null);
+    const after = {...folder("A", "C"), updatedBy: "c2"};
+    const t = makeDeps({items: [after, folder("B", "A"), folder("C", "B")], curators: ["c1", "c2"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("move_reverted");
+    const reverted = await t.db.getItem("A");
+    expect(reverted).toBeDefined();
+    if (!reverted) return;
+    expect(await processItemChange(t.deps, after, reverted)).toBe("moved");
+  });
+});
+
+describe("processItemChange — reenvio (fix round 1)", () => {
+  it("arquivo sem storagePath não chama deleteItemFiles mas avisa curadores", async () => {
+    const before = makeItem({id: "i1", status: "returned", version: 1, authorId: "t1"});
+    const after = makeItem({id: "i1", status: "in_review", version: 2, authorId: "t1"});
+    const t = makeDeps({items: [after], curators: ["c1", "t1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("resubmitted");
+    expect(t.storage.deleted).toEqual([]);
+    expect(t.notifier.sent.map((n) => n.toUid)).toEqual(["c1"]);
+  });
+
+  it("link reenviado avisa curadores", async () => {
+    const before = makeItem({id: "l1", type: "link", status: "returned", version: 1, authorId: "t1"});
+    const after = makeItem({id: "l1", type: "link", status: "in_review", version: 2, authorId: "t1"});
+    const t = makeDeps({items: [after], curators: ["c1", "t1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("resubmitted");
+    expect(t.notifier.sent.map((n) => n.toUid)).toEqual(["c1"]);
+  });
+});
+
 describe("processItemChange — reenvio", () => {
   it("item devolvido que volta para revisão limpa a versão antiga e avisa os curadores", async () => {
     const before = makeItem({id: "i1", status: "returned", version: 1, authorId: "t1", storagePath: "teaching/materials/i1/v1-a.pdf"});

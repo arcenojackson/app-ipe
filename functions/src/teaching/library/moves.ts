@@ -2,12 +2,20 @@ import {MAX_DEPTH} from "./constants";
 import type {ItemDoc, LibraryDb} from "./types";
 
 // Altura da subárvore: níveis abaixo do item (0 para arquivo ou pasta vazia).
-async function subtreeHeight(db: LibraryDb, item: ItemDoc): Promise<number> {
+// `visited` protege contra ciclos já gravados (o documento movido pode estar
+// pendurado sob o próprio descendente até o movimento ser desfeito).
+async function subtreeHeight(
+  db: LibraryDb,
+  item: ItemDoc,
+  visited: Set<string> = new Set<string>([item.id])
+): Promise<number> {
   if (item.type !== "folder") return 0;
   const children = await db.listChildren(item.id);
   let height = 0;
   for (const child of children) {
-    height = Math.max(height, 1 + (await subtreeHeight(db, child)));
+    if (visited.has(child.id)) continue;
+    visited.add(child.id);
+    height = Math.max(height, 1 + (await subtreeHeight(db, child, visited)));
   }
   return height;
 }
