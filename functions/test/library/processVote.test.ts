@@ -181,3 +181,75 @@ describe("processVote — exclusão", () => {
     expect(t.storage.deleted.map((d) => d.itemId).sort()).toEqual(["X", "Y"]);
   });
 });
+
+describe("processVote — marcador deleting (veto/voto concorrente)", () => {
+  const request = {id: "r1", requestedBy: "c1", requestedAt: 1};
+  const approveDel = (id: string, voterId: string, createdAt: number) =>
+    vote({id, voterId, action: "delete_approve", requestId: "r1", createdAt});
+  const reject = (id: string, voterId: string, createdAt: number) =>
+    vote({id, voterId, action: "reject", version: 1, comment: "Não", createdAt});
+
+  it("exclusão decidida e Storage falha: marca deleting; recusa posterior não desfaz", async () => {
+    const t = makeDeps({
+      items: [makeItem({id: "d1", status: "published", deleteRequest: request})],
+      curators: ["c1", "c2", "c3", "c4"],
+      votes: {d1: [approveDel("v1", "c2", 1), approveDel("v2", "c3", 2)]},
+    });
+    t.storage.failNext = 1;
+    await expect(processVote(t.deps, "d1", "v2")).rejects.toThrow("storage fora do ar");
+    expect((await t.db.getItem("d1"))?.deleting).toBe("execute");
+
+    t.db.votes.get("d1")!.push(
+      vote({id: "v3", voterId: "c4", action: "delete_refuse", requestId: "r1", createdAt: 3})
+    );
+    expect(await processVote(t.deps, "d1", "v3")).toBe("deleted");
+    expect(await t.db.getItem("d1")).toBeUndefined();
+    expect(t.notifier.sent.map((n) => n.id)).toEqual(["deleted_d1_r1_c1"]);
+    expect(t.audit.entries[0].actors).toEqual(["c1", "c2", "c3"]);
+  });
+
+  it("retentativa do mesmo evento conclui a exclusão", async () => {
+    const t = makeDeps({
+      items: [makeItem({id: "d1", status: "published", deleteRequest: request})],
+      curators: ["c1", "c2", "c3"],
+      votes: {d1: [approveDel("v1", "c2", 1), approveDel("v2", "c3", 2)]},
+    });
+    t.storage.failNext = 1;
+    await expect(processVote(t.deps, "d1", "v2")).rejects.toThrow();
+    expect(await processVote(t.deps, "d1", "v2")).toBe("deleted");
+    expect(await t.db.getItem("d1")).toBeUndefined();
+  });
+
+  it("rejeição decidida com falha: voto posterior (return) não ressuscita", async () => {
+    const t = makeDeps({
+      items: [makeItem({id: "i1"})],
+      curators: ["c1", "c2", "c3", "c4"],
+      votes: {i1: [reject("v1", "c1", 1), reject("v2", "c2", 2)]},
+    });
+    t.storage.failNext = 1;
+    await expect(processVote(t.deps, "i1", "v2")).rejects.toThrow();
+    expect((await t.db.getItem("i1"))?.deleting).toBe("reject");
+
+    t.db.votes.get("i1")!.push(
+      vote({id: "v3", voterId: "c3", action: "return", version: 1, comment: "x", createdAt: 3})
+    );
+    expect(await processVote(t.deps, "i1", "v3")).toBe("rejected");
+    expect(await t.db.getItem("i1")).toBeUndefined();
+    expect(t.notifier.sent.map((n) => [n.type, n.id])).toEqual([
+      ["rejected", "rejected_i1_v1_author"],
+    ]);
+    expect(t.audit.entries[0].actors).toEqual(["c1", "c2"]);
+  });
+
+  it("após sucesso normal não sobra nada e notifica uma vez; reprocessar é skipped", async () => {
+    const t = makeDeps({
+      items: [makeItem({id: "i1"})],
+      curators: ["c1", "c2"],
+      votes: {i1: [reject("v1", "c1", 1), reject("v2", "c2", 2)]},
+    });
+    expect(await processVote(t.deps, "i1", "v2")).toBe("rejected");
+    expect(await processVote(t.deps, "i1", "v2")).toBe("skipped");
+    expect(t.db.items.size).toBe(0);
+    expect(t.notifier.sent).toHaveLength(1);
+  });
+});

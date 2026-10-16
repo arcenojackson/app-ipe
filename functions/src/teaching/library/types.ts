@@ -28,6 +28,8 @@ export interface ItemDoc {
   deleteRequest?: DeleteRequest | null;
   returnComment?: string | null;
   returnedBy?: string | null;
+  // Marcador só das Functions: remoção decidida e ainda em andamento.
+  deleting?: "reject" | "execute" | null;
 }
 
 // Visão de domínio de teaching_items/{id}/votes/{voteId}.
@@ -49,6 +51,7 @@ export interface ItemPatch {
   parentId?: string | null;
   deleteRequest?: DeleteRequest | null;
   deleteRequested?: boolean;
+  deleting?: "reject" | "execute" | null;
 }
 
 export interface Tx {
