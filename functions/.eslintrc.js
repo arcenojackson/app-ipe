@@ -23,6 +23,8 @@ module.exports = {
     "/test/**/*", // Testes rodam no Vitest, fora do tsconfig de build.
     "/scripts/**/*", // Scripts manuais de manutenção.
     "/vitest.config.ts", // Config do Vitest, fora do tsconfig de build.
+    "/vitest.emulator.config.ts", // Config dos testes de emulador.
+    "/test-emulator/**/*", // Testes de emulador, fora do tsconfig de build.
   ],
   plugins: [
     "@typescript-eslint",
