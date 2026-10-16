@@ -92,7 +92,7 @@ Os gatilhos usam retentativa (`failurePolicy`), e as transições são idempoten
   - quem pediu: cancelar o próprio pedido;
   - autor, item `returned`: reenviar (`version + 1`, `status = in_review`, campos do arquivo/link e `name`).
 - **`status`, contagens e remoções são exclusivos das Functions** (Admin SDK). **Nenhuma exclusão pelo cliente.**
-- **Votos:** `create` por curador (claim `teaching_role == curator`), `voterId == uid`, `uid ≠ authorId` (e `≠ requestedBy` em votos de exclusão), item no estado certo e versão/`requestId` correspondentes; imutáveis depois.
+- **Votos:** `create` por curador (claim `teaching_role == curator`), `voterId == uid`, em votos de publicação `uid ≠ authorId`, em votos de exclusão `uid ≠ requestedBy` (quem pediu; o autor do item **pode** aprovar a exclusão), item no estado certo e versão/`requestId` correspondentes; imutáveis depois.
 - **Notificações:** só o dono lê e atualiza `readAt`.
 
 ### 6.2 Regras do Storage (substituem as de `teaching/materials`)
@@ -149,7 +149,20 @@ Mudança mínima: ao tocar numa notificação de curadoria, abrir o portal no it
 
 Substituir arquivo publicado, histórico de versões navegável, lixeira, compartilhamento por link, comentários dentro do documento, busca no conteúdo dos arquivos, fórum (etapa 4), limpeza automática de órfãos, e-mail como canal de notificação.
 
-## 14. Pendências para os planos
+## 14. Ajustes feitos na implementação do Plano A (valem para o Plano B)
+
+- **Campo `updatedBy`:** todo `create`/`update` do cliente grava `updatedBy == uid` e `updatedAt == request.time`. É assim que a Function sabe quem moveu ou pediu algo e avisa a pessoa certa.
+- **Marcador `deleting` (`"reject"` | `"execute"`):** escrito **só pela Function**, dentro da transação do voto, quando a rejeição ou a exclusão é decidida. Depois dele a decisão é final: votos posteriores (recusa, devolução, aprovação) não a desfazem, e a retentativa só conclui a remoção. O cliente não escreve esse campo.
+- **Storage guarda só o objeto atual:** o cliente envia para `teaching/materials/{itemId}/...` com nome novo a cada versão (convenção `v{versão}-{nome}`). Ao reenviar, a Function apaga todos os objetos do item exceto o `storagePath` **atual do documento vivo**. As regras do Storage não validam o número da versão.
+- **Reenvio limpa `returnComment` e `returnedBy`:** a Function zera esses campos quando o item volta para `in_review`.
+- **`deleteRequest.id` deve ser um uuid gerado pelo cliente.** Reutilizar um id faria votos antigos valerem no pedido novo e colidiria com o id determinístico das notificações.
+- **Pasta sem documentos:** a exclusão imediata revalida, no Auth, que quem pediu ainda é curador; se não for, o pedido é cancelado.
+- **Item `returned` sem reenvio** não pode ser apagado por ninguém (o pedido de exclusão só vale para `active`/`published`, e rejeitar só vale para `in_review`). Decisão de produto pendente.
+- **Consultas do professor:** sem índices compostos. Por pasta, 3 consultas de igualdade juntadas no cliente: `parentId == X` com `status == "published"`, com `status == "active"` e com `authorId == uid`; ordenação por nome no cliente. Consulta sem filtro de status/autor é negada pelas regras.
+- **Link de notificação:** o push abre `{portal}/ensino/biblioteca?item={id}` (e não `?pasta=`). O portal deve abrir o detalhe do item por esse parâmetro.
+- **Operação:** Cloud Functions primeiro, depois as regras; o Storage com leitura cruzada ao Firestore pode pedir permissão do agente de serviço no deploy; o bucket padrão está fixo em `app-ipe.firebasestorage.app`.
+
+## 15. Pendências para os planos
 
 - Confirmar no ambiente se a regra de leitura do Storage consultando o Firestore funciona no emulador (Firestore e Storage juntos).
 - Definir os textos exatos (pt-BR) das notificações.
