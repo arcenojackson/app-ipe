@@ -8,7 +8,10 @@ import {processItemChange, processItemCreated} from "./processItemChange";
 import {processVote} from "./processVote";
 
 // Retentativa ligada: as operações são idempotentes (ver processVote.ts).
-const base = functions.runWith({failurePolicy: true});
+const base = functions.runWith({
+  failurePolicy: true,
+  timeoutSeconds: 540,
+});
 
 export const onTeachingVoteCreated = base.firestore
   .document("teaching_items/{itemId}/votes/{voteId}")

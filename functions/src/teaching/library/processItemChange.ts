@@ -107,15 +107,34 @@ export async function processItemChange(
     after.status === "in_review" &&
     after.version === before.version + 1;
   if (resubmitted) {
-    if (after.type === "file" && !after.storagePath) {
+    // O evento pode ser reentregue ou atrasado: confere o item vivo antes de
+    // apagar qualquer coisa e usa o storagePath vivo como keepPath.
+    const live = await deps.db.getItem(after.id);
+    if (
+      !live ||
+      live.status !== "in_review" ||
+      live.version !== after.version
+    ) {
+      console.error(
+        `Reenvio ignorado: item ${after.id} mudou desde o evento ` +
+        `(versão do evento ${after.version}).`
+      );
+      return "none";
+    }
+    if (live.type === "file" && !live.storagePath) {
       // Sem keepPath a limpeza apagaria também o arquivo atual.
       console.error(
         `Reenvio de arquivo sem storagePath: item ${after.id}; ` +
         "limpeza do Storage ignorada."
       );
     } else {
-      await deps.storage.deleteItemFiles(after.id, after.storagePath);
+      await deps.storage.deleteItemFiles(after.id, live.storagePath);
     }
+    // Campos só das Functions: o cliente não consegue limpá-los.
+    await deps.db.updateItem(after.id, {
+      returnComment: null,
+      returnedBy: null,
+    });
     await notifyCurators(
       deps,
       after,
@@ -143,6 +162,20 @@ export async function processItemChange(
     if (after.type === "folder") {
       const subtree = await collectSubtree(deps.db, after);
       if (!hasDocuments(subtree)) {
+        const valid = await deps.roles.currentCuratorIds([
+          request.requestedBy,
+        ]);
+        if (!valid.has(request.requestedBy)) {
+          console.error(
+            `Pedido de exclusão de ${after.id} ignorado: ` +
+            `${request.requestedBy} não é mais curador.`
+          );
+          await deps.db.updateItem(after.id, {
+            deleteRequest: null,
+            deleteRequested: false,
+          });
+          return "none";
+        }
         await safely("auditar exclusão de pasta vazia", () =>
           deps.audit.record({
             id: `deleted_empty_folder_${after.id}_${request.id}`,

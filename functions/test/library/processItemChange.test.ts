@@ -107,6 +107,76 @@ describe("processItemChange — reenvio (fix round 1)", () => {
   });
 });
 
+describe("processItemChange — reenvio (fix wave)", () => {
+  const event = () => ({
+    before: makeItem({id: "i1", status: "returned", version: 1, authorId: "t1", storagePath: "p/v1"}),
+    after: makeItem({id: "i1", status: "in_review", version: 2, authorId: "t1", storagePath: "p/v2"}),
+  });
+
+  it("evento atrasado (item vivo já na versão 3) não apaga nada", async () => {
+    const {before, after} = event();
+    const live = makeItem({id: "i1", status: "in_review", version: 3, authorId: "t1", storagePath: "p/v3"});
+    const t = makeDeps({items: [live], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("none");
+    expect(t.storage.deleted).toEqual([]);
+    expect(t.notifier.sent).toEqual([]);
+  });
+
+  it("evento atrasado (item vivo devolvido de novo) não apaga nada", async () => {
+    const {before, after} = event();
+    const live = makeItem({id: "i1", status: "returned", version: 2, authorId: "t1", storagePath: "p/v2"});
+    const t = makeDeps({items: [live], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("none");
+    expect(t.storage.deleted).toEqual([]);
+  });
+
+  it("item vivo inexistente não apaga nada", async () => {
+    const {before, after} = event();
+    const t = makeDeps({items: [], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("none");
+    expect(t.storage.deleted).toEqual([]);
+  });
+
+  it("a limpeza usa o storagePath do item vivo", async () => {
+    const {before, after} = event();
+    const live = {...after, storagePath: "p/v2-vivo"};
+    const t = makeDeps({items: [live], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("resubmitted");
+    expect(t.storage.deleted).toEqual([{itemId: "i1", keepPath: "p/v2-vivo"}]);
+  });
+
+  it("limpa returnComment e returnedBy no reenvio", async () => {
+    const {before, after} = event();
+    const live = {...after, returnComment: "ajuste", returnedBy: "c1"};
+    const t = makeDeps({items: [live], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("resubmitted");
+    const stored = await t.db.getItem("i1");
+    expect(stored?.returnComment).toBeNull();
+    expect(stored?.returnedBy).toBeNull();
+  });
+});
+
+describe("processItemChange — exclusão de pasta vazia (fix wave)", () => {
+  const request = {id: "r1", requestedBy: "x1", requestedAt: 1};
+
+  it("solicitante que deixou de ser curador: não apaga e limpa o pedido", async () => {
+    const after = {...folder("F"), deleteRequest: request};
+    const t = makeDeps({items: [after], curators: ["c1", "c2"]});
+    expect(await processItemChange(t.deps, folder("F"), after)).toBe("none");
+    expect(t.db.items.has("F")).toBe(true);
+    const stored = await t.db.getItem("F");
+    expect(stored?.deleteRequest).toBeNull();
+    expect(t.audit.entries).toEqual([]);
+  });
+
+  it("solicitante ainda curador: apaga", async () => {
+    const after = {...folder("F"), deleteRequest: request};
+    const t = makeDeps({items: [after], curators: ["x1", "c2"]});
+    expect(await processItemChange(t.deps, folder("F"), after)).toBe("deleted_empty_folder");
+    expect(t.db.items.size).toBe(0);
+  });
+});
+
 describe("processItemChange — reenvio", () => {
   it("item devolvido que volta para revisão limpa a versão antiga e avisa os curadores", async () => {
     const before = makeItem({id: "i1", status: "returned", version: 1, authorId: "t1", storagePath: "teaching/materials/i1/v1-a.pdf"});
