@@ -22,6 +22,7 @@ module.exports = {
     "/generated/**/*", // Ignore generated files.
     "/test/**/*", // Testes rodam no Vitest, fora do tsconfig de build.
     "/scripts/**/*", // Scripts manuais de manutenção.
+    "/vitest.config.ts", // Config do Vitest, fora do tsconfig de build.
   ],
   plugins: [
     "@typescript-eslint",
@@ -32,4 +33,14 @@ module.exports = {
     "import/no-unresolved": 0,
     "indent": ["error", 2],
   },
+  overrides: [
+    {
+      // Código novo da biblioteca: comentários curtos em vez de JSDoc completo.
+      files: ["src/teaching/library/**/*.ts"],
+      rules: {
+        "require-jsdoc": "off",
+        "valid-jsdoc": "off",
+      },
+    },
+  ],
 };
