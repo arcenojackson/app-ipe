@@ -10,6 +10,15 @@ const repo = vi.hoisted(() => ({
 }));
 vi.mock("../repository", () => repo);
 
+const mutations = vi.hoisted(() => ({
+  createFolder: vi.fn(),
+  createLink: vi.fn(),
+  uploadFile: vi.fn(),
+  renameItem: vi.fn(),
+  moveItem: vi.fn(),
+}));
+vi.mock("../mutations", () => mutations);
+
 const item = (id: string, name: string, extra: Partial<LibraryItem> = {}): LibraryItem => ({
   id, name, type: "file", parentId: null, authorId: "a", status: "published", version: 1, ...extra,
 });
@@ -36,6 +45,9 @@ beforeEach(() => {
     return unsubscribe;
   });
   repo.loadAllVisible.mockReset().mockResolvedValue(catalog);
+  mutations.createFolder.mockReset().mockResolvedValue("new");
+  mutations.createLink.mockReset().mockResolvedValue("new");
+  mutations.uploadFile.mockReset().mockResolvedValue("new");
 });
 
 function renderAt(folderId: string | null, navigate = vi.fn(), itemId: string | null = null) {
@@ -200,5 +212,67 @@ describe("LibraryContent", () => {
     expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "grid");
     fireEvent.click(screen.getByRole("button", {name: "Ver em lista"}));
     expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "list");
+  });
+});
+
+describe("LibraryContent: criar e enviar", () => {
+  const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
+  const renderAs = (viewer: Viewer, folderId: string | null = null) =>
+    render(<LibraryContent viewer={viewer} folderId={folderId} itemId={null} navigate={vi.fn()} />);
+
+  it("professor não vê o botão Nova pasta; curador vê", async () => {
+    const {unmount} = renderAs(teacher);
+    await screen.findByText("Crianças");
+    expect(screen.queryByRole("button", {name: "Nova pasta"})).not.toBeInTheDocument();
+    unmount();
+    renderAs(curator);
+    expect(await screen.findByRole("button", {name: "Nova pasta"})).toBeInTheDocument();
+  });
+
+  it("Nova pasta chama createFolder(uid, nome, pastaAtual) e recarrega o catálogo", async () => {
+    renderAs(curator, "f1");
+    await screen.findByText("Aula 2");
+    expect(repo.loadAllVisible).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", {name: "Nova pasta"}));
+    fireEvent.change(screen.getByLabelText("Nome da pasta"), {target: {value: "Novo"}});
+    fireEvent.click(screen.getByRole("button", {name: "Criar"}));
+    await waitFor(() => expect(mutations.createFolder).toHaveBeenCalledWith("c1", "Novo", "f1"));
+    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
+  it("Adicionar link chama createLink com os dados e recarrega o catálogo", async () => {
+    renderAs(teacher, "f1");
+    await screen.findByText("Aula 2");
+    fireEvent.click(screen.getByRole("button", {name: "Adicionar link"}));
+    fireEvent.change(screen.getByLabelText("Nome"), {target: {value: "Site"}});
+    fireEvent.change(screen.getByLabelText("Endereço (URL)"), {target: {value: "https://x.org"}});
+    fireEvent.change(screen.getByLabelText("Descrição (opcional)"), {target: {value: "Bom"}});
+    fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
+    await waitFor(() =>
+      expect(mutations.createLink).toHaveBeenCalledWith("t1", {
+        name: "Site", url: "https://x.org", description: "Bom", parentId: "f1",
+      })
+    );
+    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
+  });
+
+  it("painel de envio aparece para todos", async () => {
+    const {unmount} = renderAs(teacher);
+    await screen.findByText("Crianças");
+    expect(screen.getByTestId("drop-zone")).toBeInTheDocument();
+    unmount();
+    renderAs(curator);
+    expect(await screen.findByTestId("drop-zone")).toBeInTheDocument();
+  });
+
+  it("envio concluído recarrega o catálogo", async () => {
+    renderAs(teacher, "f1");
+    await screen.findByText("Aula 2");
+    fireEvent.change(screen.getByLabelText("Escolher arquivos"), {
+      target: {files: [new File(["x"], "a.pdf", {type: "application/pdf"})]},
+    });
+    await waitFor(() => expect(mutations.uploadFile).toHaveBeenCalledWith("t1", "f1", expect.any(File), expect.any(Function)));
+    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
   });
 });

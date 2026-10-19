@@ -5,13 +5,18 @@ import {useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {Button} from "@/core/ui/Button";
 import {TextField} from "@/core/ui/TextField";
+import {validateName} from "../files";
+import {createFolder, createLink} from "../mutations";
+import {libraryPermissions} from "../permissions";
 import {sortItems, buildBreadcrumbs, filterByName, indexById} from "../tree";
 import type {LibraryItem, Viewer} from "../types";
 import {viewerFrom} from "../types";
 import {useCatalog, useFolderItems} from "../useLibrary";
 import {libraryUrl, readParams} from "../url";
 import {Breadcrumbs} from "./Breadcrumbs";
+import {LinkDialog, TextPromptDialog} from "./Dialogs";
 import {FolderView} from "./FolderView";
+import {UploadPanel} from "./UploadPanel";
 
 export function LibraryContent({
   viewer,
@@ -26,6 +31,8 @@ export function LibraryContent({
 }) {
   const [view, setView] = useState<"list" | "grid">("list");
   const [search, setSearch] = useState("");
+  const [dialog, setDialog] = useState<"folder" | "link" | null>(null);
+  const permissions = libraryPermissions(viewer);
   // Navegar sempre sai do modo busca.
   const navigate = (url: string) => {
     setSearch("");
@@ -85,6 +92,25 @@ export function LibraryContent({
           <Button type="button" variant="text" aria-pressed={view === "grid"} onClick={() => setView("grid")}>Ver em grade</Button>
         </div>
       </div>
+      <div className="flex flex-wrap gap-2">
+        {permissions.canCreateFolder && (
+          <Button type="button" onClick={() => setDialog("folder")}>Nova pasta</Button>
+        )}
+        {permissions.canAddLink && (
+          <Button type="button" variant="text" onClick={() => setDialog("link")}>Adicionar link</Button>
+        )}
+      </div>
+      <UploadPanel uid={viewer.uid} parentId={folderId} onUploaded={catalog.reload} />
+      {dialog === "folder" && (
+        <TextPromptDialog title="Nova pasta" label="Nome da pasta" submitLabel="Criar" validate={validateName}
+          onSubmit={async (name) => { await createFolder(viewer.uid, name, folderId); catalog.reload(); }}
+          onClose={() => setDialog(null)} />
+      )}
+      {dialog === "link" && (
+        <LinkDialog submitLabel="Adicionar"
+          onSubmit={async (value) => { await createLink(viewer.uid, {...value, parentId: folderId}); catalog.reload(); }}
+          onClose={() => setDialog(null)} />
+      )}
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
       {loading ? (
         <p className="text-white/70">Carregando…</p>
