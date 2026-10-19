@@ -9,6 +9,7 @@ import {itemPermissions} from "../permissions";
 import {previewKind} from "../preview";
 import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
 import type {LibraryItem, Viewer, VoteAction} from "../types";
+import {UploadError} from "../uploadFlow";
 import {useItemDetail} from "../useItemDetail";
 import {LinkDialog, MoveDialog, ReasonDialog, TextPromptDialog} from "./Dialogs";
 import {StatusBadge} from "./StatusBadge";
@@ -28,7 +29,7 @@ export function ItemDetail({
   onClose: (parentId: string | null) => void;
   onChanged: () => void;
 }) {
-  const {item, error, votes, names, fileUrl, fileUrlError} = useItemDetail(itemId, viewer);
+  const {item, error, votes, votesLoaded, votesError, names, fileUrl, fileUrlError} = useItemDetail(itemId, viewer);
   const [modal, setModal] = useState<Modal>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -50,10 +51,17 @@ export function ItemDetail({
   const deleteApprovals = countDeleteApprovals(item, votes);
   const request = item.deleteRequest ?? null;
   const preview = item.type === "file" ? previewKind(item.contentType) : "other";
+  const myVote = viewer.isCurator ?
+    [...votes]
+      .filter((v) => v.voterId === viewer.uid && v.version === item.version &&
+        (v.action === "approve" || v.action === "reject" || v.action === "return"))
+      .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
+      .pop() :
+    undefined;
 
   // Mostra o resultado na página e repassa a falha (os diálogos exibem o erro e
   // permanecem abertos; os botões a ignoram).
-  async function act(success: string, failureMessage: string, action: () => Promise<void>) {
+  async function act(success: string, failureMessage: string | ((cause: unknown) => string), action: () => Promise<void>) {
     setBusy(true);
     setNotice(null);
     setFailure(null);
@@ -62,7 +70,7 @@ export function ItemDetail({
       setNotice(success);
       onChanged();
     } catch (cause) {
-      setFailure(failureMessage);
+      setFailure(typeof failureMessage === "function" ? failureMessage(cause) : failureMessage);
       throw cause;
     } finally {
       setBusy(false);
@@ -78,7 +86,7 @@ export function ItemDetail({
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <h2 className="text-xl font-semibold">{item.name}</h2>
-          <StatusBadge badge={statusBadge(item, approvals)} />
+          <StatusBadge badge={statusBadge(item, votesLoaded ? approvals : null)} />
         </div>
         <Button type="button" variant="text" onClick={() => onClose(item.parentId)}>Fechar</Button>
       </header>
@@ -86,13 +94,17 @@ export function ItemDetail({
       {item.deleting && <p className="text-error">Este item está sendo excluído.</p>}
       {request && !item.deleting && (
         <p className="rounded-card bg-error/10 p-3 text-sm">
-          Pedido de exclusão aberto{request.reason ? `: ${request.reason}` : ""}. Aprovações: {deleteApprovals}/{REQUIRED_APPROVALS}
+          Pedido de exclusão aberto{request.reason ? `: ${request.reason}` : ""}.{votesLoaded && ` Aprovações: ${deleteApprovals}/${REQUIRED_APPROVALS}`}
         </p>
       )}
       {item.status === "returned" && item.returnComment && (
         <p className="rounded-card bg-white/10 p-3 text-sm">Devolvido pelos curadores: {item.returnComment}</p>
       )}
-      {item.status === "in_review" && !request && <p className="text-sm text-white/70">Aprovações: {approvals}/{REQUIRED_APPROVALS}</p>}
+      {item.status === "in_review" && !request && votesLoaded && (
+        <p className="text-sm text-white/70">Aprovações: {approvals}/{REQUIRED_APPROVALS}</p>
+      )}
+      {myVote && <p className="text-sm text-white/70">Seu voto: {voteLabel(myVote.action)}</p>}
+      {votesError && <p className="text-sm text-error">Não foi possível carregar o histórico de revisão.</p>}
 
       {item.type === "file" && (
         <section aria-label="Arquivo" className="space-y-2">
@@ -159,7 +171,10 @@ export function ItemDetail({
               const chosen = event.target.files?.[0];
               event.target.value = "";
               if (!chosen) return;
-              quiet(act("Arquivo reenviado para revisão.", "Não foi possível reenviar o arquivo. Tente novamente.", async () => {
+              // Tipo, tamanho ou nome inválidos não se resolvem tentando de novo: mostra o motivo.
+              const reason = (cause: unknown) =>
+                cause instanceof UploadError ? cause.message : "Não foi possível reenviar o arquivo. Tente novamente.";
+              quiet(act("Arquivo reenviado para revisão.", reason, async () => {
                 try {
                   await resubmitFile(viewer.uid, item, chosen, setProgress);
                 } finally {

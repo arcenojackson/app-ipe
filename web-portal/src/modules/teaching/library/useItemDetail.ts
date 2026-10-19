@@ -13,7 +13,9 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
     item: LibraryItem | null;
     error: string | null;
   } | null>(null);
-  const [voteState, setVoteState] = useState<{id: string; list: LibraryVote[]}>({id: itemId, list: []});
+  const [voteState, setVoteState] = useState<{id: string; list: LibraryVote[]; loaded: boolean; failed: boolean}>(
+    {id: itemId, list: [], loaded: false, failed: false}
+  );
   const [names, setNames] = useState<Record<string, string>>({});
   const [file, setFile] = useState<{path: string; url: string | null; failed: boolean} | null>(null);
 
@@ -40,12 +42,15 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
     if (!readable) return;
     return subscribeVotes(
       itemId,
-      (list) => setVoteState({id: itemId, list}),
-      () => setVoteState({id: itemId, list: []})
+      (list) => setVoteState({id: itemId, list, loaded: true, failed: false}),
+      () => setVoteState({id: itemId, list: [], loaded: false, failed: true})
     );
   }, [itemId, readable]);
 
-  const votes = voteState.id === itemId && readable ? voteState.list : [];
+  const votesCurrent = voteState.id === itemId && readable;
+  const votes = votesCurrent ? voteState.list : [];
+  const votesLoaded = votesCurrent && voteState.loaded;
+  const votesError = votesCurrent && voteState.failed;
   const voterKey = [...new Set(votes.map((v) => v.voterId))].sort().join(",");
 
   useEffect(() => {
@@ -74,6 +79,8 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
     item,
     error: loaded?.id === itemId ? loaded.error : null,
     votes,
+    votesLoaded,
+    votesError,
     names,
     fileUrl: current?.url ?? null,
     fileUrlError: current?.failed ?? false,

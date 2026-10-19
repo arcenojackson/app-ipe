@@ -2,6 +2,7 @@ import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import {indexById} from "../tree";
 import type {LibraryItem, LibraryVote, Viewer} from "../types";
+import {UploadError} from "../uploadFlow";
 import {ItemDetail} from "./ItemDetail";
 
 const repo = vi.hoisted(() => ({
@@ -41,12 +42,17 @@ function setup(viewer: Viewer, item: LibraryItem | null = file(), itemVotes: Lib
     onData(current);
     return vi.fn();
   });
-  repo.subscribeVotes.mockImplementation((_id, onData) => {
-    onData(votes);
-    return vi.fn();
-  });
+  // Testes podem pré-configurar estes mocks; os padrões só valem quando não há implementação.
+  if (!repo.subscribeVotes.getMockImplementation()) {
+    repo.subscribeVotes.mockImplementation((_id, onData) => {
+      onData(votes);
+      return vi.fn();
+    });
+  }
   repo.loadUserNames.mockResolvedValue({c1: "Ana Curadora", c2: "Beto Curador"});
-  storageAccess.downloadUrl.mockResolvedValue("https://files.example/aula.pdf");
+  if (!storageAccess.downloadUrl.getMockImplementation()) {
+    storageAccess.downloadUrl.mockResolvedValue("https://files.example/aula.pdf");
+  }
   const onClose = vi.fn();
   const onChanged = vi.fn();
   render(<ItemDetail itemId="i1" viewer={viewer} folders={folders} byId={indexById(folders)} onClose={onClose} onChanged={onChanged} />);
@@ -272,5 +278,82 @@ describe("ItemDetail — reenvio", () => {
     setup(other, file({status: "returned"}));
     await screen.findByText("Aula 1");
     expect(screen.queryByLabelText("Escolher novo arquivo")).not.toBeInTheDocument();
+  });
+});
+
+describe("ItemDetail — reenvio com erro", () => {
+  async function pick() {
+    const input = await screen.findByLabelText("Escolher novo arquivo");
+    const novo = new File(["x"], "novo.exe", {type: "application/x-msdownload"});
+    await act(async () => fireEvent.change(input, {target: {files: [novo]}}));
+  }
+
+  it("arquivo inválido mostra a mensagem do UploadError", async () => {
+    mutations.resubmitFile.mockRejectedValue(new UploadError("validate", "Tipo de arquivo não permitido. Use PDF, Office ou imagem."));
+    setup(teacher, file({status: "returned"}));
+    await pick();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Tipo de arquivo não permitido. Use PDF, Office ou imagem.");
+  });
+
+  it("outro erro mostra a mensagem genérica", async () => {
+    mutations.resubmitFile.mockRejectedValue(new Error("network"));
+    setup(teacher, file({status: "returned"}));
+    await pick();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível reenviar o arquivo. Tente novamente.");
+  });
+});
+
+describe("ItemDetail — acabamentos", () => {
+  it("falha ao obter o arquivo mostra alerta", async () => {
+    storageAccess.downloadUrl.mockRejectedValue(new Error("x"));
+    setup(other, file({status: "published"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível abrir o arquivo.");
+  });
+
+  it("imagem aparece em img com o nome como texto alternativo", async () => {
+    setup(other, file({status: "published", contentType: "image/png", fileName: "a.png"}));
+    expect(await screen.findByAltText("Aula 1")).toHaveAttribute("src", "https://files.example/aula.pdf");
+  });
+
+  it("clique duplo em Aprovar vota uma vez só", async () => {
+    mutations.castVote.mockReturnValue(new Promise(() => {}));
+    setup(curator2);
+    const button = await screen.findByRole("button", {name: "Aprovar"});
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(mutations.castVote).toHaveBeenCalledTimes(1);
+    expect(button).toBeDisabled();
+  });
+
+  it("não mostra o contador antes do primeiro retorno dos votos", async () => {
+    repo.subscribeVotes.mockImplementation(() => vi.fn());
+    setup(teacher);
+    await screen.findByText("Aula 1");
+    expect(screen.queryByText(/Aprovações:/)).not.toBeInTheDocument();
+    expect(screen.getByText("Em revisão")).toBeInTheDocument();
+  });
+
+  it("mostra o voto do curador atual nesta versão", async () => {
+    setup(curator2, file(), [
+      {id: "v1", voterId: "c2", action: "approve", version: 1, createdAt: 1},
+      {id: "v2", voterId: "c2", action: "return", version: 1, comment: "x", createdAt: 2},
+      {id: "v3", voterId: "c1", action: "approve", version: 1, createdAt: 3},
+    ]);
+    expect(await screen.findByText("Seu voto: Devolveu")).toBeInTheDocument();
+  });
+
+  it("não mostra Seu voto quando só há votos de versões antigas", async () => {
+    setup(curator2, file({version: 2}), [{id: "v1", voterId: "c2", action: "approve", version: 1, createdAt: 1}]);
+    await screen.findByText("Aula 1");
+    expect(screen.queryByText(/Seu voto/)).not.toBeInTheDocument();
+  });
+
+  it("erro ao ler os votos mostra aviso", async () => {
+    repo.subscribeVotes.mockImplementation((_id, _onData, onError) => {
+      onError(new Error("x"));
+      return vi.fn();
+    });
+    setup(curator2);
+    expect(await screen.findByText("Não foi possível carregar o histórico de revisão.")).toBeInTheDocument();
   });
 });

@@ -87,6 +87,7 @@ export function LibraryContent({
       <Breadcrumbs trail={trail} onNavigate={navigate} />
       {itemId && (
         <ItemDetail
+          key={itemId}
           itemId={itemId}
           viewer={viewer}
           folders={folders}
