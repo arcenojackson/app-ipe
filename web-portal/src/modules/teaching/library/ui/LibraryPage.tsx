@@ -16,6 +16,7 @@ import {libraryUrl, readParams} from "../url";
 import {Breadcrumbs} from "./Breadcrumbs";
 import {LinkDialog, TextPromptDialog} from "./Dialogs";
 import {FolderView} from "./FolderView";
+import {ItemDetail} from "./ItemDetail";
 import {UploadPanel} from "./UploadPanel";
 
 export function LibraryContent({
@@ -42,6 +43,7 @@ export function LibraryContent({
   const folder = useFolderItems(folderId, viewer);
 
   const byId = useMemo(() => indexById(catalog.items ?? []), [catalog.items]);
+  const folders = useMemo(() => (catalog.items ?? []).filter((i) => i.type === "folder"), [catalog.items]);
   const trail = buildBreadcrumbs(byId, folderId);
   const missingFolder =
     folderId !== null && catalog.items !== null && !byId.has(folderId);
@@ -83,6 +85,16 @@ export function LibraryContent({
     <div className="space-y-4" data-item={itemId ?? undefined}>
       <h1 className="text-2xl font-semibold">Biblioteca</h1>
       <Breadcrumbs trail={trail} onNavigate={navigate} />
+      {itemId && (
+        <ItemDetail
+          itemId={itemId}
+          viewer={viewer}
+          folders={folders}
+          byId={byId}
+          onChanged={catalog.reload}
+          onClose={(parentId) => navigate(libraryUrl({pasta: parentId ?? folderId}))}
+        />
+      )}
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[14rem] flex-1">
           <TextField id="library-search" label="Buscar na biblioteca" value={search} onChange={(e) => setSearch(e.target.value)} />

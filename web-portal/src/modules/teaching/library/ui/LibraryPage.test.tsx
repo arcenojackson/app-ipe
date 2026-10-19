@@ -7,8 +7,15 @@ import {LibraryContent} from "./LibraryPage";
 const repo = vi.hoisted(() => ({
   subscribeFolder: vi.fn(),
   loadAllVisible: vi.fn(),
+  subscribeItem: vi.fn(),
+  subscribeVotes: vi.fn(),
+  loadUserNames: vi.fn(),
+  canReadVotes: vi.fn(),
 }));
 vi.mock("../repository", () => repo);
+
+const storageAccess = vi.hoisted(() => ({downloadUrl: vi.fn()}));
+vi.mock("../storageAccess", () => storageAccess);
 
 const mutations = vi.hoisted(() => ({
   createFolder: vi.fn(),
@@ -48,6 +55,17 @@ beforeEach(() => {
   mutations.createFolder.mockReset().mockResolvedValue("new");
   mutations.createLink.mockReset().mockResolvedValue("new");
   mutations.uploadFile.mockReset().mockResolvedValue("new");
+  repo.subscribeItem.mockReset().mockImplementation((id, onData) => {
+    onData(catalog.find((i) => i.id === id) ?? null);
+    return vi.fn();
+  });
+  repo.subscribeVotes.mockReset().mockImplementation((_id, onData) => {
+    onData([]);
+    return vi.fn();
+  });
+  repo.loadUserNames.mockReset().mockResolvedValue({});
+  repo.canReadVotes.mockReset().mockReturnValue(false);
+  storageAccess.downloadUrl.mockReset().mockResolvedValue("https://files.example/a.pdf");
 });
 
 function renderAt(folderId: string | null, navigate = vi.fn(), itemId: string | null = null) {
@@ -212,6 +230,41 @@ describe("LibraryContent", () => {
     expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "grid");
     fireEvent.click(screen.getByRole("button", {name: "Ver em lista"}));
     expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "list");
+  });
+});
+
+describe("LibraryContent: detalhe do item", () => {
+  it("com itemId abre o painel do item e, ao fechar, navega para a pasta do item", async () => {
+    const navigate = renderAt("f1", vi.fn(), "i2");
+    expect(await screen.findByRole("heading", {name: "Aula 2", level: 2})).toBeInTheDocument();
+    expect(repo.subscribeItem).toHaveBeenCalledWith("i2", expect.any(Function), expect.any(Function));
+    fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
+    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1");
+  });
+
+  it("sem itemId não assina nenhum item", async () => {
+    renderAt("f1");
+    await screen.findByText("Aula 2");
+    expect(repo.subscribeItem).not.toHaveBeenCalled();
+  });
+
+  it("a listagem da pasta continua visível abaixo do painel", async () => {
+    renderAt("f1", vi.fn(), "i2");
+    expect(await screen.findByRole("heading", {name: "Aula 2", level: 2})).toBeInTheDocument();
+    expect(await screen.findByRole("button", {name: "Abrir Aula 10"})).toBeInTheDocument();
+  });
+
+  it("ação de curadoria no painel recarrega o catálogo", async () => {
+    const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
+    mutations.renameItem.mockResolvedValue(undefined);
+    render(<LibraryContent viewer={curator} folderId="f1" itemId="i2" navigate={vi.fn()} />);
+    await screen.findByRole("heading", {name: "Aula 2", level: 2});
+    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(1));
+    fireEvent.click(await screen.findByRole("button", {name: "Renomear"}));
+    fireEvent.change(screen.getByLabelText("Novo nome"), {target: {value: "Aula 2b"}});
+    fireEvent.click(screen.getByRole("button", {name: "Salvar"}));
+    await waitFor(() => expect(mutations.renameItem).toHaveBeenCalledWith("c1", "i2", "Aula 2b"));
+    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
   });
 });
 

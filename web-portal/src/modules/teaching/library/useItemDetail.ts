@@ -1,0 +1,81 @@
+"use client";
+
+import {useEffect, useState} from "react";
+import {canReadVotes, loadUserNames, subscribeItem, subscribeVotes} from "./repository";
+import {downloadUrl} from "./storageAccess";
+import type {LibraryItem, LibraryVote, Viewer} from "./types";
+
+export const ITEM_ACCESS_ERROR = "Item não encontrado ou sem acesso.";
+
+export function useItemDetail(itemId: string, viewer: Viewer) {
+  const [loaded, setLoaded] = useState<{
+    id: string;
+    item: LibraryItem | null;
+    error: string | null;
+  } | null>(null);
+  const [voteState, setVoteState] = useState<{id: string; list: LibraryVote[]}>({id: itemId, list: []});
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [file, setFile] = useState<{path: string; url: string | null; failed: boolean} | null>(null);
+
+  useEffect(() => {
+    // Para professor, item inexistente também chega como permission-denied; o
+    // primeiro erro é terminal (o Firestore já encerrou a escuta).
+    let failed = false;
+    return subscribeItem(
+      itemId,
+      (item) => {
+        if (!failed) setLoaded({id: itemId, item, error: null});
+      },
+      () => {
+        failed = true;
+        setLoaded({id: itemId, item: null, error: ITEM_ACCESS_ERROR});
+      }
+    );
+  }, [itemId]);
+
+  const item = loaded?.id === itemId ? loaded.item : undefined;
+  const readable = item ? canReadVotes(item, viewer) : false;
+
+  useEffect(() => {
+    if (!readable) return;
+    return subscribeVotes(
+      itemId,
+      (list) => setVoteState({id: itemId, list}),
+      () => setVoteState({id: itemId, list: []})
+    );
+  }, [itemId, readable]);
+
+  const votes = voteState.id === itemId && readable ? voteState.list : [];
+  const voterKey = [...new Set(votes.map((v) => v.voterId))].sort().join(",");
+
+  useEffect(() => {
+    if (!voterKey) return;
+    let active = true;
+    loadUserNames(voterKey.split(",")).then((map) => active && setNames(map));
+    return () => {
+      active = false;
+    };
+  }, [voterKey]);
+
+  const path = item?.type === "file" ? item.storagePath : undefined;
+  useEffect(() => {
+    if (!path) return;
+    let active = true;
+    downloadUrl(path)
+      .then((url) => active && setFile({path, url, failed: false}))
+      .catch(() => active && setFile({path, url: null, failed: true}));
+    return () => {
+      active = false;
+    };
+  }, [path]);
+
+  const current = path && file?.path === path ? file : null;
+  return {
+    item,
+    error: loaded?.id === itemId ? loaded.error : null,
+    votes,
+    names,
+    fileUrl: current?.url ?? null,
+    fileUrlError: current?.failed ?? false,
+  };
+}
