@@ -6,7 +6,7 @@ Data: 2026-10-15 · Branch: `worktree-society-elections` · Status: rascunho par
 
 O estatuto manda que a diretoria de cada sociedade seja eleita todo ano pelos membros ativos dela. Hoje a diretoria é definida pelo ADM em `societies/{id}.board`.
 
-Esta feature leva a eleição para dentro do app. O app **facilita o voto, a contagem e a auditoria**. A reunião continua presencial: vota quem está presente no dia, e pode haver presentes sem conta no app.
+Esta feature leva a eleição para dentro do app. O app **facilita o voto, a contagem e a auditoria**. A reunião continua presencial: vota quem está presente no dia, e pode haver presentes que ainda não usam o app: eles votam entrando com a conta Google (ou e-mail e senha) na página de voto e são cadastrados como usuários novos.
 
 Critérios de sucesso:
 - Cada pessoa liberada vota uma única vez por cargo.
@@ -29,7 +29,7 @@ Critérios de sucesso:
 | Sigilo | Voto sempre secreto. |
 | Acesso do eleitor | QR/link estático por eleição, abre uma página web. |
 | Eleitor com conta do app | Entra com a conta e vota sem aprovação, se estiver em `membersIds` da sociedade. |
-| Eleitor sem conta | Entra com nome e e-mail e espera a aprovação do admin. |
+| Eleitor que ainda não usa o app | Não há voto anônimo. Entra com a conta Google (ou e-mail e senha), é cadastrado como usuário novo (pendente, igual ao login Google do app) e espera a aprovação do admin. Aprovar na eleição não aprova o usuário no app. |
 | Logado, mas fora da sociedade | Tratado como convidado: precisa de aprovação. |
 | Aplicar o resultado | O admin toca em "Aplicar diretoria"; nada muda sozinho. |
 | Plataforma web | Módulo novo no portal Next.js (`web-portal/`), em rota pública. |
@@ -42,7 +42,7 @@ Todo voto passa por Cloud Function. O cliente só lê. Os dados ficam em **cole�
 - **Portal Next.js**: módulo `src/modules/elections/` e a rota pública `src/app/(public)/votar/[id]`, fora do grupo `(portal)`, que exige login e papel. É a página de voto.
 - **Cloud Functions** (`functions/src/elections/`): `electionSetStatus` (abrir/encerrar a eleição), `electionCheckIn`, `electionReviewVoter` (aprovar/recusar), `electionOpenRound`, `electionCastVote`, `electionCloseRound`, `electionApplyBoard`, mais o gatilho `electionVoteRecorded` (contador ao vivo "X de Y votaram").
 
-Identidade do eleitor na web: conta do app (Firebase Auth) ou Firebase Anonymous Auth para convidados. O `voterKey` é sempre o uid. Conta só-Apple não entra na web (limite já aceito no portal).
+Identidade do eleitor na web: sempre uma conta do Firebase Auth de verdade, com Google ou e-mail e senha. **Sem login anônimo** (o provedor Anônimo não é ativado). O `voterKey` é o uid; nome e e-mail vêm da conta, o que dá mais confiança no voto único e na auditoria. Conta só-Apple não entra na web (limite já aceito no portal), e quem não tem Google nem e-mail/senha não consegue votar pelo próprio celular na v1.
 
 ## 4. Dados
 
@@ -65,7 +65,7 @@ Sigilo e voto único: `voted` diz que a pessoa votou; `ballots` guarda o que foi
 5. Ao aprovar, o app avisa se o mesmo e-mail ou nome já está na lista.
 
 **Eleitor (web `/votar/[id]`)**
-1. Escolhe "Entrar com a conta do app" ou "Votar sem conta" (nome e e-mail).
+1. Escolhe "Entrar com Google" ou "Entrar com e-mail e senha". Se a conta é nova, o servidor a cadastra como usuário pendente; se a conta não traz nome, a tela pede só o nome.
 2. Membro da sociedade entra liberado. Os demais ficam em "Aguardando aprovação", atualizando em tempo real.
 3. Liberado, vê a rodada aberta, vota uma vez, confirma e recebe o código de recibo.
 4. Entre rodadas vê "Aguardando próxima rodada".
@@ -80,7 +80,7 @@ Sigilo e voto único: `voted` diz que a pessoa votou; `ballots` guarda o que foi
 
 Bloco novo `elections`, aditivo:
 - Admin (`isAdmin()` existente) cria a eleição (sempre como `draft`) e edita candidatos, **só em rodadas `pending`**; só cria rodadas `pending` e não muda `status` pelo cliente.
-- Documento da eleição: o `get` é público (a página de voto o lê antes do login; ele só guarda título, nome da sociedade, status e cargos) e o `list` é só do admin (a página de voto usa `get` com o id do link). Rodadas: leitura para qualquer usuário autenticado (inclusive anônimo).
+- Documento da eleição: o `get` é público (a página de voto o lê antes do login; ele só guarda título, nome da sociedade, status e cargos) e o `list` é só do admin (a página de voto usa `get` com o id do link). Rodadas: leitura para qualquer usuário autenticado.
 - `voted`: o eleitor lê só o próprio documento.
 - `voters`: o eleitor lê só o próprio documento; o admin lê todos.
 - `events`: leitura só do admin.
@@ -92,7 +92,7 @@ As Functions validam o admin lendo `users/{uid}.is_admin` (a mesma fonte de `isA
 
 ### Riscos aceitos
 
-0. **Login anônimo dá `request.auth != null` a qualquer visitante.** As regras antigas do projeto (`users`, `invites`, `settings`, chats etc.) usam `request.auth != null` e a regra de `users` deixa criar o próprio documento com qualquer campo. O app já tem cadastro aberto (`createUserWithEmailAndPassword`), então esse acesso já existia para quem cria uma conta; o convidado anônimo remove só o atrito do cadastro. As Functions de eleição não aceitam token anônimo como admin. Decisão do usuário pendente antes de ativar o provedor Anônimo em produção (ver relatório da execução).
+0. **Quem entra pela página de voto vira usuário do app.** Como o login Google do app, o cadastro novo nasce `is_pending: true` e passa a aparecer na lista de pessoas para aprovação. O acesso que um cadastro comum já dá nas regras antigas (`request.auth != null`) não muda; o voto anônimo, que o ampliaria, foi removido. As Functions de eleição também recusam token anônimo (check-in e operações de admin).
 1. A regra atual de `users` permite que qualquer logado marque `is_admin` no próprio documento. Aqui isso permitiria abrir e fechar eleições. Por decisão anterior, as regras de `users` não são apertadas.
 2. O sigilo vale contra a interface e contra o admin. Quem tivesse acesso administrativo bruto ao Firestore poderia tentar casar `voted` com `ballots` pelo horário interno de criação dos documentos. Mitigado com ids aleatórios e sem timestamps nos votos, mas não eliminado.
 3. Se a resposta do voto se perder na rede, o recibo não pode ser reexibido, porque não pode ficar ligado ao eleitor.
@@ -115,7 +115,7 @@ As Functions validam o admin lendo `users/{uid}.is_admin` (a mesma fonte de `isA
 
 ## 9. Passos manuais
 
-- Ativar **Anonymous Auth** no console do Firebase.
+- Confirmar que o provedor **Google** está ativo no Firebase Auth (o app já usa) e **não** ativar o login Anônimo.
 - A página de voto só loga no domínio já autorizado (`ipe-ensino.vercel.app`); previews da Vercel validam só o build.
 
 ## 10. Coordenação com o portal de ensino
