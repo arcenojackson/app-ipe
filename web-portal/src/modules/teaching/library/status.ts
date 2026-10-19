@@ -44,13 +44,14 @@ export function countDeleteApprovals(
 
 export function statusBadge(
   item: LibraryItem,
-  approvals: number
+  approvals: number | null
 ): {label: string; tone: BadgeTone} {
   if (item.deleting) return {label: "Excluindo…", tone: "danger"};
   if (item.deleteRequest) return {label: "Exclusão solicitada", tone: "danger"};
   if (item.type === "folder") return {label: "", tone: "neutral"};
   if (item.status === "published") return {label: "Publicado", tone: "success"};
   if (item.status === "returned") return {label: "Devolvido", tone: "warning"};
+  if (approvals === null) return {label: "Em revisão", tone: "info"};
   return {
     label: `Em revisão ${Math.min(approvals, REQUIRED_APPROVALS)}/${REQUIRED_APPROVALS}`,
     tone: "info",

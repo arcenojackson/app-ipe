@@ -7,6 +7,7 @@ export const teachingModule: PortalModule = {
   access: "teacher",
   navItems: [
     {label: "Início", href: "/ensino", access: "teacher"},
+    {label: "Biblioteca", href: "/ensino/biblioteca", access: "teacher"},
     {label: "Grupo de professores", href: "/ensino/admin", access: "admin"},
   ],
 };

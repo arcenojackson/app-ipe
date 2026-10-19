@@ -40,6 +40,10 @@ describe("statusBadge", () => {
     expect(statusBadge(item(), 1)).toEqual({label: "Em revisão 1/2", tone: "info"});
   });
 
+  it("sem contagem conhecida mostra só Em revisão", () => {
+    expect(statusBadge(item(), null)).toEqual({label: "Em revisão", tone: "info"});
+  });
+
   it("publicado, devolvido e pasta", () => {
     expect(statusBadge(item({status: "published"}), 0)).toEqual({label: "Publicado", tone: "success"});
     expect(statusBadge(item({status: "returned"}), 0)).toEqual({label: "Devolvido", tone: "warning"});
