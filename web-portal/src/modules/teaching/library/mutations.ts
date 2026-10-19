@@ -8,7 +8,6 @@ import {
 } from "firebase/firestore";
 import {ref, uploadBytesResumable} from "firebase/storage";
 import {db, storage} from "@/core/firebase/client";
-import {contentTypeFor, storagePathFor, validateFile} from "./files";
 import {
   cancelDeletePayload,
   deleteRequestPayload,
@@ -16,12 +15,11 @@ import {
   newFolderPayload,
   newLinkPayload,
   renamePayload,
-  resubmitFilePayload,
   resubmitLinkPayload,
   voteCommentError,
   votePayload,
 } from "./payloads";
-import {UploadError, uploadFileItem} from "./uploadFlow";
+import {resubmitFileItem, uploadFileItem} from "./uploadFlow";
 import type {LibraryItem, VoteAction} from "./types";
 
 const itemRef = (id: string) => doc(db, "teaching_items", id);
@@ -99,33 +97,22 @@ export async function cancelDelete(uid: string, id: string): Promise<void> {
   await updateDoc(itemRef(id), cancelDeletePayload({uid}, serverTimestamp()));
 }
 
-// Reenvio de arquivo devolvido: novo objeto no Storage, depois o documento.
-export async function resubmitFile(
+// Reenvio de arquivo devolvido: novo objeto no Storage (caminho único por tentativa), depois o documento.
+export function resubmitFile(
   uid: string,
   item: LibraryItem,
   file: File,
   onProgress?: (fraction: number) => void
 ): Promise<void> {
-  const problem = validateFile(file);
-  if (problem) throw new UploadError("validate", problem);
-  const contentType = contentTypeFor(file);
-  const nextVersion = item.version + 1;
-  try {
-    await uploadObject(storagePathFor(item.id, nextVersion, file.name), file, contentType, onProgress ?? (() => undefined));
-  } catch {
-    throw new UploadError("upload", "Não foi possível enviar o arquivo. Tente novamente.");
-  }
-  try {
-    await updateDoc(
-      itemRef(item.id),
-      resubmitFilePayload(
-        {uid, itemId: item.id, currentVersion: item.version, fileName: file.name, contentType, size: file.size},
-        serverTimestamp()
-      )
-    );
-  } catch {
-    throw new UploadError("create", "O arquivo foi enviado, mas não foi possível reenviar o item. Tente novamente.");
-  }
+  return resubmitFileItem<File>(
+    {
+      newNonce: () => crypto.randomUUID().slice(0, 8),
+      now: () => serverTimestamp(),
+      uploadObject,
+      updateItem: (id, payload) => updateDoc(itemRef(id), payload),
+    },
+    {uid, item, file, onProgress}
+  );
 }
 
 export async function resubmitLink(

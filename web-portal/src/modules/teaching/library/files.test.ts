@@ -66,6 +66,15 @@ describe("contentTypeFor e validateFile", () => {
     expect(validateFile({name: "foto.png", size: 10, type: ""})).toBeNull();
   });
 
+  it("não confunde nomes como constructor, toString ou 'pdf' sem ponto com extensões", () => {
+    expect(() => contentTypeFor({name: "x.constructor", type: ""})).not.toThrow();
+    expect(contentTypeFor({name: "x.constructor", type: ""})).toBe("");
+    expect(contentTypeFor({name: "x.toString", type: ""})).toBe("");
+    expect(contentTypeFor({name: "__proto__", type: ""})).toBe("");
+    expect(contentTypeFor({name: "pdf", type: ""})).toBe("");
+    expect(validateFile({name: "pdf", size: 10, type: ""})).toBe("Tipo de arquivo não permitido. Use PDF, Office ou imagem.");
+  });
+
   it("recusa nome que fica vazio depois de limpo", () => {
     expect(validateFile({name: "   ", size: 10, type: "application/pdf"})).toBe("O nome do arquivo é inválido.");
   });

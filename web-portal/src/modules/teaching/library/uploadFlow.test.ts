@@ -1,5 +1,11 @@
 import {describe, expect, it, vi} from "vitest";
-import {UploadError, uploadFileItem, type UploadDeps} from "./uploadFlow";
+import {
+  UploadError,
+  resubmitFileItem,
+  uploadFileItem,
+  type ResubmitDeps,
+  type UploadDeps,
+} from "./uploadFlow";
 
 const pdf = {name: "aula.pdf", size: 100, type: "application/pdf"};
 
@@ -36,15 +42,31 @@ describe("uploadFileItem", () => {
     }));
   });
 
-  it("nome do item opcional e limitado a 120 caracteres", async () => {
+  it("nome do item é opcional e aparado", async () => {
     const {deps} = makeDeps();
-    await uploadFileItem(deps, {uid: "t1", parentId: null, file: pdf, name: "Aula especial"});
+    await uploadFileItem(deps, {uid: "t1", parentId: null, file: pdf, name: "  Aula especial "});
     expect(deps.createItem).toHaveBeenCalledWith("item1", expect.objectContaining({name: "Aula especial"}));
-    const long = {name: `${"a".repeat(150)}.pdf`, size: 10, type: "application/pdf"};
-    const second = makeDeps();
-    await uploadFileItem(second.deps as unknown as UploadDeps<typeof long>, {uid: "t1", parentId: null, file: long});
-    const payload = (second.deps.createItem as ReturnType<typeof vi.fn>).mock.calls[0][1] as {name: string};
-    expect(payload.name.length).toBeLessThanOrEqual(120);
+  });
+
+  it.each([
+    ["vazio", ""],
+    ["só espaços", "   "],
+    ["longo demais", "a".repeat(121)],
+  ])("nome personalizado %s é recusado antes de enviar (estágio validate)", async (_label, name) => {
+    const {deps} = makeDeps();
+    const error = await uploadFileItem(deps, {uid: "t1", parentId: null, file: pdf, name}).catch((e) => e);
+    expect(error).toBeInstanceOf(UploadError);
+    expect(error.stage).toBe("validate");
+    expect(deps.uploadObject).not.toHaveBeenCalled();
+    expect(deps.createItem).not.toHaveBeenCalled();
+  });
+
+  it("arquivo com nome longo e sem nome personalizado é recusado, não truncado", async () => {
+    const long = {name: `${"a".repeat(130)}.pdf`, size: 10, type: "application/pdf"};
+    const {deps} = makeDeps();
+    const error = await uploadFileItem(deps as unknown as UploadDeps<typeof long>, {uid: "t1", parentId: null, file: long}).catch((e) => e);
+    expect(error.stage).toBe("validate");
+    expect(deps.uploadObject).not.toHaveBeenCalled();
   });
 
   it("arquivo inválido não envia nem cria (estágio validate)", async () => {
@@ -73,5 +95,61 @@ describe("uploadFileItem", () => {
     const error = await uploadFileItem(deps, {uid: "t1", parentId: null, file: pdf}).catch((e) => e);
     expect(error.stage).toBe("create");
     expect(error.message).toBe("O arquivo foi enviado, mas não foi possível registrar o item. Tente novamente.");
+  });
+});
+
+describe("resubmitFileItem", () => {
+  const item = {id: "item1", version: 2};
+
+  function makeResubmit(overrides: Partial<ResubmitDeps<typeof pdf>> = {}) {
+    let n = 0;
+    const deps: ResubmitDeps<typeof pdf> = {
+      newNonce: () => `n${++n}`,
+      now: () => "AGORA",
+      uploadObject: vi.fn(async (_p, _f, _t, onProgress) => onProgress(1)),
+      updateItem: vi.fn(async () => undefined),
+      ...overrides,
+    };
+    return deps;
+  }
+
+  it("envia para um caminho novo e atualiza o item com o mesmo caminho", async () => {
+    const deps = makeResubmit();
+    const progress: number[] = [];
+    await resubmitFileItem(deps, {uid: "t1", item, file: pdf, onProgress: (p) => progress.push(p)});
+    expect(progress).toEqual([1]);
+    expect(deps.uploadObject).toHaveBeenCalledWith("teaching/materials/item1/v3-n1-aula.pdf", pdf, "application/pdf", expect.any(Function));
+    expect(deps.updateItem).toHaveBeenCalledWith("item1", expect.objectContaining({
+      status: "in_review", version: 3, fileName: "aula.pdf", updatedBy: "t1", updatedAt: "AGORA",
+      storagePath: "teaching/materials/item1/v3-n1-aula.pdf",
+    }));
+  });
+
+  it("depois de falhar a atualização, a nova tentativa usa outro caminho", async () => {
+    const update = vi.fn().mockRejectedValueOnce(new Error("rede")).mockResolvedValue(undefined);
+    const deps = makeResubmit({updateItem: update});
+    const first = await resubmitFileItem(deps, {uid: "t1", item, file: pdf}).catch((e) => e);
+    expect(first.stage).toBe("create");
+    await resubmitFileItem(deps, {uid: "t1", item, file: pdf});
+    const paths = (deps.uploadObject as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0]);
+    expect(paths).toEqual(["teaching/materials/item1/v3-n1-aula.pdf", "teaching/materials/item1/v3-n2-aula.pdf"]);
+  });
+
+  it("arquivo inválido não envia nem atualiza (estágio validate)", async () => {
+    const deps = makeResubmit();
+    const error = await resubmitFileItem(deps, {uid: "t1", item, file: {name: "a.exe", size: 10, type: "application/x-msdownload"}}).catch((e) => e);
+    expect(error).toBeInstanceOf(UploadError);
+    expect(error.stage).toBe("validate");
+    expect(deps.uploadObject).not.toHaveBeenCalled();
+    expect(deps.updateItem).not.toHaveBeenCalled();
+  });
+
+  it("falha do envio não atualiza o item (estágio upload)", async () => {
+    const deps = makeResubmit({uploadObject: vi.fn(async () => {
+      throw new Error("rede");
+    })});
+    const error = await resubmitFileItem(deps, {uid: "t1", item, file: pdf}).catch((e) => e);
+    expect(error.stage).toBe("upload");
+    expect(deps.updateItem).not.toHaveBeenCalled();
   });
 });

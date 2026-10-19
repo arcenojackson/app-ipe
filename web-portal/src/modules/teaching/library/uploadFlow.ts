@@ -1,5 +1,5 @@
-import {contentTypeFor, storagePathFor, validateFile} from "./files";
-import {newFilePayload} from "./payloads";
+import {contentTypeFor, storagePathFor, validateFile, validateName} from "./files";
+import {newFilePayload, resubmitFilePayload} from "./payloads";
 
 export interface FileLike {
   name: string;
@@ -43,9 +43,13 @@ export async function uploadFileItem<F extends FileLike>(
   const problem = validateFile(input.file);
   if (problem) throw new UploadError("validate", problem);
 
+  // Mesmo limite de validItemName nas regras (1 a 120): recusa em vez de truncar.
+  const name = (input.name ?? input.file.name).trim();
+  const nameProblem = validateName(name);
+  if (nameProblem) throw new UploadError("validate", nameProblem);
+
   const id = deps.newId();
   const contentType = contentTypeFor(input.file);
-  const name = (input.name ?? input.file.name).trim().slice(0, 120);
 
   try {
     await deps.uploadObject(
@@ -84,4 +88,69 @@ export async function uploadFileItem<F extends FileLike>(
     );
   }
   return id;
+}
+
+export interface ResubmitDeps<F extends FileLike> {
+  newNonce(): string;
+  now(): unknown;
+  uploadObject(
+    path: string,
+    file: F,
+    contentType: string,
+    onProgress: (fraction: number) => void
+  ): Promise<void>;
+  updateItem(id: string, payload: Record<string, unknown>): Promise<void>;
+}
+
+// Reenvio de arquivo devolvido. O caminho leva um sufixo aleatório por tentativa:
+// o Storage só aceita criar objetos novos, então repetir o mesmo caminho depois
+// de uma falha ao atualizar o item travaria o professor. A regra do item exige
+// só o prefixo teaching/materials/{id}/ e um caminho diferente do anterior.
+export async function resubmitFileItem<F extends FileLike>(
+  deps: ResubmitDeps<F>,
+  input: {
+    uid: string;
+    item: {id: string; version: number};
+    file: F;
+    onProgress?: (fraction: number) => void;
+  }
+): Promise<void> {
+  const problem = validateFile(input.file);
+  if (problem) throw new UploadError("validate", problem);
+
+  const contentType = contentTypeFor(input.file);
+  const storagePath = storagePathFor(
+    input.item.id,
+    input.item.version + 1,
+    `${deps.newNonce()}-${input.file.name}`
+  );
+
+  try {
+    await deps.uploadObject(storagePath, input.file, contentType, input.onProgress ?? (() => undefined));
+  } catch {
+    throw new UploadError("upload", "Não foi possível enviar o arquivo. Tente novamente.");
+  }
+
+  try {
+    await deps.updateItem(
+      input.item.id,
+      resubmitFilePayload(
+        {
+          uid: input.uid,
+          itemId: input.item.id,
+          currentVersion: input.item.version,
+          fileName: input.file.name,
+          contentType,
+          size: input.file.size,
+          storagePath,
+        },
+        deps.now()
+      )
+    );
+  } catch {
+    throw new UploadError(
+      "create",
+      "O arquivo foi enviado, mas não foi possível reenviar o item. Tente novamente."
+    );
+  }
 }

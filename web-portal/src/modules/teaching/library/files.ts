@@ -54,8 +54,9 @@ function isAllowedType(type: string): boolean {
 // para .docx no Windows): se o tipo não é permitido, usa a extensão.
 export function contentTypeFor(file: {name: string; type: string}): string {
   if (file.type && isAllowedType(file.type)) return file.type;
-  const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return EXTENSION_TYPES[extension] ?? file.type;
+  const dot = file.name.lastIndexOf(".");
+  const extension = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : "";
+  return Object.hasOwn(EXTENSION_TYPES, extension) ? EXTENSION_TYPES[extension] : file.type;
 }
 
 export function validateFile(file: {

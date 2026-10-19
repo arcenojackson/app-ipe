@@ -123,6 +123,7 @@ export function resubmitFilePayload(
     contentType: string;
     size: number;
     name?: string;
+    storagePath?: string;
   },
   now: unknown
 ) {
@@ -135,7 +136,7 @@ export function resubmitFilePayload(
     fileName: safeFileName(i.fileName),
     contentType: i.contentType,
     size: i.size,
-    storagePath: storagePathFor(i.itemId, version, i.fileName),
+    storagePath: i.storagePath ?? storagePathFor(i.itemId, version, i.fileName),
     updatedBy: i.uid,
     updatedAt: now,
   };
