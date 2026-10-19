@@ -50,6 +50,17 @@ export interface LibraryVote {
   createdAt: number;
 }
 
+export interface LibraryNotification {
+  id: string;
+  toUid: string;
+  type: string;
+  itemId: string;
+  title: string;
+  body: string;
+  createdAt: number;
+  readAt: number | null;
+}
+
 export interface Viewer {
   uid: string;
   isCurator: boolean;
