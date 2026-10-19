@@ -114,6 +114,34 @@ describe("votos", () => {
     });
   });
 
+  it("voto de exclusão sem requestId lança erro", () => {
+    const message = "votePayload: requestId é obrigatório em votos de exclusão.";
+    expect(() => votePayload({uid: "c1", action: "delete_approve"}, NOW)).toThrow(message);
+    expect(() => votePayload({uid: "c1", action: "delete_refuse", requestId: "", comment: "x"}, NOW)).toThrow(message);
+  });
+
+  it("voto de publicação sem version lança erro", () => {
+    const message = "votePayload: version é obrigatório em votos de publicação.";
+    expect(() => votePayload({uid: "c1", action: "approve"}, NOW)).toThrow(message);
+    expect(() => votePayload({uid: "c1", action: "reject", version: undefined, comment: "x"}, NOW)).toThrow(message);
+    expect(() => votePayload({uid: "c1", action: "return", requestId: "r1", comment: "x"}, NOW)).toThrow(message);
+  });
+
+  it("comentário só com espaços é omitido", () => {
+    expect(votePayload({uid: "c1", action: "approve", version: 1, comment: "   "}, NOW)).toEqual({
+      voterId: "c1", action: "approve", version: 1, createdAt: NOW,
+    });
+    expect(votePayload({uid: "c1", action: "delete_approve", requestId: "r1", comment: "  "}, NOW)).toEqual({
+      voterId: "c1", action: "delete_approve", requestId: "r1", createdAt: NOW,
+    });
+  });
+
+  it("version 0 é aceito (typeof number)", () => {
+    expect(votePayload({uid: "c1", action: "approve", version: 0}, NOW)).toEqual({
+      voterId: "c1", action: "approve", version: 0, createdAt: NOW,
+    });
+  });
+
   it("comentário é obrigatório em devolver, rejeitar e recusar exclusão", () => {
     expect(voteCommentError("approve", undefined)).toBeNull();
     expect(voteCommentError("delete_approve", "")).toBeNull();

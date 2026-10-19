@@ -189,12 +189,22 @@ export function votePayload(
 ) {
   const comment = i.comment?.trim();
   const isDeletion = DELETION_ACTIONS.includes(i.action);
+  let target: {requestId: string} | {version: number};
+  if (isDeletion) {
+    if (typeof i.requestId !== "string" || i.requestId.length === 0) {
+      throw new Error("votePayload: requestId é obrigatório em votos de exclusão.");
+    }
+    target = {requestId: i.requestId};
+  } else {
+    if (typeof i.version !== "number") {
+      throw new Error("votePayload: version é obrigatório em votos de publicação.");
+    }
+    target = {version: i.version};
+  }
   return {
     voterId: i.uid,
     action: i.action,
-    ...(isDeletion ?
-      {requestId: i.requestId} :
-      {version: i.version}),
+    ...target,
     ...(comment ? {comment} : {}),
     createdAt: now,
   };
