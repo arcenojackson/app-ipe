@@ -1,6 +1,5 @@
 import {
   GoogleAuthProvider,
-  signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
@@ -81,12 +80,13 @@ export function watchHasVoted(
   );
 }
 
+/** `name` só é necessário quando a conta não traz nome (o servidor avisa). */
 export async function checkIn(
   electionId: string,
-  guest?: {name: string; email: string}
+  extra?: {name: string}
 ): Promise<void> {
   const call = httpsCallable(functions, "electionCheckIn");
-  await call({electionId, ...guest});
+  await call({electionId, ...extra});
 }
 
 export async function castVote(
@@ -101,8 +101,6 @@ export async function castVote(
   const res = await call({electionId, roundId, choice});
   return res.data.receipt;
 }
-
-export const signInGuest = () => signInAnonymously(auth);
 
 export const signInWithPassword = (email: string, password: string) =>
   signInWithEmailAndPassword(auth, email.trim(), password);

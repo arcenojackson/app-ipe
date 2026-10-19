@@ -20,7 +20,10 @@ import {deriveView, type VoteView} from "../voteState";
 
 export function VotePage({electionId}: {electionId: string}) {
   const {state} = useAuth();
-  const user = state.status === "signedIn" ? state.user : null;
+  // Só conta de verdade vota. Uma sessão anônima antiga do navegador é
+  // tratada como deslogada.
+  const rawUser = state.status === "signedIn" ? state.user : null;
+  const user = rawUser && !rawUser.isAnonymous ? rawUser : null;
   const uid = user?.uid;
 
   const [election, setElection] = useState<Election | null | undefined>(undefined);
@@ -59,11 +62,7 @@ export function VotePage({electionId}: {electionId: string}) {
   // e-mail em vez de ficar preso em "Verificando...".
   const [autoFailed, setAutoFailed] = useState(false);
   const needsAutoCheckIn =
-    !!user &&
-    !user.isAnonymous &&
-    !autoFailed &&
-    voter === null &&
-    election?.status === "open";
+    !!user && !autoFailed && voter === null && election?.status === "open";
   useEffect(() => {
     if (!needsAutoCheckIn || autoCheckIn.current) return;
     autoCheckIn.current = true;
@@ -116,8 +115,8 @@ export function VotePage({electionId}: {electionId: string}) {
         {view.kind === "join" && (
           <JoinStep
             electionId={electionId}
-            hasSession={!!user}
-            verifying={!!user && !user.isAnonymous && !autoFailed}
+            needsName={!!user && autoFailed}
+            verifying={!!user && !autoFailed}
           />
         )}
         {view.kind === "pending" && (

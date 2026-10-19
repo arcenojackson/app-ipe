@@ -7,30 +7,28 @@ import {TextField} from "@/core/ui/TextField";
 import {
   checkIn,
   errorMessage,
-  signInGuest,
   signInWithGoogle,
   signInWithPassword,
 } from "../data/electionClient";
 
-type Mode = "choose" | "login" | "guest";
+type Mode = "choose" | "login";
 
 interface Props {
   electionId: string;
   /**
-   * Já há uma sessão (anônima, ou conta sem nome cadastrado) sem check-in:
-   * só falta o formulário de nome e e-mail, sem criar outra sessão.
+   * Já há uma conta entrada, mas o servidor não achou o nome dela: só falta
+   * pedir o nome.
    */
-  hasSession: boolean;
-  /** Sessão com conta do app: o check-in automático está em andamento. */
+  needsName: boolean;
+  /** Conta entrada: o check-in automático está em andamento. */
   verifying: boolean;
 }
 
-export function JoinStep({electionId, hasSession, verifying}: Props) {
-  const [mode, setMode] = useState<Mode>(hasSession ? "guest" : "choose");
+export function JoinStep({electionId, needsName, verifying}: Props) {
+  const [mode, setMode] = useState<Mode>("choose");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [guestEmail, setGuestEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,16 +51,22 @@ export function JoinStep({electionId, hasSession, verifying}: Props) {
     return <p className="text-sm text-white/70">Verificando sua presença...</p>;
   }
 
-  if (mode === "choose") {
+  if (needsName) {
     return (
-      <div className="space-y-3">
-        <Button type="button" className="w-full" onClick={() => setMode("login")}>
-          Entrar com a conta do app
-        </Button>
-        <Button type="button" variant="text" className="w-full" onClick={() => setMode("guest")}>
-          Votar sem conta
-        </Button>
-      </div>
+      <form
+        className="space-y-4"
+        onSubmit={(event: FormEvent) => {
+          event.preventDefault();
+          void run(() => checkIn(electionId, {name: name.trim()}));
+        }}
+      >
+        <p className="text-sm text-white/70">
+          Não encontramos o nome da sua conta. Informe como você se chama.
+        </p>
+        <TextField id="voter-name" label="Seu nome" required value={name} onChange={(e) => setName(e.target.value)} />
+        {error && <p role="alert" className="text-sm text-error">{error}</p>}
+        <Button type="submit" disabled={busy} className="w-full">Continuar</Button>
+      </form>
     );
   }
 
@@ -81,9 +85,6 @@ export function JoinStep({electionId, hasSession, verifying}: Props) {
           {error && <p role="alert" className="text-sm text-error">{error}</p>}
           <Button type="submit" disabled={busy} className="w-full">Entrar</Button>
         </form>
-        <Button type="button" variant="text" disabled={busy} className="w-full" onClick={() => run(() => signInWithGoogle(), authMessage)}>
-          Entrar com Google
-        </Button>
         <Button type="button" variant="text" className="w-full" onClick={() => { setError(null); setMode("choose"); }}>
           Voltar
         </Button>
@@ -92,25 +93,18 @@ export function JoinStep({electionId, hasSession, verifying}: Props) {
   }
 
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(event: FormEvent) => {
-        event.preventDefault();
-        void run(async () => {
-          if (!hasSession) await signInGuest();
-          await checkIn(electionId, {name: name.trim(), email: guestEmail.trim()});
-        });
-      }}
-    >
-      <TextField id="guest-name" label="Seu nome" required value={name} onChange={(e) => setName(e.target.value)} />
-      <TextField id="guest-email" label="Seu e-mail" type="email" required value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
+    <div className="space-y-3">
+      <p className="text-sm text-white/70">
+        Para votar, entre com a sua conta. Quem ainda não tem cadastro é
+        cadastrado automaticamente.
+      </p>
+      <Button type="button" className="w-full" disabled={busy} onClick={() => run(() => signInWithGoogle(), authMessage)}>
+        Entrar com Google
+      </Button>
+      <Button type="button" variant="text" className="w-full" onClick={() => setMode("login")}>
+        Entrar com e-mail e senha
+      </Button>
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
-      <Button type="submit" disabled={busy} className="w-full">Continuar</Button>
-      {!hasSession && (
-        <Button type="button" variant="text" className="w-full" onClick={() => { setError(null); setMode("choose"); }}>
-          Voltar
-        </Button>
-      )}
-    </form>
+    </div>
   );
 }
