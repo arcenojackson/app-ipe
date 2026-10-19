@@ -1820,3 +1820,9 @@ export const sendEloAvailabilityReminder = functions
   });
 
 export {syncTeachingClaimsOnUserWrite} from "./teaching/syncClaims";
+
+export {
+  onTeachingItemCreated,
+  onTeachingItemUpdated,
+  onTeachingVoteCreated,
+} from "./teaching/library/triggers";
