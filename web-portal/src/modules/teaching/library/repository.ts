@@ -131,6 +131,22 @@ export async function loadUserNames(uids: string[]): Promise<Record<string, stri
   return result;
 }
 
+export async function loadVotes(itemId: string): Promise<LibraryVote[]> {
+  const snapshot = await getDocs(collection(db, "teaching_items", itemId, "votes"));
+  return snapshot.docs
+    .map((d) => toVote(d.id, d.data()))
+    .filter((vote): vote is LibraryVote => vote !== null);
+}
+
+// Curadores = usuários com teaching_role == "curator" (users é legível por
+// quem está logado). A Function confere o papel no Auth ao contar votos.
+export async function countCurators(): Promise<number> {
+  const snapshot = await getDocs(
+    query(collection(db, "users"), where("teaching_role", "==", "curator"))
+  );
+  return snapshot.size;
+}
+
 // Fila de revisão (curador e admin): em revisão e pedidos de exclusão.
 export async function loadReviewQueue(): Promise<{
   inReview: LibraryItem[];

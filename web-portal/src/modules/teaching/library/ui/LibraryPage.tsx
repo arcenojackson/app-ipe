@@ -14,6 +14,8 @@ import {viewerFrom} from "../types";
 import {useCatalog, useFolderItems} from "../useLibrary";
 import {libraryUrl, readParams} from "../url";
 import {Breadcrumbs} from "./Breadcrumbs";
+import {CuratorWarning} from "./CuratorWarning";
+import {NotificationBell} from "./NotificationBell";
 import {LinkDialog, TextPromptDialog} from "./Dialogs";
 import {FolderView} from "./FolderView";
 import {ItemDetail} from "./ItemDetail";
@@ -83,7 +85,11 @@ export function LibraryContent({
 
   return (
     <div className="space-y-4" data-item={itemId ?? undefined}>
-      <h1 className="text-2xl font-semibold">Biblioteca</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold">Biblioteca</h1>
+        <NotificationBell uid={viewer.uid} />
+      </div>
+      {(viewer.isCurator || viewer.isAdmin) && <CuratorWarning />}
       <Breadcrumbs trail={trail} onNavigate={navigate} />
       {itemId && (
         <ItemDetail

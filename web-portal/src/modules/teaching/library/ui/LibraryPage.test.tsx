@@ -11,8 +11,12 @@ const repo = vi.hoisted(() => ({
   subscribeVotes: vi.fn(),
   loadUserNames: vi.fn(),
   canReadVotes: vi.fn(),
+  countCurators: vi.fn(),
 }));
 vi.mock("../repository", () => repo);
+
+const notifications = vi.hoisted(() => ({subscribeNotifications: vi.fn()}));
+vi.mock("../notifications", () => notifications);
 
 const storageAccess = vi.hoisted(() => ({downloadUrl: vi.fn()}));
 vi.mock("../storageAccess", () => storageAccess);
@@ -65,6 +69,11 @@ beforeEach(() => {
   });
   repo.loadUserNames.mockReset().mockResolvedValue({});
   repo.canReadVotes.mockReset().mockReturnValue(false);
+  repo.countCurators.mockReset().mockResolvedValue(3);
+  notifications.subscribeNotifications.mockReset().mockImplementation((_uid, onData) => {
+    onData([]);
+    return vi.fn();
+  });
   storageAccess.downloadUrl.mockReset().mockResolvedValue("https://files.example/a.pdf");
 });
 
