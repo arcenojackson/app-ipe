@@ -4,6 +4,7 @@ import {
   contentTypeFor,
   safeFileName,
   storagePathFor,
+  validateDescription,
   validateFile,
   validateName,
   validateUrl,
@@ -25,6 +26,8 @@ describe("validateUrl", () => {
     expect(validateUrl("http://exemplo.org")).toBeNull();
     expect(validateUrl("javascript:alert(1)")).toBe("Use um endereço que comece com http:// ou https://.");
     expect(validateUrl("ftp://x.org")).toBe("Use um endereço que comece com http:// ou https://.");
+    expect(validateUrl("HTTP://x.org")).toBe("Use um endereço que comece com http:// ou https://.");
+    expect(validateUrl("Https://x.org")).toBe("Use um endereço que comece com http:// ou https://.");
     expect(validateUrl("")).toBe("Informe o endereço do link.");
     expect(validateUrl(`https://x.org/${"a".repeat(2000)}`)).toBe("O endereço é muito longo.");
   });
@@ -46,6 +49,33 @@ describe("contentTypeFor e validateFile", () => {
     expect(validateFile({name: "a.pdf", size: MAX_FILE_BYTES + 1, type: "application/pdf"})).toBe("O arquivo passa de 100 MB.");
     expect(validateFile({name: "a.exe", size: 10, type: "application/x-msdownload"})).toBe("Tipo de arquivo não permitido. Use PDF, Office ou imagem.");
     expect(validateFile({name: "a".repeat(201) + ".pdf", size: 10, type: "application/pdf"})).toBe("O nome do arquivo é muito longo.");
+  });
+
+  it("usa a extensão quando o tipo do navegador é genérico ou não permitido", () => {
+    expect(contentTypeFor({name: "a.docx", type: "application/octet-stream"})).toBe("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    expect(contentTypeFor({name: "a.exe", type: "application/x-msdownload"})).toBe("application/x-msdownload");
+    expect(validateFile({name: "a.docx", size: 10, type: "application/octet-stream"})).toBeNull();
+  });
+
+  it("aceita imagem com tipo vazio pela extensão", () => {
+    expect(contentTypeFor({name: "a.png", type: ""})).toBe("image/png");
+    expect(contentTypeFor({name: "a.JPG", type: ""})).toBe("image/jpeg");
+    expect(contentTypeFor({name: "a.jpeg", type: ""})).toBe("image/jpeg");
+    expect(contentTypeFor({name: "a.gif", type: ""})).toBe("image/gif");
+    expect(contentTypeFor({name: "a.webp", type: ""})).toBe("image/webp");
+    expect(validateFile({name: "foto.png", size: 10, type: ""})).toBeNull();
+  });
+
+  it("recusa nome que fica vazio depois de limpo", () => {
+    expect(validateFile({name: "   ", size: 10, type: "application/pdf"})).toBe("O nome do arquivo é inválido.");
+  });
+});
+
+describe("validateDescription", () => {
+  it("aceita até 1000 caracteres", () => {
+    expect(validateDescription("")).toBeNull();
+    expect(validateDescription("a".repeat(1000))).toBeNull();
+    expect(validateDescription("a".repeat(1001))).toBe("A descrição pode ter no máximo 1000 caracteres.");
   });
 });
 

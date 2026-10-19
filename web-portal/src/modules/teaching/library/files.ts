@@ -12,6 +12,11 @@ const EXTENSION_TYPES: Record<string, string> = {
   odt: "application/vnd.oasis.opendocument.text",
   odp: "application/vnd.oasis.opendocument.presentation",
   ods: "application/vnd.oasis.opendocument.spreadsheet",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
 };
 
 const ALLOWED_TYPES = new Set(Object.values(EXTENSION_TYPES));
@@ -27,17 +32,30 @@ export function validateUrl(url: string): string | null {
   const trimmed = url.trim();
   if (trimmed.length === 0) return "Informe o endereço do link.";
   if (trimmed.length > 2000) return "O endereço é muito longo.";
-  if (!/^https?:\/\/.+/i.test(trimmed)) {
+  // Sem a flag `i`: a regra do Firestore (`matches('https?://.+')`) diferencia maiúsculas.
+  if (!/^https?:\/\/.+/.test(trimmed)) {
     return "Use um endereço que comece com http:// ou https://.";
   }
   return null;
 }
 
-// Alguns navegadores entregam `type` vazio para Office: usa a extensão.
+export function validateDescription(description: string): string | null {
+  if (description.length > 1000) {
+    return "A descrição pode ter no máximo 1000 caracteres.";
+  }
+  return null;
+}
+
+function isAllowedType(type: string): boolean {
+  return type.startsWith("image/") || ALLOWED_TYPES.has(type);
+}
+
+// Alguns navegadores entregam `type` vazio ou genérico (ex.: octet-stream
+// para .docx no Windows): se o tipo não é permitido, usa a extensão.
 export function contentTypeFor(file: {name: string; type: string}): string {
-  if (file.type) return file.type;
+  if (file.type && isAllowedType(file.type)) return file.type;
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-  return EXTENSION_TYPES[extension] ?? "";
+  return EXTENSION_TYPES[extension] ?? file.type;
 }
 
 export function validateFile(file: {
@@ -47,12 +65,12 @@ export function validateFile(file: {
 }): string | null {
   if (file.size <= 0) return "O arquivo está vazio.";
   if (file.size > MAX_FILE_BYTES) return "O arquivo passa de 100 MB.";
-  if (safeFileName(file.name).length > 200) {
+  const safeName = safeFileName(file.name);
+  if (safeName.length === 0) return "O nome do arquivo é inválido.";
+  if (safeName.length > 200) {
     return "O nome do arquivo é muito longo.";
   }
-  const type = contentTypeFor(file);
-  const allowed = type.startsWith("image/") || ALLOWED_TYPES.has(type);
-  if (!allowed) return "Tipo de arquivo não permitido. Use PDF, Office ou imagem.";
+  if (!isAllowedType(contentTypeFor(file))) return "Tipo de arquivo não permitido. Use PDF, Office ou imagem.";
   return null;
 }
 
