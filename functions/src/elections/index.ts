@@ -37,6 +37,7 @@ export const electionCheckIn = functions.https.onCall((data, context) => {
     uid: auth.uid,
     isAnonymous: isAnonymousAuth(auth),
     email: auth.token.email,
+    name: auth.token.name,
   }, data);
 });
 

@@ -1,6 +1,11 @@
 import {FieldValue, type Firestore} from "firebase-admin/firestore";
 import {
-  assertAdmin, fail, getElection, logEvent, requireString,
+  assertAdmin,
+  assertNotAnonymous,
+  fail,
+  getElection,
+  logEvent,
+  requireString,
 } from "./common";
 import type {VoterKind, VoterStatus} from "./types";
 
@@ -8,18 +13,26 @@ export interface Caller {
   uid: string;
   isAnonymous: boolean;
   email?: string;
+  // Nome da conta (ex.: nome do perfil Google), vindo do token.
+  name?: string;
 }
 
 const str = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
-// Entrada do eleitor. Membro logado da sociedade entra aprovado; os demais
-// ficam pendentes. Idempotente: repetir não altera o estado já gravado.
+const isAlreadyExists = (error: unknown): boolean =>
+  (error as {code?: number}).code === 6;
+
+// Entrada do eleitor. Exige conta de verdade (Google ou e-mail/senha do app).
+// Membro da sociedade entra aprovado; os demais ficam pendentes e, se ainda
+// não têm cadastro, são cadastrados como usuário novo (igual ao login Google
+// do app). Idempotente: repetir não altera o estado já gravado.
 export const checkIn = async (
   db: Firestore,
   caller: Caller,
   data: unknown
 ): Promise<{status: VoterStatus; kind: VoterKind}> => {
+  assertNotAnonymous(caller.isAnonymous);
   const electionId = requireString(data, "electionId");
   const election = await getElection(db, electionId);
   if (election.status !== "open") {
@@ -36,16 +49,27 @@ export const checkIn = async (
 
   const society = await db.doc(`societies/${election.societyId}`).get();
   const members: string[] = (society.get("members") ?? []).map(String);
-  const isMember = !caller.isAnonymous && members.includes(caller.uid);
-  const userDoc = caller.isAnonymous ?
-    undefined :
-    (await db.doc(`users/${caller.uid}`).get()).data();
+  const isMember = members.includes(caller.uid);
 
-  const input = data as {name?: unknown; email?: unknown};
-  const registered = str(userDoc?.name);
-  const name = isMember ? registered : (str(input.name) || registered);
+  const userRef = db.doc(`users/${caller.uid}`);
+  const userSnap = await userRef.get();
+  const input = data as {name?: unknown};
+  const name = str(userSnap.get("name")) ||
+    str(caller.name) ||
+    str(input.name);
   if (!name) throw fail("invalid-argument", "Informe seu nome.");
-  const email = caller.email ?? str(input.email);
+  const email = str(caller.email) || str(userSnap.get("email"));
+
+  if (!userSnap.exists) {
+    // Conta nova: cadastra como usuário pendente (mesmos campos do app).
+    try {
+      await userRef.create({
+        id: caller.uid, name, email, is_admin: false, is_pending: true,
+      });
+    } catch (error) {
+      if (!isAlreadyExists(error)) throw error;
+    }
+  }
 
   const kind: VoterKind = isMember ? "member" : "guest";
   const status: VoterStatus = isMember ? "approved" : "pending";
@@ -55,8 +79,8 @@ export const checkIn = async (
       name, email, kind, status, createdAt: FieldValue.serverTimestamp(),
     });
   } catch (error) {
-    // 6 = ALREADY_EXISTS: outra chamada simultânea criou primeiro.
-    if ((error as {code?: number}).code === 6) {
+    // Outra chamada simultânea criou primeiro.
+    if (isAlreadyExists(error)) {
       const again = await voterRef.get();
       return {status: again.get("status"), kind: again.get("kind")};
     }

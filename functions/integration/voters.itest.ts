@@ -6,10 +6,15 @@ import {
 
 const member = {uid: MEMBER, isAnonymous: false, email: "ana@ipe.org"};
 const outsider = {uid: OUTSIDER, isAnonymous: false, email: "fora@x.org"};
-const guest = {uid: "anon1", isAnonymous: true};
+// Conta Google que nunca usou o app: não existe users/g1.
+const google = {
+  uid: "g1", isAnonymous: false, email: "gabi@gmail.com", name: "Gabi Google",
+};
 
 const voterDoc = async (uid: string) =>
   (await db.doc(`elections/${ELECTION}/voters/${uid}`).get()).data();
+const userDoc = async (uid: string) =>
+  (await db.doc(`users/${uid}`).get()).data();
 
 beforeEach(async () => {
   await clearDb();
@@ -23,24 +28,49 @@ describe("checkIn", () => {
     expect((await voterDoc(MEMBER))?.name).toBe("Ana");
   });
 
-  it("convidado anônimo entra pendente com nome e e-mail informados", async () => {
-    const res = await checkIn(db, guest, {
-      electionId: ELECTION, name: " Dona Maria ", email: "maria@x.org",
-    });
-    expect(res).toEqual({status: "pending", kind: "guest"});
-    const doc = await voterDoc("anon1");
-    expect(doc?.name).toBe("Dona Maria");
-    expect(doc?.email).toBe("maria@x.org");
+  it("sessão anônima é recusada", async () => {
+    await expectCode(
+      checkIn(db, {uid: "anon1", isAnonymous: true}, {electionId: ELECTION, name: "X"}),
+      "permission-denied"
+    );
+    expect(await voterDoc("anon1")).toBeUndefined();
+    expect(await userDoc("anon1")).toBeUndefined();
   });
 
-  it("convidado sem nome é recusado", async () => {
-    await expectCode(checkIn(db, guest, {electionId: ELECTION}), "invalid-argument");
-  });
-
-  it("logado que não é da sociedade vira convidado pendente", async () => {
+  it("logado que não é da sociedade vira convidado pendente, com nome do cadastro", async () => {
     const res = await checkIn(db, outsider, {electionId: ELECTION});
     expect(res).toEqual({status: "pending", kind: "guest"});
     expect((await voterDoc(OUTSIDER))?.name).toBe("Fora");
+    expect((await voterDoc(OUTSIDER))?.email).toBe("fora@x.org");
+  });
+
+  it("conta Google nova é cadastrada como usuário novo (pendente) e entra como convidado", async () => {
+    const res = await checkIn(db, google, {electionId: ELECTION});
+    expect(res).toEqual({status: "pending", kind: "guest"});
+    expect(await userDoc("g1")).toEqual({
+      id: "g1",
+      name: "Gabi Google",
+      email: "gabi@gmail.com",
+      is_admin: false,
+      is_pending: true,
+    });
+    expect((await voterDoc("g1"))?.name).toBe("Gabi Google");
+  });
+
+  it("não sobrescreve o cadastro de quem já é usuário", async () => {
+    await checkIn(db, outsider, {electionId: ELECTION});
+    const user = await userDoc(OUTSIDER);
+    expect(user).toEqual({name: "Fora", is_admin: false});
+  });
+
+  it("conta sem nome no token nem no cadastro: pede o nome; com o nome informado, cadastra", async () => {
+    const noName = {uid: "g2", isAnonymous: false, email: "sem@nome.org"};
+    await expectCode(checkIn(db, noName, {electionId: ELECTION}), "invalid-argument");
+    expect(await userDoc("g2")).toBeUndefined();
+    const res = await checkIn(db, noName, {electionId: ELECTION, name: " Dona Maria "});
+    expect(res).toEqual({status: "pending", kind: "guest"});
+    expect((await userDoc("g2"))?.name).toBe("Dona Maria");
+    expect((await voterDoc("g2"))?.name).toBe("Dona Maria");
   });
 
   it("eleição fora de 'open' recusa o check-in", async () => {
@@ -55,40 +85,47 @@ describe("checkIn", () => {
   });
 
   it("check-in repetido é idempotente e NÃO derruba a aprovação", async () => {
-    await checkIn(db, guest, {electionId: ELECTION, name: "Maria"});
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "anon1", decision: "approved"});
-    const again = await checkIn(db, guest, {electionId: ELECTION, name: "Outro nome"});
+    await checkIn(db, google, {electionId: ELECTION});
+    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
+    const again = await checkIn(db, {...google, name: "Outro nome"}, {electionId: ELECTION});
     expect(again).toEqual({status: "approved", kind: "guest"});
-    expect((await voterDoc("anon1"))?.name).toBe("Maria");
+    expect((await voterDoc("g1"))?.name).toBe("Gabi Google");
   });
 
-  it("chamadas simultâneas criam um único eleitor", async () => {
+  it("chamadas simultâneas criam um único eleitor e um único usuário", async () => {
     const results = await Promise.all([
-      checkIn(db, guest, {electionId: ELECTION, name: "Maria"}),
-      checkIn(db, guest, {electionId: ELECTION, name: "Maria"}),
+      checkIn(db, google, {electionId: ELECTION}),
+      checkIn(db, google, {electionId: ELECTION}),
     ]);
     expect(results[0]).toEqual(results[1]);
     const snap = await db.collection(`elections/${ELECTION}/voters`).get();
     expect(snap.size).toBe(1);
+    expect((await userDoc("g1"))?.is_pending).toBe(true);
   });
 });
 
 describe("reviewVoter", () => {
   it("só admin aprova", async () => {
-    await checkIn(db, guest, {electionId: ELECTION, name: "Maria"});
+    await checkIn(db, google, {electionId: ELECTION});
     await expectCode(
-      reviewVoter(db, MEMBER, {electionId: ELECTION, voterId: "anon1", decision: "approved"}),
+      reviewVoter(db, MEMBER, {electionId: ELECTION, voterId: "g1", decision: "approved"}),
       "permission-denied"
     );
   });
 
   it("admin aprova e recusa, registrando quem decidiu", async () => {
-    await checkIn(db, guest, {electionId: ELECTION, name: "Maria"});
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "anon1", decision: "approved"});
-    expect((await voterDoc("anon1"))?.status).toBe("approved");
-    expect((await voterDoc("anon1"))?.reviewedBy).toBe(ADMIN);
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "anon1", decision: "rejected"});
-    expect((await voterDoc("anon1"))?.status).toBe("rejected");
+    await checkIn(db, google, {electionId: ELECTION});
+    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
+    expect((await voterDoc("g1"))?.status).toBe("approved");
+    expect((await voterDoc("g1"))?.reviewedBy).toBe(ADMIN);
+    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "rejected"});
+    expect((await voterDoc("g1"))?.status).toBe("rejected");
+  });
+
+  it("aprovar na eleição não aprova o usuário no app", async () => {
+    await checkIn(db, google, {electionId: ELECTION});
+    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
+    expect((await userDoc("g1"))?.is_pending).toBe(true);
   });
 
   it("decisão inválida e eleitor inexistente", async () => {
@@ -96,16 +133,16 @@ describe("reviewVoter", () => {
       reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "x", decision: "approved"}),
       "not-found"
     );
-    await checkIn(db, guest, {electionId: ELECTION, name: "Maria"});
+    await checkIn(db, google, {electionId: ELECTION});
     await expectCode(
-      reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "anon1", decision: "maybe"}),
+      reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "maybe"}),
       "invalid-argument"
     );
   });
 
   it("grava eventos de auditoria do check-in e da decisão", async () => {
-    await checkIn(db, guest, {electionId: ELECTION, name: "Maria"});
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "anon1", decision: "approved"});
+    await checkIn(db, google, {electionId: ELECTION});
+    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
     const events = await db.collection(`elections/${ELECTION}/events`).get();
     const types = events.docs.map((d) => d.get("type")).sort();
     expect(types).toEqual(["checkin", "voter_reviewed"]);
