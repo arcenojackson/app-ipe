@@ -17,7 +17,7 @@ export function LibraryContent({
   viewer,
   folderId,
   itemId,
-  navigate,
+  navigate: navigateTo,
 }: {
   viewer: Viewer;
   folderId: string | null;
@@ -26,6 +26,11 @@ export function LibraryContent({
 }) {
   const [view, setView] = useState<"list" | "grid">("list");
   const [search, setSearch] = useState("");
+  // Navegar sempre sai do modo busca.
+  const navigate = (url: string) => {
+    setSearch("");
+    navigateTo(url);
+  };
   const catalog = useCatalog(viewer);
   const folder = useFolderItems(folderId, viewer);
 
@@ -61,8 +66,11 @@ export function LibraryContent({
     );
   }
 
-  const error = folder.error ?? catalog.error;
-  const loading = !searching && folder.items === null && !folder.error;
+  const error = searching ? catalog.error : folder.error ?? catalog.error;
+  const loading = searching ?
+    catalog.items === null && !catalog.error :
+    folder.items === null && !folder.error;
+  const showList = !loading && !(searching ? catalog.error : folder.error);
 
   return (
     <div className="space-y-4" data-item={itemId ?? undefined}>
@@ -73,14 +81,14 @@ export function LibraryContent({
           <TextField id="library-search" label="Buscar na biblioteca" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="text" onClick={() => setView("list")}>Ver em lista</Button>
-          <Button type="button" variant="text" onClick={() => setView("grid")}>Ver em grade</Button>
+          <Button type="button" variant="text" aria-pressed={view === "list"} onClick={() => setView("list")}>Ver em lista</Button>
+          <Button type="button" variant="text" aria-pressed={view === "grid"} onClick={() => setView("grid")}>Ver em grade</Button>
         </div>
       </div>
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
       {loading ? (
         <p className="text-white/70">Carregando…</p>
-      ) : (
+      ) : showList && (
         <FolderView
           items={shown}
           view={view}

@@ -1,4 +1,5 @@
 import {render, screen, waitFor, fireEvent} from "@testing-library/react";
+import {useState} from "react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import type {LibraryItem, Viewer} from "../types";
 import {LibraryContent} from "./LibraryPage";
@@ -47,7 +48,7 @@ describe("LibraryContent", () => {
     renderAt(null);
     expect(await screen.findByText("Crianças")).toBeInTheDocument();
     const rows = screen.getAllByRole("button", {name: /Abrir /});
-    expect(rows[0]).toHaveAccessibleName("Abrir Crianças");
+    expect(rows.map((r) => r.getAttribute("aria-label"))).toEqual(["Abrir Crianças", "Abrir Catecismo Menor"]);
     expect(screen.getByText("Catecismo Menor")).toBeInTheDocument();
     expect(screen.getByText("Publicado")).toBeInTheDocument();
   });
@@ -55,6 +56,8 @@ describe("LibraryContent", () => {
   it("em uma pasta mostra em revisão e devolvido", async () => {
     renderAt("f1");
     expect(await screen.findByText("Aula 10")).toBeInTheDocument();
+    const rows = screen.getAllByRole("button", {name: /Abrir /});
+    expect(rows[0]).toHaveAccessibleName("Abrir Antigo Testamento");
     expect(screen.getByText("Em revisão")).toBeInTheDocument();
     expect(screen.getByText("Devolvido")).toBeInTheDocument();
   });
@@ -104,6 +107,78 @@ describe("LibraryContent", () => {
     });
     renderAt(null);
     expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar esta pasta.");
+    expect(screen.queryByText("Esta pasta está vazia.")).not.toBeInTheDocument();
+  });
+
+  it("enquanto a pasta nova não responde mostra Carregando e nada da pasta anterior", async () => {
+    const { rerender } = render(<LibraryContent viewer={teacher} folderId="f1" itemId={null} navigate={vi.fn()} />);
+    await screen.findByText("Aula 2");
+    repo.subscribeFolder.mockImplementation(() => unsubscribe);
+    rerender(<LibraryContent viewer={teacher} folderId="f2" itemId={null} navigate={vi.fn()} />);
+    expect(await screen.findByText("Carregando…")).toBeInTheDocument();
+    expect(screen.queryByText("Aula 2")).not.toBeInTheDocument();
+    expect(screen.queryByText("Esta pasta está vazia.")).not.toBeInTheDocument();
+  });
+
+  it("busca com o catálogo ainda carregando mostra Carregando, não Nada encontrado", async () => {
+    repo.loadAllVisible.mockReturnValue(new Promise(() => {}));
+    renderAt(null);
+    await screen.findByText("Crianças");
+    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "x"}});
+    expect(screen.getByText("Carregando…")).toBeInTheDocument();
+    expect(screen.queryByText("Nada encontrado.")).not.toBeInTheDocument();
+  });
+
+  it("busca com erro no catálogo mostra só o alerta", async () => {
+    repo.loadAllVisible.mockRejectedValue(new Error("x"));
+    renderAt(null);
+    await screen.findByText("Crianças");
+    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "x"}});
+    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar a biblioteca.");
+    expect(screen.queryByText("Nada encontrado.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Carregando…")).not.toBeInTheDocument();
+  });
+
+  function Harness() {
+    const [folderId, setFolderId] = useState<string | null>(null);
+    return (
+      <LibraryContent
+        viewer={teacher}
+        folderId={folderId}
+        itemId={null}
+        navigate={(url) => setFolderId(new URL(url, "http://x").searchParams.get("pasta"))}
+      />
+    );
+  }
+
+  it("navegar limpa a busca e mostra o conteúdo da pasta (clique em resultado)", async () => {
+    render(<Harness />);
+    await screen.findByText("Crianças");
+    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "crian"}});
+    fireEvent.click(await screen.findByRole("button", {name: "Abrir Crianças"}));
+    expect(screen.getByLabelText("Buscar na biblioteca")).toHaveValue("");
+    expect(await screen.findByText("Aula 2")).toBeInTheDocument();
+    expect(screen.queryByText("Catecismo Menor")).not.toBeInTheDocument();
+  });
+
+  it("navegar limpa a busca (migalha)", async () => {
+    render(<Harness />);
+    fireEvent.click(await screen.findByRole("button", {name: "Abrir Crianças"}));
+    await screen.findByText("Aula 2");
+    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "catec"}});
+    expect(await screen.findByText("Catecismo Menor")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Biblioteca"}));
+    expect(screen.getByLabelText("Buscar na biblioteca")).toHaveValue("");
+    expect(await screen.findByText("Crianças")).toBeInTheDocument();
+  });
+
+  it("resultados da busca mostram o caminho de cada item", async () => {
+    renderAt(null);
+    await screen.findByText("Crianças");
+    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "catec"}});
+    expect(await screen.findByText("Biblioteca", {selector: "span.block"})).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "aula 2"}});
+    expect(await screen.findByText("Crianças", {selector: "span.block.text-xs"})).toBeInTheDocument();
   });
 
   it("trocar de pasta cancela a escuta anterior e assina a nova", async () => {
@@ -118,7 +193,10 @@ describe("LibraryContent", () => {
   it("alterna entre lista e grade", async () => {
     renderAt(null);
     await screen.findByText("Crianças");
+    expect(screen.getByRole("button", {name: "Ver em lista"})).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", {name: "Ver em grade"}));
+    expect(screen.getByRole("button", {name: "Ver em grade"})).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", {name: "Ver em lista"})).toHaveAttribute("aria-pressed", "false");
     expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "grid");
     fireEvent.click(screen.getByRole("button", {name: "Ver em lista"}));
     expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "list");
