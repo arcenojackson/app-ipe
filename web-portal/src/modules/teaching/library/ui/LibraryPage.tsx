@@ -115,6 +115,12 @@ export function LibraryContent({
         {permissions.canCreateFolder && (
           <Button type="button" onClick={() => setDialog("folder")}>Nova pasta</Button>
         )}
+        {viewer.isCurator && folderId && byId.has(folderId) && (
+          <Button type="button" variant="text"
+            onClick={() => navigate(libraryUrl({pasta: byId.get(folderId)?.parentId ?? null, item: folderId}))}>
+            Gerenciar pasta
+          </Button>
+        )}
         {permissions.canAddLink && (
           <Button type="button" variant="text" onClick={() => setDialog("link")}>Adicionar link</Button>
         )}

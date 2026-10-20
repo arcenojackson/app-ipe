@@ -27,6 +27,7 @@ const mutations = vi.hoisted(() => ({
   uploadFile: vi.fn(),
   renameItem: vi.fn(),
   moveItem: vi.fn(),
+  requestDelete: vi.fn(),
 }));
 vi.mock("../mutations", () => mutations);
 
@@ -274,6 +275,60 @@ describe("LibraryContent: detalhe do item", () => {
     fireEvent.click(screen.getByRole("button", {name: "Salvar"}));
     await waitFor(() => expect(mutations.renameItem).toHaveBeenCalledWith("c1", "i2", "Aula 2b"));
     await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe("LibraryContent: gerenciar pasta", () => {
+  const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
+
+  it("curador dentro de uma subpasta vê Gerenciar pasta e abre o detalhe da pasta", async () => {
+    const navigate = vi.fn();
+    render(<LibraryContent viewer={curator} folderId="f2" itemId={null} navigate={navigate} />);
+    fireEvent.click(await screen.findByRole("button", {name: "Gerenciar pasta"}));
+    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1&item=f2");
+  });
+
+  it("pasta na raiz: o link usa só ?item=", async () => {
+    const navigate = vi.fn();
+    render(<LibraryContent viewer={curator} folderId="f1" itemId={null} navigate={navigate} />);
+    fireEvent.click(await screen.findByRole("button", {name: "Gerenciar pasta"}));
+    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?item=f1");
+  });
+
+  it("não aparece para professor nem na raiz", async () => {
+    const {unmount} = render(<LibraryContent viewer={teacher} folderId="f1" itemId={null} navigate={vi.fn()} />);
+    await screen.findByText("Aula 2");
+    expect(screen.queryByRole("button", {name: "Gerenciar pasta"})).not.toBeInTheDocument();
+    unmount();
+    render(<LibraryContent viewer={curator} folderId={null} itemId={null} navigate={vi.fn()} />);
+    await screen.findByText("Crianças");
+    expect(screen.queryByRole("button", {name: "Gerenciar pasta"})).not.toBeInTheDocument();
+  });
+
+  it("fechar o detalhe da pasta volta para a pasta pai", async () => {
+    const navigate = vi.fn();
+    render(<LibraryContent viewer={curator} folderId="f1" itemId="f2" navigate={navigate} />);
+    expect(await screen.findByRole("heading", {name: "Antigo Testamento", level: 2})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
+    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1");
+  });
+
+  it("curador renomeia, move e pede exclusão da pasta pelo detalhe", async () => {
+    mutations.renameItem.mockResolvedValue(undefined);
+    mutations.moveItem.mockResolvedValue(undefined);
+    mutations.requestDelete.mockResolvedValue(undefined);
+    render(<LibraryContent viewer={curator} folderId="f1" itemId="f2" navigate={vi.fn()} />);
+    await screen.findByRole("heading", {name: "Antigo Testamento", level: 2});
+    fireEvent.click(await screen.findByRole("button", {name: "Renomear"}));
+    fireEvent.change(screen.getByLabelText("Novo nome"), {target: {value: "AT"}});
+    fireEvent.click(screen.getByRole("button", {name: "Salvar"}));
+    await waitFor(() => expect(mutations.renameItem).toHaveBeenCalledWith("c1", "f2", "AT"));
+    fireEvent.click(await screen.findByRole("button", {name: "Mover"}));
+    fireEvent.click(screen.getByRole("button", {name: "Biblioteca (raiz)"}));
+    await waitFor(() => expect(mutations.moveItem).toHaveBeenCalledWith("c1", "f2", null));
+    fireEvent.click(await screen.findByRole("button", {name: "Pedir exclusão"}));
+    fireEvent.click(screen.getByRole("button", {name: "Enviar pedido"}));
+    await waitFor(() => expect(mutations.requestDelete).toHaveBeenCalledWith("c1", "f2", undefined));
   });
 });
 

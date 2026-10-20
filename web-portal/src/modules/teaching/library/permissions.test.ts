@@ -13,8 +13,8 @@ const make = (extra: Partial<LibraryItem>): LibraryItem => ({...base, ...extra})
 
 describe("libraryPermissions", () => {
   it("só curador cria pasta; todos enviam arquivo e link", () => {
-    expect(libraryPermissions(curator)).toEqual({canCreateFolder: true, canUpload: true, canAddLink: true});
-    expect(libraryPermissions(teacher)).toEqual({canCreateFolder: false, canUpload: true, canAddLink: true});
+    expect(libraryPermissions(curator)).toEqual({canCreateFolder: true, canAddLink: true});
+    expect(libraryPermissions(teacher)).toEqual({canCreateFolder: false, canAddLink: true});
     expect(libraryPermissions(adminOnly).canCreateFolder).toBe(false);
   });
 });

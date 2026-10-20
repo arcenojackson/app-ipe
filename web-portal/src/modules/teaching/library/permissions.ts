@@ -13,7 +13,6 @@ export interface ItemPermissions {
 export function libraryPermissions(viewer: Viewer) {
   return {
     canCreateFolder: viewer.isCurator,
-    canUpload: true,
     canAddLink: true,
   };
 }
