@@ -17,7 +17,17 @@ export default function TeachingHomePage() {
       <p className="text-white/70">Seu papel no grupo: {roleLabel}</p>
       <Card>
         <h2 className="font-semibold">Biblioteca de materiais</h2>
-        <p className="text-sm text-white/70">Em breve: aulas, planos e bibliografia por faixa etária.</p>
+        <p className="mb-2 text-sm text-white/70">Aulas, planos e bibliografia, organizados em pastas.</p>
+        <Link href="/ensino/biblioteca" className="text-secondary underline">
+          Abrir a biblioteca
+        </Link>
+      </Card>
+      <Card>
+        <h2 className="font-semibold">Notificações</h2>
+        <p className="mb-2 text-sm text-white/70">Avisos sobre os seus envios e a curadoria.</p>
+        <Link href="/ensino/notificacoes" className="text-secondary underline">
+          Ver notificações
+        </Link>
       </Card>
       <Card>
         <h2 className="font-semibold">Fórum</h2>

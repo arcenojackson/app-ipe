@@ -31,6 +31,14 @@ O `build` precisa das variáveis `NEXT_PUBLIC_FIREBASE_*` definidas.
 
 Menu e guarda de acesso passam a valer sozinhos.
 
+## Biblioteca e curadoria
+
+- Rotas: `/ensino/biblioteca` (parâmetros `?pasta={id}` abre uma pasta e `?item={id}` abre o detalhe de um item), `/ensino/revisao` (fila do curador) e `/ensino/notificacoes`.
+- Código em `src/modules/teaching/library/`: lógica pura (`tree`, `permissions`, `status`, `files`, `payloads`, `convert`), camada de dados (`repository`, `mutations`, `notifications`, `uploadFlow`) e telas em `ui/`.
+- As permissões reais estão nas regras do Firestore/Storage e nas Cloud Functions (`functions/src/teaching/library/`); a interface só esconde o que o papel não pode.
+- Regras do produto: todo envio é revisado e precisa de 2 aprovações de curadores diferentes do autor; devolver é 1 curador; rejeitar e apagar exigem 2 curadores (e qualquer curador pode recusar um pedido de exclusão); só curador gerencia pastas.
+- O portal precisa de pelo menos 3 curadores para aprovar envios de curadores e exclusões (a tela avisa).
+
 ## Acesso
 
 - `none` não entra; `teacher` lê a biblioteca e usa o fórum; `curator` também aprova;

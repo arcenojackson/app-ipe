@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -8,6 +11,7 @@ import '../../events/presentation/event_viewer_page.dart';
 import '../../events/presentation/event_editor_page.dart';
 import '../../home/presentation/home_shell.dart';
 import '../../../../src/app.dart';
+import 'teaching_notification_url.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -140,6 +144,11 @@ class NotificationService {
   /// Navega para a tela apropriada baseado nos dados da notificação
   void _navigateFromNotification(RemoteMessage message) {
     final data = message.data;
+    final portalUri = teachingPortalUriFromData(data);
+    if (portalUri != null) {
+      launchUrl(portalUri, mode: LaunchMode.externalApplication);
+      return;
+    }
     final type = data['type'];
     final navigator = IpeApp.navigatorKey.currentState;
     
@@ -339,16 +348,26 @@ class NotificationService {
       message.notification?.title ?? 'Nova notificação',
       message.notification?.body ?? '',
       details,
-      payload: message.data.toString(),
+      payload: jsonEncode(message.data),
     );
   }
 
   /// Handler quando o usuário toca em uma notificação local
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('Notificação tocada: ${response.payload}');
-    // O payload não contém dados estruturados para notificações locais,
-    // mas o _handleForegroundMessage já deve ter processado a mensagem
-    // Se precisar, podemos melhorar isso passando dados no payload
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        final portalUri = teachingPortalUriFromData(decoded);
+        if (portalUri != null) {
+          launchUrl(portalUri, mode: LaunchMode.externalApplication);
+        }
+      }
+    } catch (_) {
+      // Payload antigo (não JSON): nada a fazer.
+    }
   }
 
   /// Envia uma notificação de teste
