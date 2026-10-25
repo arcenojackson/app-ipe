@@ -14,12 +14,14 @@ import {
   movePayload,
   newFolderPayload,
   newLinkPayload,
+  editTagsPayload,
   renamePayload,
   resubmitLinkPayload,
   voteCommentError,
   votePayload,
 } from "./payloads";
 import {resubmitFileItem, uploadFileItem} from "./uploadFlow";
+import type {ItemTags} from "./tags";
 import type {LibraryItem, VoteAction} from "./types";
 
 const itemRef = (id: string) => doc(db, "teaching_items", id);
@@ -53,7 +55,7 @@ export async function createFolder(
 
 export async function createLink(
   uid: string,
-  input: {name: string; parentId: string | null; url: string; description?: string}
+  input: {name: string; url: string; description?: string; tags: ItemTags}
 ): Promise<string> {
   const id = doc(collection(db, "teaching_items")).id;
   await setDoc(itemRef(id), newLinkPayload({uid, ...input}, serverTimestamp()));
@@ -62,10 +64,8 @@ export async function createLink(
 
 export function uploadFile(
   uid: string,
-  parentId: string | null,
   file: File,
-  onProgress?: (fraction: number) => void,
-  name?: string
+  options: {tags: ItemTags; name?: string; onProgress?: (fraction: number) => void}
 ): Promise<string> {
   return uploadFileItem<File>(
     {
@@ -74,12 +74,16 @@ export function uploadFile(
       uploadObject,
       createItem: (id, payload) => setDoc(itemRef(id), payload),
     },
-    {uid, parentId, file, name, onProgress}
+    {uid, file, tags: options.tags, name: options.name, onProgress: options.onProgress}
   );
 }
 
 export async function renameItem(uid: string, id: string, name: string): Promise<void> {
   await updateDoc(itemRef(id), renamePayload({uid, name}, serverTimestamp()));
+}
+
+export async function editTags(uid: string, id: string, tags: ItemTags): Promise<void> {
+  await updateDoc(itemRef(id), editTagsPayload({uid, tags}, serverTimestamp()));
 }
 
 export async function moveItem(uid: string, id: string, parentId: string | null): Promise<void> {
@@ -102,7 +106,8 @@ export function resubmitFile(
   uid: string,
   item: LibraryItem,
   file: File,
-  onProgress?: (fraction: number) => void
+  onProgress?: (fraction: number) => void,
+  tags?: ItemTags
 ): Promise<void> {
   return resubmitFileItem<File>(
     {
@@ -111,14 +116,14 @@ export function resubmitFile(
       uploadObject,
       updateItem: (id, payload) => updateDoc(itemRef(id), payload),
     },
-    {uid, item, file, onProgress}
+    {uid, item, file, tags, onProgress}
   );
 }
 
 export async function resubmitLink(
   uid: string,
   item: LibraryItem,
-  input: {url: string; name?: string; description?: string}
+  input: {url: string; name?: string; description?: string; tags?: ItemTags}
 ): Promise<void> {
   await updateDoc(
     itemRef(item.id),

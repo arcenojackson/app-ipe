@@ -19,6 +19,16 @@ describe("libraryPermissions", () => {
   });
 });
 
+describe("itemPermissions — editar tags", () => {
+  it("curador edita tags de item publicado e em revisão; professor, admin sem papel e item em exclusão não", () => {
+    expect(itemPermissions(make({status: "published"}), curator).canEditTags).toBe(true);
+    expect(itemPermissions(make({}), curator2).canEditTags).toBe(true);
+    expect(itemPermissions(make({}), teacher).canEditTags).toBe(false);
+    expect(itemPermissions(make({}), adminOnly).canEditTags).toBe(false);
+    expect(itemPermissions(make({deleting: "execute"}), curator).canEditTags).toBe(false);
+  });
+});
+
 describe("itemPermissions — votar na publicação", () => {
   it("curador que não é o autor vota em item em revisão", () => {
     const p = itemPermissions(make({}), curator2);

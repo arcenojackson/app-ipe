@@ -8,6 +8,7 @@ export interface ItemPermissions {
   canCancelDelete: boolean;
   canVoteDelete: boolean;
   canResubmit: boolean;
+  canEditTags: boolean;
 }
 
 export function libraryPermissions(viewer: Viewer) {
@@ -27,6 +28,7 @@ export function itemPermissions(item: LibraryItem, viewer: Viewer): ItemPermissi
     canCancelDelete: false,
     canVoteDelete: false,
     canResubmit: false,
+    canEditTags: false,
   };
   if (item.deleting) return none;
 
@@ -49,5 +51,6 @@ export function itemPermissions(item: LibraryItem, viewer: Viewer): ItemPermissi
       viewer.isCurator && request !== null && request.requestedBy !== viewer.uid,
     canResubmit:
       decided && item.status === "returned" && item.authorId === viewer.uid,
+    canEditTags: viewer.isCurator,
   };
 }

@@ -1,5 +1,7 @@
 import type {AccessClaims} from "@/core/auth/access";
 
+export type {ItemTags} from "./tags";
+
 export type ItemType = "folder" | "file" | "link";
 export type ItemStatus = "active" | "in_review" | "returned" | "published";
 export type VoteAction =
@@ -32,6 +34,12 @@ export interface LibraryItem {
   storagePath?: string;
   url?: string;
   description?: string;
+  // Ids de teaching_tags; toItem sempre preenche (vazio quando ausente).
+  typeTags?: string[];
+  subjectTags?: string[];
+  ageTags?: string[];
+  searchTokens?: string[];
+  publishedAt?: number;
   returnComment?: string | null;
   returnedBy?: string | null;
   deleteRequest?: DeleteRequest | null;

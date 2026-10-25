@@ -8,6 +8,7 @@ import {TextField} from "@/core/ui/TextField";
 import {validateName} from "../files";
 import {createFolder, createLink} from "../mutations";
 import {libraryPermissions} from "../permissions";
+import {EMPTY_TAGS} from "../tags";
 import {sortItems, buildBreadcrumbs, filterByName, indexById} from "../tree";
 import type {LibraryItem, Viewer} from "../types";
 import {viewerFrom} from "../types";
@@ -125,7 +126,7 @@ export function LibraryContent({
           <Button type="button" variant="text" onClick={() => setDialog("link")}>Adicionar link</Button>
         )}
       </div>
-      <UploadPanel uid={viewer.uid} parentId={folderId} onUploaded={catalog.reload} />
+      <UploadPanel uid={viewer.uid} onUploaded={catalog.reload} />
       {dialog === "folder" && (
         <TextPromptDialog title="Nova pasta" label="Nome da pasta" submitLabel="Criar" validate={validateName}
           onSubmit={async (name) => { await createFolder(viewer.uid, name, folderId); catalog.reload(); }}
@@ -133,7 +134,7 @@ export function LibraryContent({
       )}
       {dialog === "link" && (
         <LinkDialog submitLabel="Adicionar"
-          onSubmit={async (value) => { await createLink(viewer.uid, {...value, parentId: folderId}); catalog.reload(); }}
+          onSubmit={async (value) => { await createLink(viewer.uid, {...value, tags: EMPTY_TAGS}); catalog.reload(); }}
           onClose={() => setDialog(null)} />
       )}
       {error && <p role="alert" className="text-sm text-error">{error}</p>}

@@ -1,3 +1,4 @@
+import {EMPTY_TAGS} from "../tags";
 import {render, screen, waitFor, fireEvent} from "@testing-library/react";
 import {useState} from "react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
@@ -368,7 +369,7 @@ describe("LibraryContent: criar e enviar", () => {
     fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
     await waitFor(() =>
       expect(mutations.createLink).toHaveBeenCalledWith("t1", {
-        name: "Site", url: "https://x.org", description: "Bom", parentId: "f1",
+        name: "Site", url: "https://x.org", description: "Bom", tags: EMPTY_TAGS,
       })
     );
     await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
@@ -389,7 +390,7 @@ describe("LibraryContent: criar e enviar", () => {
     fireEvent.change(screen.getByLabelText("Escolher arquivos"), {
       target: {files: [new File(["x"], "a.pdf", {type: "application/pdf"})]},
     });
-    await waitFor(() => expect(mutations.uploadFile).toHaveBeenCalledWith("t1", "f1", expect.any(File), expect.any(Function)));
+    await waitFor(() => expect(mutations.uploadFile).toHaveBeenCalledWith("t1", expect.any(File), {tags: EMPTY_TAGS, onProgress: expect.any(Function)}));
     await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
   });
 });

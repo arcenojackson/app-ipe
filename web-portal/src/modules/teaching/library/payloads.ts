@@ -1,5 +1,13 @@
 import {safeFileName, storagePathFor} from "./files";
+import {searchTokens} from "./searchTokens";
+import type {ItemTags} from "./tags";
 import type {VoteAction} from "./types";
+
+const tagFields = (tags: ItemTags) => ({
+  typeTags: tags.typeTags,
+  subjectTags: tags.subjectTags,
+  ageTags: tags.ageTags,
+});
 
 // `now` é o valor de serverTimestamp(), injetado para os construtores ficarem
 // puros. Cada construtor produz exatamente os campos que as regras aceitam.
@@ -26,17 +34,17 @@ export function newFilePayload(
     uid: string;
     itemId: string;
     name: string;
-    parentId: string | null;
     fileName: string;
     contentType: string;
     size: number;
+    tags: ItemTags;
   },
   now: unknown
 ) {
   return {
     type: "file",
     name: i.name.trim(),
-    parentId: i.parentId,
+    parentId: null,
     authorId: i.uid,
     updatedBy: i.uid,
     status: "in_review",
@@ -45,6 +53,8 @@ export function newFilePayload(
     contentType: i.contentType,
     size: i.size,
     storagePath: storagePathFor(i.itemId, 1, i.fileName),
+    ...tagFields(i.tags),
+    searchTokens: searchTokens(i.name),
     createdAt: now,
     updatedAt: now,
   };
@@ -54,9 +64,9 @@ export function newLinkPayload(
   i: {
     uid: string;
     name: string;
-    parentId: string | null;
     url: string;
     description?: string;
+    tags: ItemTags;
   },
   now: unknown
 ) {
@@ -64,20 +74,32 @@ export function newLinkPayload(
   return {
     type: "link",
     name: i.name.trim(),
-    parentId: i.parentId,
+    parentId: null,
     authorId: i.uid,
     updatedBy: i.uid,
     status: "in_review",
     version: 1,
     url: i.url.trim(),
     ...(description ? {description} : {}),
+    ...tagFields(i.tags),
+    searchTokens: searchTokens(i.name),
     createdAt: now,
     updatedAt: now,
   };
 }
 
 export function renamePayload(i: {uid: string; name: string}, now: unknown) {
-  return {name: i.name.trim(), updatedBy: i.uid, updatedAt: now};
+  return {
+    name: i.name.trim(),
+    searchTokens: searchTokens(i.name),
+    updatedBy: i.uid,
+    updatedAt: now,
+  };
+}
+
+// Só os três campos de tag: não mexe em version nem em votos (curatorEditsTags).
+export function editTagsPayload(i: {uid: string; tags: ItemTags}, now: unknown) {
+  return {...tagFields(i.tags), updatedBy: i.uid, updatedAt: now};
 }
 
 export function movePayload(
@@ -124,6 +146,7 @@ export function resubmitFilePayload(
     size: number;
     name?: string;
     storagePath?: string;
+    tags?: ItemTags;
   },
   now: unknown
 ) {
@@ -132,7 +155,8 @@ export function resubmitFilePayload(
   return {
     status: "in_review",
     version,
-    ...(name ? {name} : {}),
+    ...(name ? {name, searchTokens: searchTokens(name)} : {}),
+    ...(i.tags ? tagFields(i.tags) : {}),
     fileName: safeFileName(i.fileName),
     contentType: i.contentType,
     size: i.size,
@@ -149,6 +173,7 @@ export function resubmitLinkPayload(
     url: string;
     name?: string;
     description?: string;
+    tags?: ItemTags;
   },
   now: unknown
 ) {
@@ -157,7 +182,8 @@ export function resubmitLinkPayload(
   return {
     status: "in_review",
     version: i.currentVersion + 1,
-    ...(name ? {name} : {}),
+    ...(name ? {name, searchTokens: searchTokens(name)} : {}),
+    ...(i.tags ? tagFields(i.tags) : {}),
     url: i.url.trim(),
     ...(description ? {description} : {}),
     updatedBy: i.uid,

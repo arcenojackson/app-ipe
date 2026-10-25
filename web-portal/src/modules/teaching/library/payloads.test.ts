@@ -2,6 +2,7 @@ import {describe, expect, it} from "vitest";
 import {
   cancelDeletePayload,
   deleteRequestPayload,
+  editTagsPayload,
   movePayload,
   newFilePayload,
   newFolderPayload,
@@ -12,8 +13,10 @@ import {
   voteCommentError,
   votePayload,
 } from "./payloads";
+import type {ItemTags} from "./tags";
 
 const NOW = "AGORA";
+const TAGS: ItemTags = {typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump", "faixa-adultos"]};
 
 describe("criação", () => {
   it("pasta: ativa, versão 1, autor e updatedBy iguais ao uid", () => {
@@ -23,29 +26,33 @@ describe("criação", () => {
     });
   });
 
-  it("arquivo: em revisão, caminho no Storage com o id do item e nome sem barras", () => {
+  it("arquivo: em revisão, sem pasta, com tags e tokens, caminho no Storage com o id do item", () => {
     expect(newFilePayload({
-      uid: "t1", itemId: "abc", name: "Aula 1", parentId: "f1",
+      uid: "t1", itemId: "abc", name: "Fé", tags: TAGS,
       fileName: "aula/1.pdf", contentType: "application/pdf", size: 1000,
     }, NOW)).toEqual({
-      type: "file", name: "Aula 1", parentId: "f1", authorId: "t1", updatedBy: "t1",
+      type: "file", name: "Fé", parentId: null, authorId: "t1", updatedBy: "t1",
       status: "in_review", version: 1, fileName: "aula_1.pdf", contentType: "application/pdf",
-      size: 1000, storagePath: "teaching/materials/abc/v1-aula_1.pdf", createdAt: NOW, updatedAt: NOW,
+      size: 1000, storagePath: "teaching/materials/abc/v1-aula_1.pdf",
+      ...TAGS, searchTokens: ["fe"], createdAt: NOW, updatedAt: NOW,
     });
   });
 
-  it("link: em revisão; description só quando preenchida", () => {
-    const withDescription = newLinkPayload({uid: "t1", name: "Livro", parentId: null, url: " https://x.org ", description: " bom "}, NOW);
-    expect(withDescription).toMatchObject({type: "link", status: "in_review", url: "https://x.org", description: "bom"});
-    const without = newLinkPayload({uid: "t1", name: "Livro", parentId: null, url: "https://x.org", description: "  "}, NOW);
+  it("link: em revisão, com tags; description só quando preenchida", () => {
+    const withDescription = newLinkPayload({uid: "t1", name: "Livro", url: " https://x.org ", description: " bom ", tags: TAGS}, NOW);
+    expect(withDescription).toMatchObject({
+      type: "link", status: "in_review", url: "https://x.org", description: "bom", parentId: null, ...TAGS,
+    });
+    expect(withDescription.searchTokens).toContain("livro");
+    const without = newLinkPayload({uid: "t1", name: "Livro", url: "https://x.org", description: "  ", tags: TAGS}, NOW);
     expect(Object.keys(without)).not.toContain("description");
   });
 
   it("nenhum construtor de criação inclui campos que só a Function escreve", () => {
     const docs = [
       newFolderPayload({uid: "c1", name: "A", parentId: null}, NOW),
-      newFilePayload({uid: "t1", itemId: "i", name: "A", parentId: null, fileName: "a.pdf", contentType: "application/pdf", size: 1}, NOW),
-      newLinkPayload({uid: "t1", name: "A", parentId: null, url: "https://x.org"}, NOW),
+      newFilePayload({uid: "t1", itemId: "i", name: "A", fileName: "a.pdf", contentType: "application/pdf", size: 1, tags: TAGS}, NOW),
+      newLinkPayload({uid: "t1", name: "A", url: "https://x.org", tags: TAGS}, NOW),
     ];
     for (const doc of docs) {
       for (const forbidden of ["deleteRequest", "deleteRequested", "deleting", "returnComment", "returnedBy"]) {
@@ -57,8 +64,15 @@ describe("criação", () => {
 
 describe("organização e exclusão", () => {
   it("renomear e mover mexem só nos campos permitidos", () => {
-    expect(renamePayload({uid: "c1", name: " Novo "}, NOW)).toEqual({name: "Novo", updatedBy: "c1", updatedAt: NOW});
+    expect(renamePayload({uid: "c1", name: " Novo "}, NOW)).toEqual({
+      name: "Novo", searchTokens: ["no", "nov", "novo"], updatedBy: "c1", updatedAt: NOW,
+    });
     expect(movePayload({uid: "c1", parentId: null}, NOW)).toEqual({parentId: null, updatedBy: "c1", updatedAt: NOW});
+  });
+
+  it("editar tags mexe só nos três campos de tag e no autor da alteração", () => {
+    expect(editTagsPayload({uid: "c1", tags: TAGS}, NOW)).toEqual({...TAGS, updatedBy: "c1", updatedAt: NOW});
+    expect(Object.keys(editTagsPayload({uid: "c1", tags: TAGS}, NOW))).not.toContain("searchTokens");
   });
 
   it("pedido de exclusão: uuid recebido, quem pediu, motivo opcional", () => {
@@ -92,6 +106,25 @@ describe("reenvio", () => {
     expect(resubmitLinkPayload({uid: "t1", currentVersion: 1, url: " https://novo.org "}, NOW)).toEqual({
       status: "in_review", version: 2, url: "https://novo.org", updatedBy: "t1", updatedAt: NOW,
     });
+  });
+});
+
+describe("reenvio com tags", () => {
+  it("arquivo: inclui tags só quando vierem; name recalcula searchTokens", () => {
+    const withTags = resubmitFilePayload({
+      uid: "t1", itemId: "i", currentVersion: 1, fileName: "b.pdf", contentType: "application/pdf", size: 5,
+      name: "Novo nome", tags: TAGS,
+    }, NOW);
+    expect(withTags).toMatchObject({...TAGS, name: "Novo nome", searchTokens: ["no", "nov", "novo", "nom", "nome"]});
+    const without = resubmitFilePayload({
+      uid: "t1", itemId: "i", currentVersion: 1, fileName: "b.pdf", contentType: "application/pdf", size: 5,
+    }, NOW);
+    for (const key of ["typeTags", "subjectTags", "ageTags", "searchTokens"]) expect(Object.keys(without)).not.toContain(key);
+  });
+
+  it("link: inclui tags quando vierem", () => {
+    const payload = resubmitLinkPayload({uid: "t1", currentVersion: 1, url: "https://novo.org", tags: TAGS}, NOW);
+    expect(payload).toMatchObject(TAGS);
   });
 });
 

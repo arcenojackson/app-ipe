@@ -3,6 +3,7 @@
 import {useRef, useState, type DragEvent} from "react";
 import {Button} from "@/core/ui/Button";
 import {uploadFile} from "../mutations";
+import {EMPTY_TAGS} from "../tags";
 import {UploadError} from "../uploadFlow";
 
 interface Entry {
@@ -15,11 +16,9 @@ interface Entry {
 
 export function UploadPanel({
   uid,
-  parentId,
   onUploaded,
 }: {
   uid: string;
-  parentId: string | null;
   onUploaded: () => void;
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
@@ -35,7 +34,7 @@ export function UploadPanel({
       const key = counter.current++;
       setEntries((list) => [...list, {key, name: file.name, progress: 0, status: "uploading"}]);
       try {
-        await uploadFile(uid, parentId, file, (progress) => patch(key, {progress}));
+        await uploadFile(uid, file, {tags: EMPTY_TAGS, onProgress: (progress) => patch(key, {progress})});
         patch(key, {status: "done", progress: 1});
         onUploaded();
       } catch (error) {
