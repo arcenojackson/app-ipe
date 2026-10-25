@@ -18,20 +18,9 @@ service firebase.storage {
       );
     }
 
+    // Qualquer tipo de arquivo é aceito (decisão do produto); o limite é o tamanho.
     function allowedContentType() {
-      return request.resource.contentType == 'application/pdf' ||
-        request.resource.contentType.matches('image/.*') ||
-        request.resource.contentType in [
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/vnd.ms-powerpoint',
-          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.oasis.opendocument.text',
-          'application/vnd.oasis.opendocument.presentation',
-          'application/vnd.oasis.opendocument.spreadsheet'
-        ];
+      return true;
     }
 
     function itemPath(id) {

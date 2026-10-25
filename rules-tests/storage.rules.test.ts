@@ -80,12 +80,14 @@ describe("criação, sobrescrita e exclusão", () => {
     await assertSucceeds(uploadBytes(ref(curator(), p("n2", "a.pdf")), bytes, pdf));
   });
 
-  it("sem papel e anônimo não enviam; tipo fora da lista é negado", async () => {
+  it("sem papel e anônimo não enviam", async () => {
     await assertFails(uploadBytes(ref(plain(), p("n3", "a.pdf")), bytes, pdf));
     await assertFails(uploadBytes(ref(anon(), p("n3", "a.pdf")), bytes, pdf));
-    await assertFails(uploadBytes(ref(teacher(), p("n3", "x.exe")), bytes, {
-      contentType: "application/x-msdownload",
-    }));
+  });
+
+  it("aceita application/zip e qualquer outro tipo, até 100 MB", async () => {
+    await assertSucceeds(uploadBytes(ref(teacher(), p("n5", "a.zip")), bytes, {contentType: "application/zip"}));
+    await assertSucceeds(uploadBytes(ref(teacher(), p("n5", "x.bin")), bytes, {contentType: "application/octet-stream"}));
   });
 
   it("arquivo acima de 100 MB é negado", async () => {
