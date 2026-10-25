@@ -11,8 +11,6 @@ import {db, storage} from "@/core/firebase/client";
 import {
   cancelDeletePayload,
   deleteRequestPayload,
-  movePayload,
-  newFolderPayload,
   newLinkPayload,
   editTagsPayload,
   renamePayload,
@@ -41,16 +39,6 @@ function uploadObject(
       () => resolve()
     );
   });
-}
-
-export async function createFolder(
-  uid: string,
-  name: string,
-  parentId: string | null
-): Promise<string> {
-  const id = doc(collection(db, "teaching_items")).id;
-  await setDoc(itemRef(id), newFolderPayload({uid, name, parentId}, serverTimestamp()));
-  return id;
 }
 
 export async function createLink(
@@ -84,10 +72,6 @@ export async function renameItem(uid: string, id: string, name: string): Promise
 
 export async function editTags(uid: string, id: string, tags: ItemTags): Promise<void> {
   await updateDoc(itemRef(id), editTagsPayload({uid, tags}, serverTimestamp()));
-}
-
-export async function moveItem(uid: string, id: string, parentId: string | null): Promise<void> {
-  await updateDoc(itemRef(id), movePayload({uid, parentId}, serverTimestamp()));
 }
 
 export async function requestDelete(uid: string, id: string, reason?: string): Promise<void> {

@@ -3,9 +3,7 @@ import {
   cancelDeletePayload,
   deleteRequestPayload,
   editTagsPayload,
-  movePayload,
   newFilePayload,
-  newFolderPayload,
   newLinkPayload,
   renamePayload,
   resubmitFilePayload,
@@ -19,13 +17,6 @@ const NOW = "AGORA";
 const TAGS: ItemTags = {typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump", "faixa-adultos"]};
 
 describe("criação", () => {
-  it("pasta: ativa, versão 1, autor e updatedBy iguais ao uid", () => {
-    expect(newFolderPayload({uid: "c1", name: "  Crianças ", parentId: null}, NOW)).toEqual({
-      type: "folder", name: "Crianças", parentId: null, authorId: "c1", updatedBy: "c1",
-      status: "active", version: 1, createdAt: NOW, updatedAt: NOW,
-    });
-  });
-
   it("arquivo: em revisão, sem pasta, com tags e tokens, caminho no Storage com o id do item", () => {
     expect(newFilePayload({
       uid: "t1", itemId: "abc", name: "Fé", tags: TAGS,
@@ -50,7 +41,6 @@ describe("criação", () => {
 
   it("nenhum construtor de criação inclui campos que só a Function escreve", () => {
     const docs = [
-      newFolderPayload({uid: "c1", name: "A", parentId: null}, NOW),
       newFilePayload({uid: "t1", itemId: "i", name: "A", fileName: "a.pdf", contentType: "application/pdf", size: 1, tags: TAGS}, NOW),
       newLinkPayload({uid: "t1", name: "A", url: "https://x.org", tags: TAGS}, NOW),
     ];
@@ -63,11 +53,10 @@ describe("criação", () => {
 });
 
 describe("organização e exclusão", () => {
-  it("renomear e mover mexem só nos campos permitidos", () => {
+  it("renomear mexe só nos campos permitidos", () => {
     expect(renamePayload({uid: "c1", name: " Novo "}, NOW)).toEqual({
       name: "Novo", searchTokens: ["no", "nov", "novo"], updatedBy: "c1", updatedAt: NOW,
     });
-    expect(movePayload({uid: "c1", parentId: null}, NOW)).toEqual({parentId: null, updatedBy: "c1", updatedAt: NOW});
   });
 
   it("editar tags mexe só nos três campos de tag e no autor da alteração", () => {

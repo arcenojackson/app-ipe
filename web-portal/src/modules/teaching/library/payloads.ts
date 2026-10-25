@@ -12,23 +12,6 @@ const tagFields = (tags: ItemTags) => ({
 // `now` é o valor de serverTimestamp(), injetado para os construtores ficarem
 // puros. Cada construtor produz exatamente os campos que as regras aceitam.
 
-export function newFolderPayload(
-  i: {uid: string; name: string; parentId: string | null},
-  now: unknown
-) {
-  return {
-    type: "folder",
-    name: i.name.trim(),
-    parentId: i.parentId,
-    authorId: i.uid,
-    updatedBy: i.uid,
-    status: "active",
-    version: 1,
-    createdAt: now,
-    updatedAt: now,
-  };
-}
-
 export function newFilePayload(
   i: {
     uid: string;
@@ -100,13 +83,6 @@ export function renamePayload(i: {uid: string; name: string}, now: unknown) {
 // Só os três campos de tag: não mexe em version nem em votos (curatorEditsTags).
 export function editTagsPayload(i: {uid: string; tags: ItemTags}, now: unknown) {
   return {...tagFields(i.tags), updatedBy: i.uid, updatedAt: now};
-}
-
-export function movePayload(
-  i: {uid: string; parentId: string | null},
-  now: unknown
-) {
-  return {parentId: i.parentId, updatedBy: i.uid, updatedAt: now};
 }
 
 export function deleteRequestPayload(

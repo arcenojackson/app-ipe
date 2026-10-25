@@ -1,14 +1,12 @@
 "use client";
 
-import {useState, type FormEvent, type ReactNode} from "react";
+import {useState, type FormEvent} from "react";
 import {Button} from "@/core/ui/Button";
 import {TextField} from "@/core/ui/TextField";
 import {validateDescription, validateName, validateUrl} from "../files";
 import {EMPTY_TAGS, validateTags, type ItemTags} from "../tags";
 import {useTags} from "../useTags";
 import {TagPicker} from "./TagPicker";
-import {buildBreadcrumbs} from "../tree";
-import type {LibraryItem} from "../types";
 import {Dialog} from "./Dialog";
 
 const GENERIC_ERROR = "Não foi possível concluir. Tente novamente.";
@@ -171,53 +169,6 @@ export function ReasonDialog({
         <ErrorLine error={error} />
         <Actions busy={busy} submitLabel={submitLabel} onClose={onClose} />
       </form>
-    </Dialog>
-  );
-}
-
-// Pastas para onde o item pode ir: nunca ele mesmo nem seus descendentes.
-export function eligibleTargets(
-  item: LibraryItem,
-  folders: LibraryItem[],
-  byId: Map<string, LibraryItem>
-): LibraryItem[] {
-  return folders.filter((folder) => {
-    if (folder.id === item.id) return false;
-    if (item.type !== "folder") return true;
-    return !buildBreadcrumbs(byId, folder.id).some((p) => p.id === item.id);
-  });
-}
-
-export function MoveDialog({
-  item, folders, byId, onPick, onClose,
-}: {
-  item: LibraryItem;
-  folders: LibraryItem[];
-  byId: Map<string, LibraryItem>;
-  onPick: (parentId: string | null) => Promise<void>;
-  onClose: () => void;
-}) {
-  const {error, busy, run} = useSubmit(onClose);
-  const targets = eligibleTargets(item, folders, byId);
-  const pathOf = (folder: LibraryItem) => buildBreadcrumbs(byId, folder.id).map((p) => p.name).join(" / ");
-  const choice = (label: ReactNode, parentId: string | null, key: string) => (
-    <li key={key}>
-      <button type="button" disabled={busy} onClick={() => void run(null, () => onPick(parentId))}
-        className="w-full rounded-button px-3 py-2 text-left hover:bg-white/10 disabled:opacity-50">
-        {label}
-      </button>
-    </li>
-  );
-  return (
-    <Dialog title={`Mover "${item.name}"`} onClose={onClose}>
-      <ul className="max-h-72 space-y-1 overflow-y-auto">
-        {choice("Biblioteca (raiz)", null, "raiz")}
-        {targets.map((folder) => choice(pathOf(folder), folder.id, folder.id))}
-      </ul>
-      <ErrorLine error={error} />
-      <div className="mt-4 flex justify-end">
-        <Button type="button" variant="text" onClick={onClose}>Cancelar</Button>
-      </div>
     </Dialog>
   );
 }

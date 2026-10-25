@@ -19,7 +19,6 @@ import {db} from "@/core/firebase/client";
 import {toItem, toVote} from "./convert";
 import {collectPage, planQuery, type Batch, type LibraryFilters} from "./libraryQuery";
 import {buildReviewQueue, type ReviewQueue} from "./reviewQueue";
-import {mergeById} from "./merge";
 import type {LibraryItem, LibraryVote, Viewer} from "./types";
 
 const items = () => collection(db, "teaching_items");
@@ -28,60 +27,6 @@ function itemsFrom(snapshot: QuerySnapshot<DocumentData>): LibraryItem[] {
   return snapshot.docs
     .map((d) => toItem(d.id, d.data()))
     .filter((item): item is LibraryItem => item !== null);
-}
-
-// Curador e admin leem tudo; professor precisa de filtros que provem a regra:
-// publicado, ativo (pastas) e os próprios envios da pasta.
-function folderQueries(folderId: string | null, viewer: Viewer) {
-  if (viewer.isCurator || viewer.isAdmin) {
-    return [query(items(), where("parentId", "==", folderId))];
-  }
-  return [
-    query(items(), where("parentId", "==", folderId), where("status", "==", "published")),
-    query(items(), where("parentId", "==", folderId), where("status", "==", "active")),
-    query(items(), where("parentId", "==", folderId), where("authorId", "==", viewer.uid)),
-  ];
-}
-
-export function subscribeFolder(
-  folderId: string | null,
-  viewer: Viewer,
-  onData: (items: LibraryItem[]) => void,
-  onError: (error: Error) => void
-): () => void {
-  const queries = folderQueries(folderId, viewer);
-  const latest: Array<LibraryItem[] | undefined> = queries.map(() => undefined);
-  let active = true;
-  const unsubscribers = queries.map((q, index) =>
-    onSnapshot(
-      q,
-      (snapshot) => {
-        if (!active) return;
-        latest[index] = itemsFrom(snapshot);
-        if (latest.every((list) => list !== undefined)) {
-          onData(mergeById(latest as LibraryItem[][]));
-        }
-      },
-      (error) => active && onError(error)
-    )
-  );
-  return () => {
-    active = false;
-    unsubscribers.forEach((stop) => stop());
-  };
-}
-
-// Todos os itens que o espectador pode ver (busca por nome e migalhas).
-export async function loadAllVisible(viewer: Viewer): Promise<LibraryItem[]> {
-  if (viewer.isCurator || viewer.isAdmin) {
-    return itemsFrom(await getDocs(items()));
-  }
-  const snapshots = await Promise.all([
-    getDocs(query(items(), where("status", "==", "published"))),
-    getDocs(query(items(), where("status", "==", "active"))),
-    getDocs(query(items(), where("authorId", "==", viewer.uid))),
-  ]);
-  return mergeById(snapshots.map(itemsFrom));
 }
 
 export function subscribeItem(

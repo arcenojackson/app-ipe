@@ -1,9 +1,7 @@
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {describe, expect, it, vi} from "vitest";
-import {indexById} from "../tree";
-import type {LibraryItem} from "../types";
 import type {Tag} from "../tags";
-import {LinkDialog, MoveDialog, ReasonDialog, TagEditDialog, TextPromptDialog, eligibleTargets} from "./Dialogs";
+import {LinkDialog, ReasonDialog, TagEditDialog, TextPromptDialog} from "./Dialogs";
 
 const tagList: Tag[] = [
   {id: "tipo-artigos", kind: "type", name: "Artigos", order: 1, active: true},
@@ -149,32 +147,5 @@ describe("ReasonDialog", () => {
     render(<ReasonDialog title="Pedir exclusão" label="Motivo (opcional)" submitLabel="Pedir exclusão" onSubmit={onSubmit} onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", {name: "Pedir exclusão"}));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(""));
-  });
-});
-
-describe("eligibleTargets e MoveDialog", () => {
-  const f = (id: string, name: string, parentId: string | null = null): LibraryItem => ({
-    id, name, type: "folder", parentId, authorId: "c1", status: "active", version: 1,
-  });
-  const folders = [f("A", "Crianças"), f("B", "Antigo", "A"), f("C", "Gênesis", "B"), f("D", "Jovens")];
-  const byId = indexById(folders);
-
-  it("não oferece a própria pasta nem descendentes", () => {
-    expect(eligibleTargets(folders[0], folders, byId).map((i) => i.id)).toEqual(["D"]);
-    expect(eligibleTargets(folders[1], folders, byId).map((i) => i.id)).toEqual(["A", "D"]);
-  });
-
-  it("arquivo pode ir para qualquer pasta", () => {
-    const file: LibraryItem = {id: "x", name: "Aula", type: "file", parentId: "A", authorId: "t", status: "published", version: 1};
-    expect(eligibleTargets(file, folders, byId).map((i) => i.id)).toEqual(["A", "B", "C", "D"]);
-  });
-
-  it("MoveDialog lista a raiz e as pastas e devolve a escolha", async () => {
-    const onPick = vi.fn().mockResolvedValue(undefined);
-    render(<MoveDialog item={folders[2]} folders={folders} byId={byId} onPick={onPick} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", {name: "Biblioteca (raiz)"}));
-    await waitFor(() => expect(onPick).toHaveBeenCalledWith(null));
-    fireEvent.click(screen.getByRole("button", {name: "Crianças / Antigo"}));
-    await waitFor(() => expect(onPick).toHaveBeenCalledWith("B"));
   });
 });
