@@ -12,7 +12,7 @@ const repo = vi.hoisted(() => ({
 }));
 const mutations = vi.hoisted(() => ({
   castVote: vi.fn(), requestDelete: vi.fn(), cancelDelete: vi.fn(), renameItem: vi.fn(),
-  moveItem: vi.fn(), resubmitFile: vi.fn(), resubmitLink: vi.fn(),
+  moveItem: vi.fn(), editTags: vi.fn(), resubmitFile: vi.fn(), resubmitLink: vi.fn(),
 }));
 vi.mock("./PreviewPane", () => ({
   PreviewPane: ({item}: {item: LibraryItem}) => <div data-testid="preview">{`preview de ${item.name}`}</div>,
@@ -193,6 +193,26 @@ describe("ItemDetail — histórico e visualização", () => {
     setup(curator2, file({deleting: "reject"}));
     expect(await screen.findByText("Este item está sendo excluído.")).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: "Aprovar"})).not.toBeInTheDocument();
+  });
+});
+
+describe("ItemDetail — editar tags", () => {
+  it("curador edita as tags e salva", async () => {
+    const {onChanged} = setup(curator1, file({status: "in_review", typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]}));
+    fireEvent.click(await screen.findByRole("button", {name: "Editar tags"}));
+    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
+    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
+    fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
+    await waitFor(() => expect(mutations.editTags).toHaveBeenCalledWith("c1", "i1", {
+      typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"],
+    }));
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+  });
+
+  it("professor autor não vê Editar tags", async () => {
+    setup(teacher, file());
+    await screen.findByText("Aula 1");
+    expect(screen.queryByRole("button", {name: "Editar tags"})).not.toBeInTheDocument();
   });
 });
 

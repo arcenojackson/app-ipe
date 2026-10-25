@@ -4,6 +4,9 @@ import {useState, type FormEvent, type ReactNode} from "react";
 import {Button} from "@/core/ui/Button";
 import {TextField} from "@/core/ui/TextField";
 import {validateDescription, validateName, validateUrl} from "../files";
+import {EMPTY_TAGS, validateTags, type ItemTags} from "../tags";
+import {useTags} from "../useTags";
+import {TagPicker} from "./TagPicker";
 import {buildBreadcrumbs} from "../tree";
 import type {LibraryItem} from "../types";
 import {Dialog} from "./Dialog";
@@ -74,14 +77,18 @@ export function TextPromptDialog({
 }
 
 export function LinkDialog({
-  title = "Adicionar link", initial, submitLabel, onSubmit, onClose,
+  title = "Adicionar link", initial, submitLabel, withTags = false, onSubmit, onClose,
 }: {
   title?: string;
   initial?: {name: string; url: string; description: string};
   submitLabel: string;
-  onSubmit: (value: {name: string; url: string; description: string}) => Promise<void>;
+  // Pede uma tag de cada tipo (criação de link novo).
+  withTags?: boolean;
+  onSubmit: (value: {name: string; url: string; description: string; tags?: ItemTags}) => Promise<void>;
   onClose: () => void;
 }) {
+  const [tags, setTags] = useState<ItemTags>(EMPTY_TAGS);
+  const {tags: tagList} = useTags();
   const [name, setName] = useState(initial?.name ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -91,15 +98,42 @@ export function LinkDialog({
       <form className="space-y-3" onSubmit={(e: FormEvent) => {
         e.preventDefault();
         void run(
-          validateName(name) ?? validateUrl(url) ?? validateDescription(description),
-          () => onSubmit({name, url, description})
+          validateName(name) ?? validateUrl(url) ?? validateDescription(description) ??
+            (withTags ? validateTags(tags) : null),
+          () => onSubmit(withTags ? {name, url, description, tags} : {name, url, description})
         );
       }}>
         <TextField id="link-name" label="Nome" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         <TextField id="link-url" label="Endereço (URL)" value={url} onChange={(e) => setUrl(e.target.value)} />
         <TextField id="link-description" label="Descrição (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+        {withTags && <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} />}
         <ErrorLine error={error} />
         <Actions busy={busy} submitLabel={submitLabel} onClose={onClose} />
+      </form>
+    </Dialog>
+  );
+}
+
+// Curador corrige ou acrescenta tags (no momento da revisão ou depois).
+export function TagEditDialog({
+  initial, onSubmit, onClose,
+}: {
+  initial: ItemTags;
+  onSubmit: (tags: ItemTags) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [tags, setTags] = useState<ItemTags>(initial);
+  const {tags: tagList} = useTags();
+  const {error, busy, run} = useSubmit(onClose);
+  return (
+    <Dialog title="Editar tags" onClose={onClose} wide>
+      <form onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        void run(validateTags(tags), () => onSubmit(tags));
+      }}>
+        <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} />
+        <ErrorLine error={error} />
+        <Actions busy={busy} submitLabel="Salvar tags" onClose={onClose} />
       </form>
     </Dialog>
   );

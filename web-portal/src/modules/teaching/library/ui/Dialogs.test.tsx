@@ -2,7 +2,17 @@ import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {describe, expect, it, vi} from "vitest";
 import {indexById} from "../tree";
 import type {LibraryItem} from "../types";
-import {LinkDialog, MoveDialog, ReasonDialog, TextPromptDialog, eligibleTargets} from "./Dialogs";
+import type {Tag} from "../tags";
+import {LinkDialog, MoveDialog, ReasonDialog, TagEditDialog, TextPromptDialog, eligibleTargets} from "./Dialogs";
+
+const tagList: Tag[] = [
+  {id: "tipo-artigos", kind: "type", name: "Artigos", order: 1, active: true},
+  {id: "assunto-trindade", kind: "subject", name: "Trindade", order: 1, active: true},
+  {id: "faixa-ump", kind: "age", name: "UMP", order: 1, active: true},
+];
+vi.mock("../useTags", () => ({
+  useTags: () => ({tags: tagList, error: null, byId: new Map(tagList.map((t) => [t.id, t])), active: () => tagList}),
+}));
 
 describe("TextPromptDialog", () => {
   const setup = (onSubmit = vi.fn().mockResolvedValue(undefined)) => {
@@ -66,6 +76,57 @@ describe("LinkDialog", () => {
     fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
     expect(screen.getByRole("alert")).toHaveTextContent("A descrição pode ter no máximo 1000 caracteres.");
     expect(onSubmit).not.toHaveBeenCalled();
+  });
+});
+
+describe("LinkDialog com tags", () => {
+  const fill = () => {
+    fireEvent.change(screen.getByLabelText("Nome"), {target: {value: "Livro"}});
+    fireEvent.change(screen.getByLabelText("Endereço (URL)"), {target: {value: "https://x.org"}});
+  };
+
+  it("não envia sem uma tag de cada tipo e envia com elas", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<LinkDialog withTags submitLabel="Adicionar" onSubmit={onSubmit} onClose={vi.fn()} />);
+    fill();
+    fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("Escolha pelo menos uma tag de tipo.");
+    expect(onSubmit).not.toHaveBeenCalled();
+    for (const name of ["Artigos", "Trindade", "UMP"]) fireEvent.click(screen.getByRole("checkbox", {name}));
+    fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
+      name: "Livro", url: "https://x.org", description: "",
+      tags: {typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]},
+    }));
+  });
+
+  it("sem withTags não pede tags", () => {
+    render(<LinkDialog submitLabel="Adicionar" onSubmit={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.queryByRole("checkbox", {name: "Artigos"})).not.toBeInTheDocument();
+  });
+});
+
+describe("TagEditDialog", () => {
+  const initial = {typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]};
+
+  it("não deixa esvaziar um tipo de tag", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TagEditDialog initial={initial} onSubmit={onSubmit} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
+    fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("Escolha pelo menos uma tag de faixa.");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("envia as tags novas e fecha", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    render(<TagEditDialog initial={initial} onSubmit={onSubmit} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
+    fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
+    fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(initial));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
   });
 });
 

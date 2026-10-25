@@ -4,20 +4,20 @@ import {useState} from "react";
 import {Button} from "@/core/ui/Button";
 import {REQUIRED_APPROVALS, validateName} from "../files";
 import {formatDateTime, voteLabel} from "../labels";
-import {cancelDelete, castVote, renameItem, requestDelete, resubmitFile, resubmitLink} from "../mutations";
+import {cancelDelete, castVote, editTags, renameItem, requestDelete, resubmitFile, resubmitLink} from "../mutations";
 import {itemPermissions} from "../permissions";
 import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
 import type {Viewer, VoteAction} from "../types";
 import {UploadError} from "../uploadFlow";
 import {useItemDetail} from "../useItemDetail";
 import {useTags} from "../useTags";
-import {LinkDialog, ReasonDialog, TextPromptDialog} from "./Dialogs";
+import {LinkDialog, ReasonDialog, TagEditDialog, TextPromptDialog} from "./Dialogs";
 import {PreviewPane} from "./PreviewPane";
 import {StatusBadge} from "./StatusBadge";
 import {TagChips} from "./TagChips";
 
 type Modal =
-  | "return" | "reject" | "refuse" | "delete" | "rename" | "resubmit-link" | null;
+  | "return" | "reject" | "refuse" | "delete" | "rename" | "tags" | "resubmit-link" | null;
 
 const isWebUrl = (url: string) => /^https?:\/\/.+/.test(url);
 
@@ -151,6 +151,7 @@ export function ItemDetail({
           </Button>
         )}
         {permissions.canRename && <Button type="button" variant="text" disabled={busy} onClick={() => setModal("rename")}>Renomear</Button>}
+        {permissions.canEditTags && <Button type="button" variant="text" disabled={busy} onClick={() => setModal("tags")}>Editar tags</Button>}
         {permissions.canRequestDelete && <Button type="button" variant="text" disabled={busy} onClick={() => setModal("delete")}>Pedir exclusão</Button>}
         {permissions.canResubmit && item.type === "link" && (
           <Button type="button" disabled={busy} onClick={() => setModal("resubmit-link")}>Reenviar link</Button>
@@ -219,6 +220,12 @@ export function ItemDetail({
       {modal === "rename" && (
         <TextPromptDialog title="Renomear" label="Novo nome" initial={item.name} submitLabel="Salvar" validate={validateName}
           onSubmit={async (name) => { await renameItem(viewer.uid, item.id, name.trim()); onChanged(); }}
+          onClose={() => setModal(null)} />
+      )}
+      {modal === "tags" && (
+        <TagEditDialog
+          initial={{typeTags: item.typeTags ?? [], subjectTags: item.subjectTags ?? [], ageTags: item.ageTags ?? []}}
+          onSubmit={async (tags) => { await editTags(viewer.uid, item.id, tags); onChanged(); }}
           onClose={() => setModal(null)} />
       )}
       {modal === "resubmit-link" && (

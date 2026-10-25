@@ -10,6 +10,7 @@ import {
   startAfter,
   where,
   type DocumentData,
+  type Query,
   type QueryConstraint,
   type QueryDocumentSnapshot,
   type QuerySnapshot,
@@ -17,6 +18,7 @@ import {
 import {db} from "@/core/firebase/client";
 import {toItem, toVote} from "./convert";
 import {collectPage, planQuery, type Batch, type LibraryFilters} from "./libraryQuery";
+import {buildReviewQueue, type ReviewQueue} from "./reviewQueue";
 import {mergeById} from "./merge";
 import type {LibraryItem, LibraryVote, Viewer} from "./types";
 
@@ -153,16 +155,49 @@ export async function countCurators(): Promise<number> {
   return snapshot.size;
 }
 
-// Fila de revisão (curador e admin): em revisão e pedidos de exclusão.
-export async function loadReviewQueue(): Promise<{
-  inReview: LibraryItem[];
-  deleteRequests: LibraryItem[];
-}> {
-  const [review, deletes] = await Promise.all([
-    getDocs(query(items(), where("status", "==", "in_review"))),
-    getDocs(query(items(), where("deleteRequested", "==", true))),
-  ]);
-  return {inReview: itemsFrom(review), deleteRequests: itemsFrom(deletes)};
+// Fila de revisão ao vivo. Todos veem os próprios envios em revisão/devolvidos;
+// curador e admin também veem o que aguarda revisão e os pedidos de exclusão.
+// O primeiro erro é terminal (o Firestore já encerrou aquela escuta).
+export function subscribeReviewQueue(
+  viewer: Viewer,
+  onData: (queue: ReviewQueue) => void,
+  onError: (error: Error) => void
+): () => void {
+  const privileged = viewer.isCurator || viewer.isAdmin;
+  const sources: Array<{key: "mine" | "inReview" | "deleteRequested"; q: Query<DocumentData>}> = [
+    {key: "mine", q: query(items(), where("authorId", "==", viewer.uid), where("status", "in", ["in_review", "returned"]))},
+  ];
+  if (privileged) {
+    sources.push(
+      {key: "inReview", q: query(items(), where("status", "==", "in_review"))},
+      {key: "deleteRequested", q: query(items(), where("deleteRequested", "==", true))}
+    );
+  }
+  const latest: Partial<Record<"mine" | "inReview" | "deleteRequested", LibraryItem[]>> = {};
+  let active = true;
+  const stops = sources.map(({key, q}) =>
+    onSnapshot(
+      q,
+      (snapshot) => {
+        if (!active) return;
+        latest[key] = itemsFrom(snapshot);
+        if (sources.every((s) => latest[s.key] !== undefined)) {
+          onData(
+            buildReviewQueue(viewer, {
+              mine: latest.mine ?? [],
+              inReview: latest.inReview ?? [],
+              deleteRequested: latest.deleteRequested ?? [],
+            })
+          );
+        }
+      },
+      (error) => active && onError(error)
+    )
+  );
+  return () => {
+    active = false;
+    stops.forEach((stop) => stop());
+  };
 }
 
 export type LibraryCursor = QueryDocumentSnapshot<DocumentData>;
