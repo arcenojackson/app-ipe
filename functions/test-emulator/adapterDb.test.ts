@@ -28,6 +28,7 @@ describe("createAdminLibraryDb", () => {
     expect(await db.getItem("a")).toEqual({
       id: "a", type: "file", name: "a", parentId: null, authorId: "t1", status: "in_review", version: 1,
       updatedBy: undefined, storagePath: "teaching/materials/a/v1-a.pdf",
+      typeTags: [], subjectTags: [], ageTags: [],
       deleteRequest: {id: "r1", requestedBy: "c1", requestedAt: 1234, reason: "x"},
       returnComment: null, returnedBy: null, deleting: null,
     });
@@ -56,6 +57,14 @@ describe("createAdminLibraryDb", () => {
     expect(data.deleteRequested).toBe(false);
     expect(data.status).toBe("in_review");
     expect(data.updatedAt).toBeDefined();
+  });
+
+  it("publishedAt vira server timestamp, não o booleano", async () => {
+    await firestore.doc("teaching_items/a").set(item("a"));
+    const db = createAdminLibraryDb(firestore);
+    await db.updateItem("a", {status: "published", publishedAt: true});
+    const data = (await firestore.doc("teaching_items/a").get()).data()!;
+    expect(data.publishedAt).toBeInstanceOf(admin.firestore.Timestamp);
   });
 
   it("transact lê antes e aplica as escritas no fim, com votos convertidos", async () => {

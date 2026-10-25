@@ -287,3 +287,43 @@ describe("processItemCreated", () => {
     expect(t.notifier.sent).toEqual([]);
   });
 });
+
+describe("processItemChange — edição de tags", () => {
+  const tagged = (overrides: Parameters<typeof makeItem>[0]) =>
+    makeItem({status: "published", typeTags: ["a"], subjectTags: ["s"], ageTags: ["g"], ...overrides});
+
+  it("edição de tags por curador notifica o autor e audita", async () => {
+    const before = tagged({id: "i1"});
+    const after = {...before, typeTags: ["a", "b"], updatedBy: "c1"};
+    const t = makeDeps({items: [after], curators: ["c1", "c2"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("tags_edited");
+    expect(t.notifier.sent.map((n) => [n.toUid, n.type])).toEqual([["author", "tags_edited"]]);
+    expect(t.notifier.sent[0].id).toMatch(/^tags_edited_i1_/);
+    expect(t.audit.entries.map((e) => [e.action, e.itemId, e.actors])).toEqual([
+      ["tags_edited", "i1", ["c1"]],
+    ]);
+  });
+
+  it("sem mudança de tags não faz nada", async () => {
+    const before = tagged({id: "i1"});
+    const after = {...before, updatedBy: "c1"};
+    const t = makeDeps({items: [after], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("none");
+    expect(t.notifier.sent).toEqual([]);
+  });
+
+  it("autor editando as próprias tags não dispara tags_edited", async () => {
+    const before = tagged({id: "i1"});
+    const after = {...before, subjectTags: ["s", "z"], updatedBy: "author"};
+    const t = makeDeps({items: [after], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("none");
+    expect(t.notifier.sent).toEqual([]);
+  });
+
+  it("mudança só na ordem dos ids não dispara", async () => {
+    const before = tagged({id: "i1", typeTags: ["a", "b"]});
+    const after = {...before, typeTags: ["b", "a"], updatedBy: "c1"};
+    const t = makeDeps({items: [after], curators: ["c1"]});
+    expect(await processItemChange(t.deps, before, after)).toBe("none");
+  });
+});

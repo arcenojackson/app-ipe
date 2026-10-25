@@ -11,7 +11,8 @@ export type ChangeOutcome =
   | "move_reverted"
   | "move_invalid"
   | "delete_requested"
-  | "deleted_empty_folder";
+  | "deleted_empty_folder"
+  | "tags_edited";
 
 async function notifyCurators(
   deps: LibraryDeps,
@@ -209,5 +210,47 @@ export async function processItemChange(
     return "delete_requested";
   }
 
+  // 4) Tags ajustadas por outra pessoa que não o autor (revisão do curador)
+  const editor = after.updatedBy;
+  if (editor && editor !== after.authorId && tagsChanged(before, after)) {
+    const m = msg.tagsEditedMessage(after);
+    await safely("notificar tags editadas", () =>
+      deps.notifier.notify({
+        id: `tags_edited_${after.id}_${tagsStamp(after)}_${after.authorId}`,
+        toUid: after.authorId,
+        type: "tags_edited",
+        itemId: after.id,
+        ...m,
+      })
+    );
+    await safely("auditar edição de tags", () =>
+      deps.audit.record({
+        id: `tags_edited_${after.id}_${tagsStamp(after)}`,
+        action: "tags_edited",
+        itemId: after.id,
+        itemName: after.name,
+        actors: [editor],
+      })
+    );
+    return "tags_edited";
+  }
+
   return "none";
+}
+
+const sameSet = (a: string[] = [], b: string[] = []): boolean =>
+  a.length === b.length && a.every((id) => b.includes(id));
+
+function tagsChanged(before: ItemDoc, after: ItemDoc): boolean {
+  return !(
+    sameSet(before.typeTags, after.typeTags) &&
+    sameSet(before.subjectTags, after.subjectTags) &&
+    sameSet(before.ageTags, after.ageTags)
+  );
+}
+
+// Estável por conteúdo: reentrega do mesmo evento gera o mesmo id.
+function tagsStamp(item: ItemDoc): string {
+  const sorted = (ids: string[] = []) => [...ids].sort().join(",");
+  return [item.typeTags, item.subjectTags, item.ageTags].map(sorted).join("|");
 }

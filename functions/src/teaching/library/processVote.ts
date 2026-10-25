@@ -65,6 +65,7 @@ export async function processVote(
       } else if (decision.type === "publish") {
         tx.updateItem(item.id, {
           status: "published",
+          publishedAt: true,
           returnComment: null,
           returnedBy: null,
         });

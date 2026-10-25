@@ -24,6 +24,26 @@ describe("processVote — publicação", () => {
     expect(t.audit.entries.map((e) => e.action)).toEqual(["published"]);
   });
 
+  it("ao publicar, grava publishedAt; devolver não grava", async () => {
+    const t = makeDeps({
+      items: [makeItem({id: "i1"})],
+      curators: ["c1", "c2", "c3"],
+      votes: {i1: [approve("v1", "c1", 1), approve("v2", "c2", 2)]},
+    });
+    expect(await processVote(t.deps, "i1", "v2")).toBe("published");
+    const published = (await t.db.getItem("i1")) as unknown as Record<string, unknown>;
+    expect(published.publishedAt).toBe(true);
+
+    const returned = makeDeps({
+      items: [makeItem({id: "i2"})],
+      curators: ["c1", "c2"],
+      votes: {i2: [vote({id: "v1", voterId: "c1", action: "return", version: 1, comment: "Falta fonte"})]},
+    });
+    expect(await processVote(returned.deps, "i2", "v1")).toBe("returned");
+    const after = (await returned.db.getItem("i2")) as unknown as Record<string, unknown>;
+    expect(after.publishedAt).toBeUndefined();
+  });
+
   it("reprocessar o voto depois de publicar não faz nada", async () => {
     const t = makeDeps({
       items: [makeItem({id: "i1", status: "published"})],
