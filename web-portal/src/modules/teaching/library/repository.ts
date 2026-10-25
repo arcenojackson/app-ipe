@@ -3,14 +3,20 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
+  orderBy,
   query,
+  startAfter,
   where,
   type DocumentData,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
   type QuerySnapshot,
 } from "firebase/firestore";
 import {db} from "@/core/firebase/client";
 import {toItem, toVote} from "./convert";
+import {collectPage, planQuery, type Batch, type LibraryFilters} from "./libraryQuery";
 import {mergeById} from "./merge";
 import type {LibraryItem, LibraryVote, Viewer} from "./types";
 
@@ -157,4 +163,34 @@ export async function loadReviewQueue(): Promise<{
     getDocs(query(items(), where("deleteRequested", "==", true))),
   ]);
   return {inReview: itemsFrom(review), deleteRequests: itemsFrom(deletes)};
+}
+
+export type LibraryCursor = QueryDocumentSnapshot<DocumentData>;
+
+// Biblioteca: só itens publicados, do mais novo ao mais antigo. Um filtro de
+// servidor (ver planQuery) mais o filtro completo no cliente, com paginação
+// por cursor. Índices em firestore.indexes.json.
+export async function loadLibraryPage(
+  filters: LibraryFilters,
+  after: LibraryCursor | null,
+  pageSize = 20
+): Promise<{items: LibraryItem[]; cursor: LibraryCursor | null; done: boolean}> {
+  const plan = planQuery(filters);
+  const fetchBatch = async (cursor: LibraryCursor | null, size: number): Promise<Batch<LibraryCursor>> => {
+    const constraints: QueryConstraint[] = [where("status", "==", "published")];
+    if (plan.server) {
+      const {field, op, values} = plan.server;
+      constraints.push(where(field, op, op === "array-contains" ? values[0] : values));
+    }
+    constraints.push(orderBy("publishedAt", "desc"));
+    if (cursor) constraints.push(startAfter(cursor));
+    constraints.push(limit(size));
+    const snapshot = await getDocs(query(items(), ...constraints));
+    const entries = snapshot.docs.flatMap((d) => {
+      const item = toItem(d.id, d.data());
+      return item ? [{item, cursor: d}] : [];
+    });
+    return {items: entries, exhausted: snapshot.docs.length < size};
+  };
+  return collectPage(fetchBatch, plan.matches, after, pageSize);
 }
