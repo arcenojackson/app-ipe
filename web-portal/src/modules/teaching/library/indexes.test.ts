@@ -12,7 +12,13 @@ interface IndexDef {
 }
 
 describe("firestore.indexes.json", () => {
-  const indexes: IndexDef[] = read("firestore.indexes.json").indexes;
+  const all: IndexDef[] = read("firestore.indexes.json").indexes;
+  const indexes = all.filter((i) => i.collectionGroup === "teaching_items");
+
+  it("preserva os índices que já existiam em produção (o deploy não pode removê-los)", () => {
+    const others = all.filter((i) => i.collectionGroup !== "teaching_items").map((i) => i.collectionGroup).sort();
+    expect(others).toEqual(["messages", "music_evaluation_forms", "music_evaluation_forms", "responses", "responses"]);
+  });
 
   it("tem o índice base e um por filtro de servidor, sempre com status e publishedAt desc", () => {
     expect(indexes).toHaveLength(5);
