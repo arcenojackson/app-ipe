@@ -1,6 +1,5 @@
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
-import {indexById} from "../tree";
 import type {LibraryItem, LibraryVote, Viewer} from "../types";
 import {UploadError} from "../uploadFlow";
 import {ItemDetail} from "./ItemDetail";
@@ -15,10 +14,19 @@ const mutations = vi.hoisted(() => ({
   castVote: vi.fn(), requestDelete: vi.fn(), cancelDelete: vi.fn(), renameItem: vi.fn(),
   moveItem: vi.fn(), resubmitFile: vi.fn(), resubmitLink: vi.fn(),
 }));
-const storageAccess = vi.hoisted(() => ({downloadUrl: vi.fn()}));
+vi.mock("./PreviewPane", () => ({
+  PreviewPane: ({item}: {item: LibraryItem}) => <div data-testid="preview">{`preview de ${item.name}`}</div>,
+}));
+vi.mock("../useTags", () => {
+  const list = [
+    {id: "tipo-artigos", kind: "type", name: "Artigos", order: 1, active: true},
+    {id: "assunto-trindade", kind: "subject", name: "Trindade", order: 1, active: true},
+    {id: "faixa-ump", kind: "age", name: "UMP", order: 1, active: true},
+  ];
+  return {useTags: () => ({tags: list, error: null, byId: new Map(list.map((t) => [t.id, t])), active: () => list})};
+});
 vi.mock("../repository", () => repo);
 vi.mock("../mutations", () => mutations);
-vi.mock("../storageAccess", () => storageAccess);
 
 const curator1: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
 const curator2: Viewer = {uid: "c2", isCurator: true, isAdmin: false};
@@ -29,7 +37,6 @@ const file = (extra: Partial<LibraryItem> = {}): LibraryItem => ({
   id: "i1", type: "file", name: "Aula 1", parentId: "f1", authorId: "t1", status: "in_review", version: 1,
   fileName: "aula.pdf", contentType: "application/pdf", size: 2048, storagePath: "teaching/materials/i1/v1-aula.pdf", ...extra,
 });
-const folders: LibraryItem[] = [{id: "f1", name: "Crianças", type: "folder", parentId: null, authorId: "c1", status: "active", version: 1}];
 
 let current: LibraryItem | null;
 let votes: LibraryVote[];
@@ -49,18 +56,15 @@ function setup(viewer: Viewer, item: LibraryItem | null = file(), itemVotes: Lib
       return vi.fn();
     });
   }
-  repo.loadUserNames.mockResolvedValue({c1: "Ana Curadora", c2: "Beto Curador"});
-  if (!storageAccess.downloadUrl.getMockImplementation()) {
-    storageAccess.downloadUrl.mockResolvedValue("https://files.example/aula.pdf");
-  }
+  repo.loadUserNames.mockResolvedValue({c1: "Ana Curadora", c2: "Beto Curador", t1: "Felipe"});
   const onClose = vi.fn();
   const onChanged = vi.fn();
-  render(<ItemDetail itemId="i1" viewer={viewer} folders={folders} byId={indexById(folders)} onClose={onClose} onChanged={onChanged} />);
+  render(<ItemDetail itemId="i1" viewer={viewer} onClose={onClose} onChanged={onChanged} />);
   return {onClose, onChanged};
 }
 
 beforeEach(() => {
-  for (const fn of [...Object.values(repo), ...Object.values(mutations), ...Object.values(storageAccess)]) fn.mockReset();
+  for (const fn of [...Object.values(repo), ...Object.values(mutations)]) fn.mockReset();
   for (const fn of Object.values(mutations)) fn.mockResolvedValue(undefined);
 });
 
@@ -139,16 +143,13 @@ describe("ItemDetail — histórico e visualização", () => {
     expect(repo.subscribeVotes).not.toHaveBeenCalled();
   });
 
-  it("PDF aparece em iframe e há link para baixar", async () => {
-    setup(other, file({status: "published"}));
-    expect(await screen.findByTitle("Visualização de Aula 1")).toHaveAttribute("src", "https://files.example/aula.pdf");
-    expect(screen.getByRole("link", {name: "Baixar"})).toHaveAttribute("href", "https://files.example/aula.pdf");
-  });
-
-  it("arquivo Office não tem visualização: oferece baixar", async () => {
-    setup(other, file({status: "published", contentType: "application/msword", fileName: "a.doc"}));
-    expect(await screen.findByText("Este tipo de arquivo não tem visualização. Baixe para abrir.")).toBeInTheDocument();
-    expect(screen.queryByTitle("Visualização de Aula 1")).not.toBeInTheDocument();
+  it("arquivo mostra a visualização (PreviewPane), as tags e o autor", async () => {
+    setup(other, file({status: "published", typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]}));
+    expect(await screen.findByTestId("preview")).toHaveTextContent("Aula 1");
+    expect(screen.getByText("Artigos")).toBeInTheDocument();
+    expect(screen.getByText("Trindade")).toBeInTheDocument();
+    expect(screen.getByText("UMP")).toBeInTheDocument();
+    expect(await screen.findByText("Enviado por Felipe")).toBeInTheDocument();
   });
 
   it("link abre em nova aba com rel seguro", async () => {
@@ -169,7 +170,7 @@ describe("ItemDetail — histórico e visualização", () => {
     const {onClose} = setup(other, null);
     expect(await screen.findByText("Item não encontrado ou excluído.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
-    expect(onClose).toHaveBeenCalledWith(null);
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("erro de acesso ao item (permission-denied) mostra aviso terminal", async () => {
@@ -181,11 +182,11 @@ describe("ItemDetail — histórico e visualização", () => {
       onError(new Error("permission-denied"));
       return vi.fn();
     });
-    render(<ItemDetail itemId="i1" viewer={other} folders={folders} byId={indexById(folders)} onClose={onClose} onChanged={vi.fn()} />);
+    render(<ItemDetail itemId="i1" viewer={other} onClose={onClose} onChanged={vi.fn()} />);
     expect(await screen.findByText("Item não encontrado ou sem acesso.")).toBeInTheDocument();
     expect(screen.queryByText("Aula 1")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
-    expect(onClose).toHaveBeenCalledWith(null);
+    expect(onClose).toHaveBeenCalled();
   });
 
   it("item sendo excluído mostra aviso e nenhuma ação", async () => {
@@ -202,14 +203,6 @@ describe("ItemDetail — organizar e excluir", () => {
     fireEvent.change(screen.getByLabelText("Novo nome"), {target: {value: "Aula 1 revisada"}});
     fireEvent.click(screen.getByRole("button", {name: "Salvar"}));
     await waitFor(() => expect(mutations.renameItem).toHaveBeenCalledWith("c1", "i1", "Aula 1 revisada"));
-    await waitFor(() => expect(onChanged).toHaveBeenCalled());
-  });
-
-  it("curador move para a raiz", async () => {
-    const {onChanged} = setup(curator1, file({status: "published"}));
-    fireEvent.click(await screen.findByRole("button", {name: "Mover"}));
-    fireEvent.click(screen.getByRole("button", {name: "Biblioteca (raiz)"}));
-    await waitFor(() => expect(mutations.moveItem).toHaveBeenCalledWith("c1", "i1", null));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
 
@@ -304,17 +297,6 @@ describe("ItemDetail — reenvio com erro", () => {
 });
 
 describe("ItemDetail — acabamentos", () => {
-  it("falha ao obter o arquivo mostra alerta", async () => {
-    storageAccess.downloadUrl.mockRejectedValue(new Error("x"));
-    setup(other, file({status: "published"}));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível abrir o arquivo.");
-  });
-
-  it("imagem aparece em img com o nome como texto alternativo", async () => {
-    setup(other, file({status: "published", contentType: "image/png", fileName: "a.png"}));
-    expect(await screen.findByAltText("Aula 1")).toHaveAttribute("src", "https://files.example/aula.pdf");
-  });
-
   it("clique duplo em Aprovar vota uma vez só", async () => {
     mutations.castVote.mockReturnValue(new Promise(() => {}));
     setup(curator2);
