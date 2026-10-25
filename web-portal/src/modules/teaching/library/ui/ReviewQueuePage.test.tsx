@@ -64,7 +64,7 @@ describe("ReviewQueuePage", () => {
   it("abrir um item navega para a biblioteca naquele item", async () => {
     renderAs("c1");
     fireEvent.click(await screen.findByRole("button", {name: "Abrir Aula 1"}));
-    expect(nav.push).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1&item=i1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino/biblioteca?item=i1");
   });
 
   it("fila vazia mostra mensagem", async () => {

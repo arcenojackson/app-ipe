@@ -66,7 +66,7 @@ export default function ReviewQueuePage() {
     const names = buildBreadcrumbs(byId, item.parentId).map((f) => f.name);
     return names.length > 0 ? names.join(" / ") : "Biblioteca";
   };
-  const open = (item: LibraryItem) => router.push(libraryUrl({pasta: item.parentId, item: item.id}));
+  const open = (item: LibraryItem) => router.push(libraryUrl({item: item.id}));
 
   const visibleReviews = (reviews ?? []).filter(({item, votes}) =>
     showAll || (itemPermissions(item, viewer).canVote && !iVoted(item, votes, viewer.uid)));

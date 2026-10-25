@@ -16,3 +16,16 @@ export function formatDateTime(ms: number): string {
   if (!ms) return "—";
   return new Date(ms).toLocaleString("pt-BR", {dateStyle: "short", timeStyle: "short"});
 }
+
+export function formatDate(ms: number | undefined): string {
+  if (!ms) return "—";
+  return new Date(ms).toLocaleDateString("pt-BR");
+}
+
+export function formatBytes(size: number): string {
+  if (size < 1024) return `${size} B`;
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`;
+  const mb = size / (1024 * 1024);
+  const text = Number.isInteger(mb) ? String(mb) : mb.toFixed(1).replace(".", ",");
+  return `${text} MB`;
+}
