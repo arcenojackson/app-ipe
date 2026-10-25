@@ -10,7 +10,7 @@ service firebase.storage {
       );
     }
 
-    // Curador ou administrador
+    // Curador ou administrador (leitura de tudo)
     function isCuratorOrAdmin() {
       return request.auth != null && (
         request.auth.token.get('admin', false) == true ||
@@ -34,25 +34,28 @@ service firebase.storage {
         ];
     }
 
-    match /teaching/materials/{materialId}/{fileName} {
-      allow read: if hasTeachingAccess();
+    function itemPath(id) {
+      return /databases/(default)/documents/teaching_items/$(id);
+    }
 
-      // 100 MB por arquivo. Qualquer professor cria arquivos novos.
-      // O emulador avalia o envio sobre um objeto existente como `create`
-      // (com `resource` preenchido); por isso, sobrescrever exige curador/admin
-      // também aqui. Objeto novo (`resource == null`): qualquer professor.
+    match /teaching/materials/{itemId}/{fileName} {
+      // Só se o item existe e: publicado, ou do próprio autor, ou curador/admin.
+      allow read: if hasTeachingAccess() &&
+        firestore.exists(itemPath(itemId)) && (
+          isCuratorOrAdmin() ||
+          firestore.get(itemPath(itemId)).data.status == 'published' ||
+          firestore.get(itemPath(itemId)).data.authorId == request.auth.uid
+        );
+
+      // Só objetos novos, até 100 MB. O envio sobre objeto existente (avaliado
+      // como create com `resource` preenchido no emulador, como update em
+      // produção) é negado. Apagar/trocar é feito pela Cloud Function.
       allow create: if hasTeachingAccess() &&
-        (resource == null || isCuratorOrAdmin()) &&
+        resource == null &&
         request.resource.size <= 100 * 1024 * 1024 &&
         allowedContentType();
 
-      // Sobrescrever equivale a apagar: só curador/admin. A substituição pelo
-      // autor virá com o controle de propriedade em etapa posterior.
-      allow update: if isCuratorOrAdmin() &&
-        request.resource.size <= 100 * 1024 * 1024 &&
-        allowedContentType();
-
-      allow delete: if isCuratorOrAdmin();
+      // Sem update nem delete pelo cliente.
     }
   }
 }

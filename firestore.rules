@@ -228,5 +228,232 @@ service cloud.firestore {
         allow read: if isAdmin();
       }
     }
+
+    // ===== Biblioteca de ensino (etapas 2 e 3) =====
+    // Papéis vêm das custom claims geradas por syncTeachingClaimsOnUserWrite.
+    // Nenhuma regra acima foi alterada.
+
+    function hasAdminClaim() {
+      return request.auth != null &&
+        request.auth.token.get('admin', false) == true;
+    }
+
+    function isCurator() {
+      return request.auth != null &&
+        request.auth.token.get('teaching_role', '') == 'curator';
+    }
+
+    function canUseTeaching() {
+      return request.auth != null && (hasAdminClaim() ||
+        request.auth.token.get('teaching_role', '') in ['teacher', 'curator']);
+    }
+
+    function itemPath(id) {
+      return /databases/$(database)/documents/teaching_items/$(id);
+    }
+
+    function validContentType(ct) {
+      return ct == 'application/pdf' ||
+        ct.matches('image/.*') ||
+        ct in [
+          'application/msword',
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/vnd.ms-powerpoint',
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'application/vnd.oasis.opendocument.text',
+          'application/vnd.oasis.opendocument.presentation',
+          'application/vnd.oasis.opendocument.spreadsheet'
+        ];
+    }
+
+    function validItemName(data) {
+      return data.name is string && data.name.size() >= 1 &&
+        data.name.size() <= 120;
+    }
+
+    function validParent(data) {
+      return data.parentId == null || (
+        data.parentId is string &&
+        exists(itemPath(data.parentId)) &&
+        get(itemPath(data.parentId)).data.type == 'folder');
+    }
+
+    function validNewFolder(data) {
+      return data.keys().hasOnly(['type', 'name', 'parentId', 'authorId',
+        'status', 'version', 'updatedBy', 'createdAt', 'updatedAt']) &&
+        data.status == 'active';
+    }
+
+    function validNewFile(itemId, data) {
+      return data.keys().hasOnly(['type', 'name', 'parentId', 'authorId',
+        'status', 'version', 'updatedBy', 'createdAt', 'updatedAt',
+        'fileName', 'contentType', 'size', 'storagePath']) &&
+        data.keys().hasAll(['fileName', 'contentType', 'size', 'storagePath']) &&
+        data.status == 'in_review' &&
+        data.fileName is string && data.fileName.size() >= 1 &&
+        data.fileName.size() <= 200 && !data.fileName.matches('.*/.*') &&
+        data.size is int && data.size > 0 && data.size <= 104857600 &&
+        validContentType(data.contentType) &&
+        data.storagePath.matches('teaching/materials/' + itemId + '/.+');
+    }
+
+    function validNewLink(data) {
+      return data.keys().hasOnly(['type', 'name', 'parentId', 'authorId',
+        'status', 'version', 'updatedBy', 'createdAt', 'updatedAt',
+        'url', 'description']) &&
+        data.keys().hasAll(['url']) &&
+        data.status == 'in_review' &&
+        data.url is string && data.url.size() <= 2000 &&
+        data.url.matches('https?://.+') &&
+        (!('description' in data) ||
+          (data.description is string && data.description.size() <= 1000));
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    function curatorOrganizes() {
+      return isCurator() &&
+        changedKeys().hasOnly(['name', 'parentId', 'updatedBy', 'updatedAt']) &&
+        validItemName(request.resource.data) &&
+        validParent(request.resource.data);
+    }
+
+    function curatorRequestsDelete() {
+      return isCurator() &&
+        changedKeys().hasOnly(['deleteRequest', 'deleteRequested',
+          'updatedBy', 'updatedAt']) &&
+        resource.data.get('deleteRequest', null) == null &&
+        resource.data.status in ['active', 'published'] &&
+        request.resource.data.deleteRequested == true &&
+        request.resource.data.deleteRequest.keys().hasOnly(
+          ['id', 'requestedBy', 'requestedAt', 'reason']) &&
+        request.resource.data.deleteRequest.keys().hasAll(
+          ['id', 'requestedBy', 'requestedAt']) &&
+        request.resource.data.deleteRequest.id is string &&
+        request.resource.data.deleteRequest.id.size() > 0 &&
+        request.resource.data.deleteRequest.requestedBy == request.auth.uid &&
+        request.resource.data.deleteRequest.requestedAt == request.time;
+    }
+
+    function requesterCancelsDelete() {
+      return isCurator() &&
+        resource.data.get('deleteRequest', null) != null &&
+        resource.data.deleteRequest.requestedBy == request.auth.uid &&
+        changedKeys().hasOnly(['deleteRequest', 'deleteRequested',
+          'updatedBy', 'updatedAt']) &&
+        request.resource.data.get('deleteRequest', null) == null &&
+        request.resource.data.deleteRequested == false;
+    }
+
+    function authorResubmits(itemId) {
+      return resource.data.authorId == request.auth.uid &&
+        resource.data.status == 'returned' &&
+        request.resource.data.status == 'in_review' &&
+        request.resource.data.version == resource.data.version + 1 &&
+        changedKeys().hasOnly(['status', 'version', 'name', 'fileName',
+          'contentType', 'size', 'storagePath', 'url', 'description',
+          'updatedBy', 'updatedAt']) &&
+        validItemName(request.resource.data) &&
+        (resource.data.type != 'file' || (
+          request.resource.data.storagePath.matches(
+            'teaching/materials/' + itemId + '/.+') &&
+          request.resource.data.storagePath != resource.data.storagePath &&
+          request.resource.data.fileName is string &&
+          request.resource.data.size is int &&
+          request.resource.data.size > 0 &&
+          request.resource.data.size <= 104857600 &&
+          validContentType(request.resource.data.contentType))) &&
+        (resource.data.type != 'link' ||
+          request.resource.data.url.matches('https?://.+'));
+    }
+
+    match /teaching_items/{itemId} {
+      // Curador e admin leem tudo. Professor lê pastas, itens publicados e
+      // os próprios envios. Consultas precisam trazer o filtro correspondente.
+      allow read: if canUseTeaching() && (
+        isCurator() || hasAdminClaim() ||
+        resource.data.status in ['active', 'published'] ||
+        resource.data.authorId == request.auth.uid);
+
+      allow create: if canUseTeaching() &&
+        request.resource.data.authorId == request.auth.uid &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.version == 1 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        validItemName(request.resource.data) &&
+        validParent(request.resource.data) && (
+          (request.resource.data.type == 'folder' && isCurator() &&
+            validNewFolder(request.resource.data)) ||
+          (request.resource.data.type == 'file' &&
+            validNewFile(itemId, request.resource.data)) ||
+          (request.resource.data.type == 'link' &&
+            validNewLink(request.resource.data)));
+
+      allow update: if canUseTeaching() &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time && (
+          curatorOrganizes() || curatorRequestsDelete() ||
+          requesterCancelsDelete() || authorResubmits(itemId));
+
+      // Sem delete pelo cliente: exclusões são feitas por Cloud Function.
+
+      match /votes/{voteId} {
+        function commentOk() {
+          return request.resource.data.action in ['approve', 'delete_approve'] ||
+            (request.resource.data.comment is string &&
+              request.resource.data.comment.size() >= 1 &&
+              request.resource.data.comment.size() <= 1000);
+        }
+
+        function publicationVoteOk() {
+          let item = get(itemPath(itemId)).data;
+          return item.status == 'in_review' &&
+            item.authorId != request.auth.uid &&
+            request.resource.data.version == item.version &&
+            commentOk();
+        }
+
+        function deletionVoteOk() {
+          let item = get(itemPath(itemId)).data;
+          return item.get('deleteRequest', null) != null &&
+            item.deleteRequest.requestedBy != request.auth.uid &&
+            request.resource.data.requestId == item.deleteRequest.id &&
+            commentOk();
+        }
+
+        allow read: if canUseTeaching() && (
+          isCurator() || hasAdminClaim() ||
+          get(itemPath(itemId)).data.authorId == request.auth.uid);
+
+        allow create: if isCurator() &&
+          request.resource.data.voterId == request.auth.uid &&
+          request.resource.data.createdAt == request.time &&
+          request.resource.data.keys().hasOnly(['voterId', 'action',
+            'version', 'requestId', 'comment', 'createdAt']) && (
+            (request.resource.data.action in ['approve', 'reject', 'return'] &&
+              publicationVoteOk()) ||
+            (request.resource.data.action in
+              ['delete_approve', 'delete_refuse'] && deletionVoteOk()));
+
+        allow update, delete: if false;
+      }
+    }
+
+    match /teaching_notifications/{notificationId} {
+      allow read: if request.auth != null &&
+        resource.data.toUid == request.auth.uid;
+      allow update: if request.auth != null &&
+        resource.data.toUid == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['readAt']);
+      // create/delete: só Cloud Functions.
+    }
+
+    // teaching_log: sem acesso do cliente (negado por padrão).
   }
 }    

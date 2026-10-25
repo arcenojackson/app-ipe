@@ -1830,3 +1830,10 @@ export {
   electionSetStatus,
   electionVoteRecorded,
 } from "./elections";
+
+
+export {
+  onTeachingItemCreated,
+  onTeachingItemUpdated,
+  onTeachingVoteCreated,
+} from "./teaching/library/triggers";
