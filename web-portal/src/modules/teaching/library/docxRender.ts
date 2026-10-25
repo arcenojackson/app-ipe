@@ -19,12 +19,22 @@ export function sanitizeDocxLinks(container: HTMLElement): void {
   }
 }
 
+// Conteúdo ativo nunca fica na pré-visualização: um DOCX malicioso poderia
+// trazer um iframe (altChunk) com script no mesmo domínio do portal.
+const ACTIVE_SELECTOR = "iframe, frame, frameset, object, embed, script";
+
+export function stripActiveContent(container: HTMLElement): void {
+  for (const element of container.querySelectorAll(ACTIVE_SELECTOR)) element.remove();
+}
+
 // Desenha o DOCX no próprio navegador (sem enviar o arquivo a nenhum serviço).
 // Devolve a função de limpeza.
 export async function renderDocx(container: HTMLElement, bytes: ArrayBuffer): Promise<() => void> {
   const {renderAsync} = await import("docx-preview");
   container.replaceChildren();
-  await renderAsync(bytes, container, undefined, {inWrapper: true, breakPages: false});
+  // renderAltChunks: false — a opção padrão gera <iframe srcdoc> com o HTML do arquivo.
+  await renderAsync(bytes, container, undefined, {inWrapper: true, breakPages: false, renderAltChunks: false});
+  stripActiveContent(container);
   sanitizeDocxLinks(container);
   return () => container.replaceChildren();
 }
