@@ -3,15 +3,22 @@ import {
   doc,
   getDoc,
   getDocs,
+  limit,
   onSnapshot,
+  orderBy,
   query,
+  startAfter,
   where,
   type DocumentData,
+  type Query,
+  type QueryConstraint,
+  type QueryDocumentSnapshot,
   type QuerySnapshot,
 } from "firebase/firestore";
 import {db} from "@/core/firebase/client";
 import {toItem, toVote} from "./convert";
-import {mergeById} from "./merge";
+import {collectPage, planQuery, type Batch, type LibraryFilters} from "./libraryQuery";
+import {buildReviewQueue, type ReviewQueue} from "./reviewQueue";
 import type {LibraryItem, LibraryVote, Viewer} from "./types";
 
 const items = () => collection(db, "teaching_items");
@@ -20,60 +27,6 @@ function itemsFrom(snapshot: QuerySnapshot<DocumentData>): LibraryItem[] {
   return snapshot.docs
     .map((d) => toItem(d.id, d.data()))
     .filter((item): item is LibraryItem => item !== null);
-}
-
-// Curador e admin leem tudo; professor precisa de filtros que provem a regra:
-// publicado, ativo (pastas) e os próprios envios da pasta.
-function folderQueries(folderId: string | null, viewer: Viewer) {
-  if (viewer.isCurator || viewer.isAdmin) {
-    return [query(items(), where("parentId", "==", folderId))];
-  }
-  return [
-    query(items(), where("parentId", "==", folderId), where("status", "==", "published")),
-    query(items(), where("parentId", "==", folderId), where("status", "==", "active")),
-    query(items(), where("parentId", "==", folderId), where("authorId", "==", viewer.uid)),
-  ];
-}
-
-export function subscribeFolder(
-  folderId: string | null,
-  viewer: Viewer,
-  onData: (items: LibraryItem[]) => void,
-  onError: (error: Error) => void
-): () => void {
-  const queries = folderQueries(folderId, viewer);
-  const latest: Array<LibraryItem[] | undefined> = queries.map(() => undefined);
-  let active = true;
-  const unsubscribers = queries.map((q, index) =>
-    onSnapshot(
-      q,
-      (snapshot) => {
-        if (!active) return;
-        latest[index] = itemsFrom(snapshot);
-        if (latest.every((list) => list !== undefined)) {
-          onData(mergeById(latest as LibraryItem[][]));
-        }
-      },
-      (error) => active && onError(error)
-    )
-  );
-  return () => {
-    active = false;
-    unsubscribers.forEach((stop) => stop());
-  };
-}
-
-// Todos os itens que o espectador pode ver (busca por nome e migalhas).
-export async function loadAllVisible(viewer: Viewer): Promise<LibraryItem[]> {
-  if (viewer.isCurator || viewer.isAdmin) {
-    return itemsFrom(await getDocs(items()));
-  }
-  const snapshots = await Promise.all([
-    getDocs(query(items(), where("status", "==", "published"))),
-    getDocs(query(items(), where("status", "==", "active"))),
-    getDocs(query(items(), where("authorId", "==", viewer.uid))),
-  ]);
-  return mergeById(snapshots.map(itemsFrom));
 }
 
 export function subscribeItem(
@@ -147,14 +100,77 @@ export async function countCurators(): Promise<number> {
   return snapshot.size;
 }
 
-// Fila de revisão (curador e admin): em revisão e pedidos de exclusão.
-export async function loadReviewQueue(): Promise<{
-  inReview: LibraryItem[];
-  deleteRequests: LibraryItem[];
-}> {
-  const [review, deletes] = await Promise.all([
-    getDocs(query(items(), where("status", "==", "in_review"))),
-    getDocs(query(items(), where("deleteRequested", "==", true))),
-  ]);
-  return {inReview: itemsFrom(review), deleteRequests: itemsFrom(deletes)};
+// Fila de revisão ao vivo. Todos veem os próprios envios em revisão/devolvidos;
+// curador e admin também veem o que aguarda revisão e os pedidos de exclusão.
+// O primeiro erro é terminal (o Firestore já encerrou aquela escuta).
+export function subscribeReviewQueue(
+  viewer: Viewer,
+  onData: (queue: ReviewQueue) => void,
+  onError: (error: Error) => void
+): () => void {
+  const privileged = viewer.isCurator || viewer.isAdmin;
+  const sources: Array<{key: "mine" | "inReview" | "deleteRequested"; q: Query<DocumentData>}> = [
+    {key: "mine", q: query(items(), where("authorId", "==", viewer.uid), where("status", "in", ["in_review", "returned"]))},
+  ];
+  if (privileged) {
+    sources.push(
+      {key: "inReview", q: query(items(), where("status", "==", "in_review"))},
+      {key: "deleteRequested", q: query(items(), where("deleteRequested", "==", true))}
+    );
+  }
+  const latest: Partial<Record<"mine" | "inReview" | "deleteRequested", LibraryItem[]>> = {};
+  let active = true;
+  const stops = sources.map(({key, q}) =>
+    onSnapshot(
+      q,
+      (snapshot) => {
+        if (!active) return;
+        latest[key] = itemsFrom(snapshot);
+        if (sources.every((s) => latest[s.key] !== undefined)) {
+          onData(
+            buildReviewQueue(viewer, {
+              mine: latest.mine ?? [],
+              inReview: latest.inReview ?? [],
+              deleteRequested: latest.deleteRequested ?? [],
+            })
+          );
+        }
+      },
+      (error) => active && onError(error)
+    )
+  );
+  return () => {
+    active = false;
+    stops.forEach((stop) => stop());
+  };
+}
+
+export type LibraryCursor = QueryDocumentSnapshot<DocumentData>;
+
+// Biblioteca: só itens publicados, do mais novo ao mais antigo. Um filtro de
+// servidor (ver planQuery) mais o filtro completo no cliente, com paginação
+// por cursor. Índices em firestore.indexes.json.
+export async function loadLibraryPage(
+  filters: LibraryFilters,
+  after: LibraryCursor | null,
+  pageSize = 20
+): Promise<{items: LibraryItem[]; cursor: LibraryCursor | null; done: boolean}> {
+  const plan = planQuery(filters);
+  const fetchBatch = async (cursor: LibraryCursor | null, size: number): Promise<Batch<LibraryCursor>> => {
+    const constraints: QueryConstraint[] = [where("status", "==", "published")];
+    if (plan.server) {
+      const {field, op, values} = plan.server;
+      constraints.push(where(field, op, op === "array-contains" ? values[0] : values));
+    }
+    constraints.push(orderBy("publishedAt", "desc"));
+    if (cursor) constraints.push(startAfter(cursor));
+    constraints.push(limit(size));
+    const snapshot = await getDocs(query(items(), ...constraints));
+    const entries = snapshot.docs.flatMap((d) => {
+      const item = toItem(d.id, d.data());
+      return item ? [{item, cursor: d}] : [];
+    });
+    return {items: entries, exhausted: snapshot.docs.length < size};
+  };
+  return collectPage(fetchBatch, plan.matches, after, pageSize);
 }

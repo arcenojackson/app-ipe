@@ -4,32 +4,33 @@ import {useState} from "react";
 import {Button} from "@/core/ui/Button";
 import {REQUIRED_APPROVALS, validateName} from "../files";
 import {formatDateTime, voteLabel} from "../labels";
-import {cancelDelete, castVote, moveItem, renameItem, requestDelete, resubmitFile, resubmitLink} from "../mutations";
+import {cancelDelete, castVote, editTags, renameItem, requestDelete, resubmitFile, resubmitLink} from "../mutations";
 import {itemPermissions} from "../permissions";
-import {previewKind} from "../preview";
 import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
-import type {LibraryItem, Viewer, VoteAction} from "../types";
+import type {Viewer, VoteAction} from "../types";
 import {UploadError} from "../uploadFlow";
 import {useItemDetail} from "../useItemDetail";
-import {LinkDialog, MoveDialog, ReasonDialog, TextPromptDialog} from "./Dialogs";
+import {useTags} from "../useTags";
+import {LinkDialog, ReasonDialog, TagEditDialog, TextPromptDialog} from "./Dialogs";
+import {PreviewPane} from "./PreviewPane";
 import {StatusBadge} from "./StatusBadge";
+import {TagChips} from "./TagChips";
 
 type Modal =
-  | "return" | "reject" | "refuse" | "delete" | "rename" | "move" | "resubmit-link" | null;
+  | "return" | "reject" | "refuse" | "delete" | "rename" | "tags" | "resubmit-link" | null;
 
 const isWebUrl = (url: string) => /^https?:\/\/.+/.test(url);
 
 export function ItemDetail({
-  itemId, viewer, folders, byId, onClose, onChanged,
+  itemId, viewer, onClose, onChanged,
 }: {
   itemId: string;
   viewer: Viewer;
-  folders: LibraryItem[];
-  byId: Map<string, LibraryItem>;
-  onClose: (parentId: string | null) => void;
+  onClose: () => void;
   onChanged: () => void;
 }) {
-  const {item, error, votes, votesLoaded, votesError, names, fileUrl, fileUrlError} = useItemDetail(itemId, viewer);
+  const {item, error, votes, votesLoaded, votesError, names, authorName} = useItemDetail(itemId, viewer);
+  const {byId: tagById} = useTags();
   const [modal, setModal] = useState<Modal>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function ItemDetail({
     return (
       <div className="space-y-3 rounded-card bg-surface-elevated p-6">
         <p>{error ?? "Item não encontrado ou excluído."}</p>
-        <Button type="button" variant="text" onClick={() => onClose(null)}>Fechar</Button>
+        <Button type="button" variant="text" onClick={() => onClose()}>Fechar</Button>
       </div>
     );
   }
@@ -50,7 +51,6 @@ export function ItemDetail({
   const approvals = countApprovals(item, votes);
   const deleteApprovals = countDeleteApprovals(item, votes);
   const request = item.deleteRequest ?? null;
-  const preview = item.type === "file" ? previewKind(item.contentType) : "other";
   const myVote = viewer.isCurator ?
     [...votes]
       .filter((v) => v.voterId === viewer.uid && v.version === item.version &&
@@ -88,8 +88,16 @@ export function ItemDetail({
           <h2 className="text-xl font-semibold">{item.name}</h2>
           <StatusBadge badge={statusBadge(item, votesLoaded ? approvals : null)} />
         </div>
-        <Button type="button" variant="text" onClick={() => onClose(item.parentId)}>Fechar</Button>
+        <Button type="button" variant="text" onClick={() => onClose()}>Fechar</Button>
       </header>
+
+      <div className="space-y-1">
+        {authorName && <p className="text-sm text-white/70">Enviado por {authorName}</p>}
+        <TagChips
+          ids={[...(item.typeTags ?? []), ...(item.subjectTags ?? []), ...(item.ageTags ?? [])]}
+          byId={tagById}
+        />
+      </div>
 
       {item.deleting && <p className="text-error">Este item está sendo excluído.</p>}
       {request && !item.deleting && (
@@ -106,16 +114,7 @@ export function ItemDetail({
       {myVote && <p className="text-sm text-white/70">Seu voto: {voteLabel(myVote.action)}</p>}
       {votesError && <p className="text-sm text-error">Não foi possível carregar o histórico de revisão.</p>}
 
-      {item.type === "file" && (
-        <section aria-label="Arquivo" className="space-y-2">
-          {fileUrlError && <p role="alert" className="text-sm text-error">Não foi possível abrir o arquivo.</p>}
-          {fileUrl && preview === "pdf" && <iframe title={`Visualização de ${item.name}`} src={fileUrl} className="h-[60vh] w-full rounded-card bg-white" />}
-          {/* eslint-disable-next-line @next/next/no-img-element -- URL assinada do Storage, fora do otimizador do Next */}
-          {fileUrl && preview === "image" && <img alt={item.name} src={fileUrl} className="max-h-[60vh] rounded-card" />}
-          {fileUrl && preview === "other" && <p className="text-sm text-white/70">Este tipo de arquivo não tem visualização. Baixe para abrir.</p>}
-          {fileUrl && <a href={fileUrl} target="_blank" rel="noopener noreferrer" download={item.fileName} className="text-secondary underline">Baixar</a>}
-        </section>
-      )}
+      {item.type === "file" && <PreviewPane item={item} />}
       {item.type === "link" && item.url && (
         <section aria-label="Link" className="space-y-1">
           {isWebUrl(item.url) ? (
@@ -152,7 +151,7 @@ export function ItemDetail({
           </Button>
         )}
         {permissions.canRename && <Button type="button" variant="text" disabled={busy} onClick={() => setModal("rename")}>Renomear</Button>}
-        {permissions.canMove && <Button type="button" variant="text" disabled={busy} onClick={() => setModal("move")}>Mover</Button>}
+        {permissions.canEditTags && <Button type="button" variant="text" disabled={busy} onClick={() => setModal("tags")}>Editar tags</Button>}
         {permissions.canRequestDelete && <Button type="button" variant="text" disabled={busy} onClick={() => setModal("delete")}>Pedir exclusão</Button>}
         {permissions.canResubmit && item.type === "link" && (
           <Button type="button" disabled={busy} onClick={() => setModal("resubmit-link")}>Reenviar link</Button>
@@ -223,9 +222,10 @@ export function ItemDetail({
           onSubmit={async (name) => { await renameItem(viewer.uid, item.id, name.trim()); onChanged(); }}
           onClose={() => setModal(null)} />
       )}
-      {modal === "move" && (
-        <MoveDialog item={item} folders={folders} byId={byId}
-          onPick={async (parentId) => { await moveItem(viewer.uid, item.id, parentId); onChanged(); }}
+      {modal === "tags" && (
+        <TagEditDialog
+          initial={{typeTags: item.typeTags ?? [], subjectTags: item.subjectTags ?? [], ageTags: item.ageTags ?? []}}
+          onSubmit={async (tags) => { await editTags(viewer.uid, item.id, tags); onChanged(); }}
           onClose={() => setModal(null)} />
       )}
       {modal === "resubmit-link" && (

@@ -29,6 +29,10 @@ const adminOnly = () => env.authenticatedContext("a1", {admin: true}).firestore(
 const plain = () => env.authenticatedContext("p1").firestore();
 
 const base = {parentId: "f1", version: 1, name: "Item"};
+const tags = {
+  typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"],
+  searchTokens: ["it", "ite", "item"],
+};
 
 beforeAll(async () => {
   env = await createEnv();
@@ -46,7 +50,7 @@ beforeEach(async () => {
       type: "folder", name: "Pasta", parentId: null, authorId: "c1", status: "active", version: 1,
     });
     await setDoc(doc(db, "teaching_items/pub"), {
-      ...base, type: "file", authorId: "t1", status: "published",
+      ...base, ...tags, type: "file", authorId: "t1", status: "published",
       fileName: "a.pdf", contentType: "application/pdf", size: 10, storagePath: "teaching/materials/pub/v1-a.pdf",
     });
     await setDoc(doc(db, "teaching_items/rev"), {
@@ -54,11 +58,11 @@ beforeEach(async () => {
       fileName: "a.pdf", contentType: "application/pdf", size: 10, storagePath: "teaching/materials/rev/v1-a.pdf",
     });
     await setDoc(doc(db, "teaching_items/ret"), {
-      ...base, type: "file", authorId: "t1", status: "returned",
+      ...base, ...tags, type: "file", authorId: "t1", status: "returned",
       fileName: "a.pdf", contentType: "application/pdf", size: 10, storagePath: "teaching/materials/ret/v1-a.pdf",
     });
     await setDoc(doc(db, "teaching_items/lnk"), {
-      ...base, type: "link", authorId: "t1", status: "returned", url: "https://exemplo.org",
+      ...base, ...tags, type: "link", authorId: "t1", status: "returned", url: "https://exemplo.org",
     });
     await setDoc(doc(db, "teaching_items/del"), {
       ...base, type: "file", authorId: "t1", status: "published",
@@ -76,7 +80,7 @@ function fileData(uid: string, id: string, extra: Record<string, unknown> = {}) 
   return {
     type: "file", name: "Aula 1", parentId: "f1", authorId: uid, updatedBy: uid,
     status: "in_review", version: 1, fileName: "a.pdf", contentType: "application/pdf",
-    size: 1000, storagePath: `teaching/materials/${id}/v1-a.pdf`,
+    size: 1000, storagePath: `teaching/materials/${id}/v1-a.pdf`, ...tags,
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(), ...extra,
   };
 }
@@ -124,7 +128,7 @@ describe("criação de itens", () => {
   it("professor cria link http(s); link com outro esquema é negado", async () => {
     const link = (url: string) => ({
       type: "link", name: "Livro", parentId: "f1", authorId: "t1", updatedBy: "t1",
-      status: "in_review", version: 1, url, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+      status: "in_review", version: 1, url, ...tags, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
     });
     await assertSucceeds(setDoc(doc(teacher(), "teaching_items/l1"), link("https://exemplo.org/livro")));
     await assertFails(setDoc(doc(teacher(), "teaching_items/l2"), link("javascript:alert(1)")));
@@ -145,9 +149,87 @@ describe("criação de itens", () => {
     await assertFails(setDoc(doc(plain(), "teaching_items/i"), fileData("p1", "i")));
   });
 
-  it("negado: tipo de arquivo ou tamanho inválidos", async () => {
-    await assertFails(setDoc(doc(teacher(), "teaching_items/j"), fileData("t1", "j", {contentType: "application/x-msdownload"})));
+  it("negado: content type vazio ou tamanho inválido", async () => {
+    await assertFails(setDoc(doc(teacher(), "teaching_items/j"), fileData("t1", "j", {contentType: ""})));
     await assertFails(setDoc(doc(teacher(), "teaching_items/k"), fileData("t1", "k", {size: 104857601})));
+  });
+});
+
+describe("tags e qualquer tipo de arquivo", () => {
+  it("professor cria arquivo com uma tag de cada tipo", async () => {
+    await assertSucceeds(setDoc(doc(teacher(), "teaching_items/t1"), fileData("t1", "t1", {parentId: null})));
+  });
+
+  it("nega criar arquivo sem tag de tipo, assunto ou faixa", async () => {
+    await assertFails(setDoc(doc(teacher(), "teaching_items/s1"), fileData("t1", "s1", {typeTags: []})));
+    await assertFails(setDoc(doc(teacher(), "teaching_items/s2"), fileData("t1", "s2", {subjectTags: []})));
+    await assertFails(setDoc(doc(teacher(), "teaching_items/s3"), fileData("t1", "s3", {ageTags: []})));
+  });
+
+  it("nega mais de 10 tags num tipo e mais de 200 searchTokens", async () => {
+    const many = Array.from({length: 11}, (_, i) => `assunto-${i}`);
+    await assertFails(setDoc(doc(teacher(), "teaching_items/s4"), fileData("t1", "s4", {subjectTags: many})));
+    const tokens = Array.from({length: 201}, (_, i) => `t${i}`);
+    await assertFails(setDoc(doc(teacher(), "teaching_items/s5"), fileData("t1", "s5", {searchTokens: tokens})));
+  });
+
+  it("link sem tags é negado", async () => {
+    const link = {
+      type: "link", name: "Livro", parentId: null, authorId: "t1", updatedBy: "t1",
+      status: "in_review", version: 1, url: "https://exemplo.org", typeTags: [], subjectTags: [], ageTags: [],
+      searchTokens: [], createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+    };
+    await assertFails(setDoc(doc(teacher(), "teaching_items/l3"), link));
+  });
+
+  it("aceita qualquer content type não vazio", async () => {
+    await assertSucceeds(setDoc(doc(teacher(), "teaching_items/z1"), fileData("t1", "z1", {contentType: "application/zip"})));
+  });
+
+  it("curador edita só as tags de item publicado", async () => {
+    const edit = (extra: Record<string, unknown> = {}) => ({
+      typeTags: ["tipo-aulas"], subjectTags: ["assunto-trindade", "assunto-igreja"], ageTags: ["faixa-upa"],
+      updatedBy: "c1", updatedAt: serverTimestamp(), ...extra,
+    });
+    await assertSucceeds(updateDoc(doc(curator1(), "teaching_items/pub"), edit()));
+    await assertFails(updateDoc(doc(curator1(), "teaching_items/pub"), edit({status: "in_review"})));
+    await assertFails(updateDoc(doc(curator1(), "teaching_items/pub"), edit({typeTags: []})));
+  });
+
+  it("professor e admin sem papel curador não editam tags", async () => {
+    const edit = (uid: string) => ({typeTags: ["tipo-aulas"], updatedBy: uid, updatedAt: serverTimestamp()});
+    await assertFails(updateDoc(doc(teacher(), "teaching_items/pub"), edit("t1")));
+    await assertFails(updateDoc(doc(adminOnly(), "teaching_items/pub"), edit("a1")));
+  });
+
+  it("curador renomeia atualizando searchTokens", async () => {
+    await assertSucceeds(updateDoc(doc(curator1(), "teaching_items/pub"), {
+      name: "Novo nome", searchTokens: ["no", "nov", "novo"], updatedBy: "c1", updatedAt: serverTimestamp(),
+    }));
+  });
+
+  it("autor reenvia item devolvido trocando as tags; tipo vazio é negado", async () => {
+    const resubmit = (extra: Record<string, unknown> = {}) => ({
+      status: "in_review", version: 2, storagePath: "teaching/materials/ret/v2-b.pdf", fileName: "b.pdf",
+      updatedBy: "t1", updatedAt: serverTimestamp(), ...extra,
+    });
+    await assertSucceeds(updateDoc(doc(teacher(), "teaching_items/ret"), resubmit({subjectTags: ["assunto-cristo"]})));
+    await assertFails(updateDoc(doc(teacher(), "teaching_items/ret"), resubmit({ageTags: []})));
+  });
+});
+
+describe("coleção de tags", () => {
+  it("professor lê tags e ninguém grava", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "teaching_tags/tipo-artigos"), {kind: "type", name: "Artigos", order: 1, active: true});
+    });
+    await assertSucceeds(getDoc(doc(teacher(), "teaching_tags/tipo-artigos")));
+    await assertSucceeds(getDocs(collection(teacher(), "teaching_tags")));
+    await assertFails(getDoc(doc(plain(), "teaching_tags/tipo-artigos")));
+    for (const db of [teacher(), curator1(), adminOnly()]) {
+      await assertFails(setDoc(doc(db, "teaching_tags/novo"), {kind: "type", name: "X", order: 9, active: true}));
+      await assertFails(updateDoc(doc(db, "teaching_tags/tipo-artigos"), {name: "Y"}));
+    }
   });
 });
 

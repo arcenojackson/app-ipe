@@ -253,19 +253,14 @@ service cloud.firestore {
     }
 
     function validContentType(ct) {
-      return ct == 'application/pdf' ||
-        ct.matches('image/.*') ||
-        ct in [
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'application/vnd.ms-powerpoint',
-          'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-          'application/vnd.ms-excel',
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-          'application/vnd.oasis.opendocument.text',
-          'application/vnd.oasis.opendocument.presentation',
-          'application/vnd.oasis.opendocument.spreadsheet'
-        ];
+      return ct is string && ct.size() >= 1 && ct.size() <= 255;
+    }
+
+    function validTags(d) {
+      return d.typeTags is list && d.typeTags.size() >= 1 && d.typeTags.size() <= 10 &&
+        d.subjectTags is list && d.subjectTags.size() >= 1 && d.subjectTags.size() <= 10 &&
+        d.ageTags is list && d.ageTags.size() >= 1 && d.ageTags.size() <= 10 &&
+        d.searchTokens is list && d.searchTokens.size() <= 200;
     }
 
     function validItemName(data) {
@@ -289,8 +284,11 @@ service cloud.firestore {
     function validNewFile(itemId, data) {
       return data.keys().hasOnly(['type', 'name', 'parentId', 'authorId',
         'status', 'version', 'updatedBy', 'createdAt', 'updatedAt',
-        'fileName', 'contentType', 'size', 'storagePath']) &&
-        data.keys().hasAll(['fileName', 'contentType', 'size', 'storagePath']) &&
+        'fileName', 'contentType', 'size', 'storagePath',
+        'typeTags', 'subjectTags', 'ageTags', 'searchTokens']) &&
+        data.keys().hasAll(['fileName', 'contentType', 'size', 'storagePath',
+          'typeTags', 'subjectTags', 'ageTags', 'searchTokens']) &&
+        validTags(data) &&
         data.status == 'in_review' &&
         data.fileName is string && data.fileName.size() >= 1 &&
         data.fileName.size() <= 200 && !data.fileName.matches('.*/.*') &&
@@ -302,8 +300,11 @@ service cloud.firestore {
     function validNewLink(data) {
       return data.keys().hasOnly(['type', 'name', 'parentId', 'authorId',
         'status', 'version', 'updatedBy', 'createdAt', 'updatedAt',
-        'url', 'description']) &&
-        data.keys().hasAll(['url']) &&
+        'url', 'description', 'typeTags', 'subjectTags', 'ageTags',
+        'searchTokens']) &&
+        data.keys().hasAll(['url', 'typeTags', 'subjectTags', 'ageTags',
+          'searchTokens']) &&
+        validTags(data) &&
         data.status == 'in_review' &&
         data.url is string && data.url.size() <= 2000 &&
         data.url.matches('https?://.+') &&
@@ -317,9 +318,17 @@ service cloud.firestore {
 
     function curatorOrganizes() {
       return isCurator() &&
-        changedKeys().hasOnly(['name', 'parentId', 'updatedBy', 'updatedAt']) &&
+        changedKeys().hasOnly(['name', 'parentId', 'searchTokens', 'updatedBy',
+          'updatedAt']) &&
         validItemName(request.resource.data) &&
         validParent(request.resource.data);
+    }
+
+    function curatorEditsTags() {
+      return isCurator() &&
+        changedKeys().hasOnly(['typeTags', 'subjectTags', 'ageTags',
+          'updatedBy', 'updatedAt']) &&
+        validTags(request.resource.data);
     }
 
     function curatorRequestsDelete() {
@@ -356,8 +365,10 @@ service cloud.firestore {
         request.resource.data.version == resource.data.version + 1 &&
         changedKeys().hasOnly(['status', 'version', 'name', 'fileName',
           'contentType', 'size', 'storagePath', 'url', 'description',
+          'typeTags', 'subjectTags', 'ageTags', 'searchTokens',
           'updatedBy', 'updatedAt']) &&
         validItemName(request.resource.data) &&
+        validTags(request.resource.data) &&
         (resource.data.type != 'file' || (
           request.resource.data.storagePath.matches(
             'teaching/materials/' + itemId + '/.+') &&
@@ -397,7 +408,7 @@ service cloud.firestore {
       allow update: if canUseTeaching() &&
         request.resource.data.updatedBy == request.auth.uid &&
         request.resource.data.updatedAt == request.time && (
-          curatorOrganizes() || curatorRequestsDelete() ||
+          curatorOrganizes() || curatorEditsTags() || curatorRequestsDelete() ||
           requesterCancelsDelete() || authorResubmits(itemId));
 
       // Sem delete pelo cliente: exclusões são feitas por Cloud Function.
@@ -442,6 +453,11 @@ service cloud.firestore {
 
         allow update, delete: if false;
       }
+    }
+
+    match /teaching_tags/{tagId} {
+      allow read: if canUseTeaching();
+      // Sem escrita pelo cliente: tags são mantidas direto no banco.
     }
 
     match /teaching_notifications/{notificationId} {

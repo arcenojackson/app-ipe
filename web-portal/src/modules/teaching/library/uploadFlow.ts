@@ -1,5 +1,6 @@
 import {contentTypeFor, storagePathFor, validateFile, validateName} from "./files";
 import {newFilePayload, resubmitFilePayload} from "./payloads";
+import {validateTags, type ItemTags} from "./tags";
 
 export interface FileLike {
   name: string;
@@ -34,8 +35,8 @@ export async function uploadFileItem<F extends FileLike>(
   deps: UploadDeps<F>,
   input: {
     uid: string;
-    parentId: string | null;
     file: F;
+    tags: ItemTags;
     name?: string;
     onProgress?: (fraction: number) => void;
   }
@@ -47,6 +48,9 @@ export async function uploadFileItem<F extends FileLike>(
   const name = (input.name ?? input.file.name).trim();
   const nameProblem = validateName(name);
   if (nameProblem) throw new UploadError("validate", nameProblem);
+
+  const tagsProblem = validateTags(input.tags);
+  if (tagsProblem) throw new UploadError("validate", tagsProblem);
 
   const id = deps.newId();
   const contentType = contentTypeFor(input.file);
@@ -73,10 +77,10 @@ export async function uploadFileItem<F extends FileLike>(
           uid: input.uid,
           itemId: id,
           name,
-          parentId: input.parentId,
           fileName: input.file.name,
           contentType,
           size: input.file.size,
+          tags: input.tags,
         },
         deps.now()
       )
@@ -112,11 +116,14 @@ export async function resubmitFileItem<F extends FileLike>(
     uid: string;
     item: {id: string; version: number};
     file: F;
+    tags?: ItemTags;
     onProgress?: (fraction: number) => void;
   }
 ): Promise<void> {
   const problem = validateFile(input.file);
   if (problem) throw new UploadError("validate", problem);
+  const tagsProblem = input.tags ? validateTags(input.tags) : null;
+  if (tagsProblem) throw new UploadError("validate", tagsProblem);
 
   const contentType = contentTypeFor(input.file);
   const storagePath = storagePathFor(
@@ -143,6 +150,7 @@ export async function resubmitFileItem<F extends FileLike>(
           contentType,
           size: input.file.size,
           storagePath,
+          tags: input.tags,
         },
         deps.now()
       )

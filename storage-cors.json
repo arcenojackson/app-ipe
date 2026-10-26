@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://ipe-ensino.vercel.app", "http://localhost:3000"],
+    "method": ["GET"],
+    "responseHeader": ["Authorization", "Content-Type"],
+    "maxAgeSeconds": 3600
+  }
+]
