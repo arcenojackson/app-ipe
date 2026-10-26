@@ -154,6 +154,15 @@ describe("pickOldest", () => {
     });
   });
 
+  it("não elege quem já foi eleito em outro cargo no meio tempo", async () => {
+    await seedCargo("presidente", tied);
+    await seedCargo("vice", {stage: "decided", winnerId: MEMBER});
+    await expectCode(oldest(MEMBER), "failed-precondition");
+    expect((await cargo("presidente")).stage).toBe("tiebreak");
+    await oldest(MEMBER2);
+    expect((await cargo("presidente")).winnerId).toBe(MEMBER2);
+  });
+
   it("só em tiebreak e só entre os empatados", async () => {
     await expectCode(oldest(MEMBER), "failed-precondition"); // idle
     await seedCargo("presidente", tied);

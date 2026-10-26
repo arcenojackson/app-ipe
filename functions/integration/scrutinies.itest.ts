@@ -129,6 +129,42 @@ describe("startScrutiny", () => {
     expect((await round(res.roundId)).options).toEqual([{id: MEMBER, name: "Ana"}]);
   });
 
+  it("2º e 3º escrutínios não oferecem quem já foi eleito em outro cargo", async () => {
+    await seedCargo("vice", {stage: "decided", winnerId: MEMBER});
+    await seedCargo("presidente", {
+      stage: "confirming",
+      candidates: [{id: MEMBER, name: "Ana", votes: 3}, {id: MEMBER2, name: "Bia", votes: 1}],
+    });
+    const second = await start("presidente");
+    expect(second.number).toBe(2);
+    expect((await round(second.roundId)).options).toEqual([{id: MEMBER2, name: "Bia"}]);
+    await roundsRef().doc(second.roundId).update({status: "closed"});
+
+    await seedCargo("presidente", {
+      stage: "awaiting3",
+      candidates: [{id: MEMBER, name: "Ana", votes: 3}, {id: MEMBER3, name: "Caio", votes: 1}],
+    });
+    const third = await start("presidente");
+    expect(third.number).toBe(3);
+    expect((await round(third.roundId)).options).toEqual([{id: MEMBER3, name: "Caio"}]);
+  });
+
+  it("se todos os candidatos já foram eleitos em outro cargo, recusa com a razão", async () => {
+    await seedCargo("vice", {stage: "decided", winnerId: MEMBER});
+    await seedCargo("presidente", {
+      stage: "confirming", candidates: [{id: MEMBER, name: "Ana", votes: 3}],
+    });
+    await expectCode(start("presidente"), "failed-precondition");
+    expect((await cargo("presidente")).stage).toBe("confirming");
+  });
+
+  it("duas aberturas simultâneas em cargos diferentes: no máximo um escrutínio fica aberto", async () => {
+    const settled = await Promise.allSettled([start("presidente"), start("vice")]);
+    expect(settled.filter((s) => s.status === "fulfilled")).toHaveLength(1);
+    const open = await roundsRef().where("status", "==", "open").get();
+    expect(open.size).toBe(1);
+  });
+
   it("estados que não permitem iniciar", async () => {
     for (const stage of ["scrutiny1", "scrutiny2", "scrutiny3", "tiebreak", "decided"]) {
       await seedCargo("presidente", {stage});

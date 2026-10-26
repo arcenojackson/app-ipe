@@ -96,7 +96,20 @@ export const pickOldest = async (
   const ref = cargoRefOf(db, electionId, position);
   const picked = await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
+    const cargos = await tx.get(
+      db.collection(`elections/${electionId}/cargos`)
+    );
     if (!snap.exists) throw fail("not-found", "Cargo não encontrado.");
+    const electedElsewhere = cargos.docs.some(
+      (d) => d.id !== position &&
+        d.get("stage") === "decided" &&
+        d.get("winnerId") === candidateId
+    );
+    if (electedElsewhere) {
+      throw fail(
+        "failed-precondition", "Esta pessoa já foi eleita para outro cargo."
+      );
+    }
     if (snap.get("stage") !== "tiebreak") {
       throw fail("failed-precondition", "Este cargo não está em desempate.");
     }

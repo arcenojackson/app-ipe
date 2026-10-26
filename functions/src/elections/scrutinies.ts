@@ -86,19 +86,25 @@ export const startScrutiny = async (
     const cargo = cargoSnap.data() as CargoDoc;
     const number = nextNumber(cargo);
 
-    let options: Candidate[];
-    if (number === 1) {
-      const elected = new Set(
-        cargos.docs
-          .filter((d) => d.get("stage") === "decided" && d.get("winnerId"))
-          .map((d) => String(d.get("winnerId")))
-      );
-      options = members.filter((m) => !elected.has(m.id));
-    } else {
-      options = cargo.candidates.map((c) => ({id: c.id, name: c.name}));
-    }
+    // Quem já foi eleito em outro cargo não pode ser eleito de novo.
+    const elected = new Set(
+      cargos.docs
+        .filter((d) => d.id !== position)
+        .filter((d) => d.get("stage") === "decided" && d.get("winnerId"))
+        .map((d) => String(d.get("winnerId")))
+    );
+    const pool: Candidate[] = number === 1 ?
+      members :
+      cargo.candidates.map((c) => ({id: c.id, name: c.name}));
+    const options = pool.filter((o) => !elected.has(o.id));
     if (options.length === 0) {
-      throw fail("failed-precondition", "Não há opções para este escrutínio.");
+      throw fail(
+        "failed-precondition",
+        number === 1 ?
+          "Não há opções para este escrutínio." :
+          "Todos os candidatos já foram eleitos em outro cargo. " +
+            "Reinicie o cargo."
+      );
     }
 
     const roundRef = roundsRef.doc();
