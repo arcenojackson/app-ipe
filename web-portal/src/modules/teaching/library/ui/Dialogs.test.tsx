@@ -1,3 +1,4 @@
+import {chooseTag} from "./chooseTag";
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {describe, expect, it, vi} from "vitest";
 import type {Tag} from "../tags";
@@ -90,7 +91,7 @@ describe("LinkDialog com tags", () => {
     fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
     expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("Escolha pelo menos uma tag de tipo.");
     expect(onSubmit).not.toHaveBeenCalled();
-    for (const name of ["Artigos", "Trindade", "UMP"]) fireEvent.click(screen.getByRole("checkbox", {name}));
+    for (const name of ["Artigos", "Trindade", "UMP"]) chooseTag(name);
     fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
       name: "Livro", url: "https://x.org", description: "",
@@ -110,7 +111,7 @@ describe("TagEditDialog", () => {
   it("não deixa esvaziar um tipo de tag", () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(<TagEditDialog initial={initial} onSubmit={onSubmit} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
+    chooseTag("UMP");
     fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
     expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("Escolha pelo menos uma tag de faixa.");
     expect(onSubmit).not.toHaveBeenCalled();
@@ -120,8 +121,8 @@ describe("TagEditDialog", () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
     render(<TagEditDialog initial={initial} onSubmit={onSubmit} onClose={onClose} />);
-    fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
-    fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
+    chooseTag("Trindade");
+    chooseTag("Trindade");
     fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(initial));
     await waitFor(() => expect(onClose).toHaveBeenCalled());

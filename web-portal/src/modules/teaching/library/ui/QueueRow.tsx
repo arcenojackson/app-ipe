@@ -1,6 +1,7 @@
 import type {BadgeTone} from "../status";
 import type {Tag} from "../tags";
 import type {LibraryItem} from "../types";
+import {FileTypeIcon} from "./FileTypeIcon";
 import {StatusBadge} from "./StatusBadge";
 import {TagChips} from "./TagChips";
 
@@ -30,7 +31,7 @@ export function QueueRow({
         onClick={onOpen}
         className="flex w-full items-center gap-3 rounded-card bg-surface-elevated px-4 py-3 text-left transition hover:brightness-125"
       >
-        <span aria-hidden className="text-xl">{item.type === "link" ? "🔗" : "📄"}</span>
+        <FileTypeIcon item={item} />
         <span className="min-w-0 flex-1 space-y-1">
           <span className="block truncate font-medium">{item.name}</span>
           <TagChips

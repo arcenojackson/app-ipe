@@ -11,11 +11,12 @@ const tags: Tag[] = [
 ];
 
 describe("TagPicker", () => {
-  it("lista só as tags ativas, em três grupos", () => {
+  it("tem um chip por tipo e lista só as tags ativas no menu", () => {
     render(<TagPicker tags={tags} value={EMPTY_TAGS} onChange={() => undefined} />);
-    expect(screen.getByRole("group", {name: "Tipo"})).toBeInTheDocument();
-    expect(screen.getByRole("group", {name: "Assunto"})).toBeInTheDocument();
-    expect(screen.getByRole("group", {name: "Faixa"})).toBeInTheDocument();
+    for (const kind of ["Tipo", "Assunto", "Faixa"]) {
+      expect(screen.getByRole("button", {name: new RegExp(`^${kind}`)})).toBeInTheDocument();
+    }
+    fireEvent.click(screen.getByRole("button", {name: /^Assunto/}));
     expect(screen.getByRole("checkbox", {name: "Trindade"})).toBeInTheDocument();
     expect(screen.queryByRole("checkbox", {name: "Assunto antigo"})).not.toBeInTheDocument();
   });
@@ -23,6 +24,7 @@ describe("TagPicker", () => {
   it("marcar acrescenta o id no campo certo; desmarcar remove", () => {
     const onChange = vi.fn();
     const {rerender} = render(<TagPicker tags={tags} value={EMPTY_TAGS} onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button", {name: /^Assunto/}));
     fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
     expect(onChange).toHaveBeenCalledWith({...EMPTY_TAGS, subjectTags: ["assunto-trindade"]});
 

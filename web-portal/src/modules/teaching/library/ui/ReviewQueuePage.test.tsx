@@ -9,8 +9,11 @@ import ReviewQueuePage from "./ReviewQueuePage";
 
 const repo = vi.hoisted(() => ({subscribeReviewQueue: vi.fn(), loadVotes: vi.fn(), countCurators: vi.fn()}));
 vi.mock("../repository", () => repo);
-const nav = vi.hoisted(() => ({push: vi.fn()}));
-vi.mock("next/navigation", () => ({useRouter: () => ({push: nav.push})}));
+const nav = vi.hoisted(() => ({push: vi.fn(), replace: vi.fn(), search: ""}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({push: nav.push, replace: nav.replace}),
+  useSearchParams: () => new URLSearchParams(nav.search),
+}));
 vi.mock("./UploadPanel", () => ({UploadPanel: () => <div data-testid="upload-panel" />}));
 vi.mock("./Dialogs", () => ({LinkDialog: () => <div data-testid="link-dialog" />}));
 const mutations = vi.hoisted(() => ({createLink: vi.fn()}));
@@ -44,6 +47,8 @@ const asTeacher = () => renderAs("t1", {admin: false, teachingRole: "teacher"});
 
 beforeEach(() => {
   nav.push.mockReset();
+  nav.replace.mockReset();
+  nav.search = "";
   repo.countCurators.mockReset().mockResolvedValue(3);
   repo.loadVotes.mockReset().mockImplementation(async (id: string): Promise<LibraryVote[]> =>
     id === "i1" ? [{id: "v1", voterId: "c3", action: "approve", version: 1, createdAt: 1}] : []);
@@ -68,11 +73,12 @@ describe("ReviewQueuePage — professor", () => {
   it("vê o envio de material e só os próprios envios", async () => {
     queue = {mine: [item("m1", "Meu envio")], toReview: [], returned: [], deleteRequests: []};
     asTeacher();
-    expect(await screen.findByTestId("upload-panel")).toBeInTheDocument();
-    expect(section("Meus envios").getByText("Meu envio")).toBeInTheDocument();
+    expect(await screen.findByText("Meu envio")).toBeInTheDocument();
+    expect(screen.queryByTestId("upload-panel")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Enviar material"}));
+    expect(screen.getByTestId("upload-panel")).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", {name: "Para revisar"})).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", {name: "Devolvidos aguardando o autor"})).not.toBeInTheDocument();
-    expect(screen.queryByRole("region", {name: "Pedidos de exclusão"})).not.toBeInTheDocument();
   });
 
   it("sem envios mostra a mensagem da seção", async () => {
@@ -83,17 +89,22 @@ describe("ReviewQueuePage — professor", () => {
 });
 
 describe("ReviewQueuePage — curador", () => {
-  it("vê Meus envios, Para revisar (com o andamento) e Pedidos de exclusão", async () => {
+  it("abre em Para revisar (com o andamento) e as demais seções ficam em abas", async () => {
     renderAs("c1");
     expect(await screen.findByText("Aula 1")).toBeInTheDocument();
-    expect(section("Meus envios").getByText("Meu envio")).toBeInTheDocument();
+    expect(screen.getByRole("tab", {name: /Para revisar/})).toHaveAttribute("aria-selected", "true");
     expect(section("Para revisar").getByText("1/2 aprovações")).toBeInTheDocument();
+    expect(screen.queryByText("Meu envio")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", {name: /Meus envios/}));
+    expect(section("Meus envios").getByText("Meu envio")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", {name: /Pedidos de exclusão/}));
     expect(section("Pedidos de exclusão").getByText("Livro antigo")).toBeInTheDocument();
     expect(screen.getByText(/Obsoleto/)).toBeInTheDocument();
   });
 
   it("lista os devolvidos de outros autores, para o curador abrir e pedir a exclusão", async () => {
     renderAs("c1");
+    fireEvent.click(await screen.findByRole("tab", {name: /Devolvidos/}));
     await screen.findByText("Parado no autor");
     expect(section("Devolvidos aguardando o autor").getByText(/Sem resposta do autor/)).toBeInTheDocument();
     fireEvent.click(section("Devolvidos aguardando o autor").getByRole("button", {name: "Abrir Parado no autor"}));
@@ -109,6 +120,7 @@ describe("ReviewQueuePage — curador", () => {
 
   it("item devolvido mostra o comentário de devolução", async () => {
     renderAs("c1");
+    fireEvent.click(await screen.findByRole("tab", {name: /Meus envios/}));
     expect(await screen.findByText(/Falta a fonte/)).toBeInTheDocument();
   });
 
@@ -132,6 +144,7 @@ describe("ReviewQueuePage — curador", () => {
     queue = {mine: [], toReview: [], returned: [], deleteRequests: []};
     renderAs("c1");
     expect(await screen.findByText("Nada aguardando a sua revisão.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", {name: /Pedidos de exclusão/}));
     expect(screen.getByText("Nenhum pedido de exclusão.")).toBeInTheDocument();
   });
 
@@ -141,10 +154,28 @@ describe("ReviewQueuePage — curador", () => {
     expect(await screen.findByText(/Há apenas 1 curador/)).toBeInTheDocument();
   });
 
-  it("Adicionar link abre o diálogo de link", async () => {
+  it("Enviar material abre o painel lateral; Adicionar link abre o diálogo de link", async () => {
     renderAs("c1");
-    fireEvent.click(await screen.findByRole("button", {name: "Adicionar link"}));
+    fireEvent.click(await screen.findByRole("button", {name: "Enviar material"}));
+    expect(screen.getByRole("dialog", {name: "Enviar material"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Adicionar link"}));
     expect(screen.getByTestId("link-dialog")).toBeInTheDocument();
+  });
+
+  it("?novo=1 já abre o painel de envio e fechar limpa o endereço", async () => {
+    nav.search = "novo=1";
+    renderAs("c1");
+    expect(await screen.findByRole("dialog", {name: "Enviar material"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
+    expect(screen.queryByRole("dialog", {name: "Enviar material"})).not.toBeInTheDocument();
+    expect(nav.replace).toHaveBeenCalledWith("/ensino/revisao");
+  });
+
+  it("Esc fecha o painel de envio", async () => {
+    renderAs("c1");
+    fireEvent.click(await screen.findByRole("button", {name: "Enviar material"}));
+    fireEvent.keyDown(window, {key: "Escape"});
+    expect(screen.queryByRole("dialog", {name: "Enviar material"})).not.toBeInTheDocument();
   });
 });
 
