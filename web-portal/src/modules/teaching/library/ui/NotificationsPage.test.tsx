@@ -46,14 +46,14 @@ describe("NotificationsPage", () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", {name: /Material publicado/}));
     await waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith("n1"));
-    expect(nav.push).toHaveBeenCalledWith("/ensino/biblioteca?item=i1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino?item=i1");
   });
 
   it("não remarca uma notificação já lida", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", {name: /Material devolvido/}));
     expect(notifications.markRead).not.toHaveBeenCalled();
-    expect(nav.push).toHaveBeenCalledWith("/ensino/biblioteca?item=i2");
+    expect(nav.push).toHaveBeenCalledWith("/ensino?item=i2");
   });
 
   it("marcar todas como lidas só envia as não lidas", async () => {

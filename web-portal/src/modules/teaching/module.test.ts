@@ -13,9 +13,9 @@ describe("teachingModule", () => {
     expect(item?.access).toBe("teacher");
   });
 
-  it("Biblioteca e Notificações são de professores; o grupo é do admin", () => {
+  it("Biblioteca (a Início) e Notificações são de professores; o grupo é do admin", () => {
     const access = (href: string) => teachingModule.navItems.find((i) => i.href === href)?.access;
-    expect(access("/ensino/biblioteca")).toBe("teacher");
+    expect(access("/ensino")).toBe("teacher");
     expect(access("/ensino/notificacoes")).toBe("teacher");
     expect(access("/ensino/admin")).toBe("admin");
   });

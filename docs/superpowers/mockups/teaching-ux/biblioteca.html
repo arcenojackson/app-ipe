@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Biblioteca — direções de UX</title>
+<style>
+:root{--bg:#0b0f19;--surface:#111828;--elev:#1b2435;--primary:#2f4f2f;--sec:#6b8e23;--err:#ff5470;--on:#fff;
+--muted:rgba(255,255,255,.62);--line:rgba(255,255,255,.08);--r:18px}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--on);font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+.switch{position:sticky;top:0;z-index:50;display:flex;gap:8px;padding:10px 16px;background:#06090f;border-bottom:1px solid var(--line)}
+.switch button{border:1px solid var(--line);background:none;padding:8px 14px;border-radius:99px}
+.switch button.on{background:var(--sec);border-color:var(--sec);color:#fff;font-weight:600}
+.dir{display:none}.dir.on{display:block}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:calc(100vh - 53px)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px}
+.brand{font-weight:700;font-size:16px;padding:4px 10px 14px;display:flex;align-items:center;gap:8px}
+.logo{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--sec))}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;color:var(--muted)}
+.nav.on{background:rgba(107,142,35,.18);color:#fff;font-weight:600}
+.nav .dot{width:18px;text-align:center}
+.sp{flex:1}.who{padding:10px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:13px}
+.main{padding:20px 28px;min-width:0}
+.top{display:flex;gap:12px;align-items:center;margin-bottom:16px}
+.search{flex:1;display:flex;align-items:center;gap:10px;background:var(--elev);border-radius:99px;padding:11px 18px;color:var(--muted)}
+.bell{width:42px;height:42px;border-radius:50%;background:var(--elev);display:grid;place-items:center;position:relative}
+.bell i{position:absolute;top:8px;right:9px;width:9px;height:9px;border-radius:50%;background:var(--err)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center}
+.chip{border:1px solid var(--line);background:none;border-radius:99px;padding:6px 13px;font-size:13px;color:var(--muted)}
+.chip.on{background:rgba(107,142,35,.22);border-color:var(--sec);color:#fff}
+.chip.add{border-style:dashed}
+.btn{background:var(--sec);border:0;color:#fff;border-radius:99px;padding:9px 18px;font-weight:600}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:13px;margin:22px 0 10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.sub{color:var(--muted);margin:0 0 16px}
+/* lista */
+.list{background:var(--surface);border-radius:var(--r);overflow:hidden}
+.row{display:grid;grid-template-columns:36px minmax(0,2.2fr) minmax(0,1.6fr) 120px 90px;gap:14px;align-items:center;padding:11px 16px;border-top:1px solid var(--line)}
+.row.head{border:0;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.row:not(.head):hover,.row.sel{background:rgba(255,255,255,.05)}
+.row.sel{box-shadow:inset 3px 0 var(--sec)}
+.ico{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:11px;font-weight:800}
+.pdf{background:#5b1f2b;color:#ff8da1}.doc{background:#1f3a5b;color:#8dbcff}.img{background:#3d2f5b;color:#c3a8ff}.lnk{background:#1f4a3f;color:#7fe0c3}.ppt{background:#5b3d1f;color:#ffc58d}
+.nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.meta{color:var(--muted);font-size:12px}
+.tg{display:flex;gap:5px;flex-wrap:nowrap;overflow:hidden}
+.t{font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.08);white-space:nowrap}
+.t.s{background:rgba(107,142,35,.22)}.t.a{background:rgba(120,160,255,.18)}
+/* painel */
+.split{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px}
+.panel{background:var(--surface);border-radius:var(--r);padding:18px;position:sticky;top:70px;align-self:start}
+.prev{height:210px;border-radius:14px;background:linear-gradient(160deg,#1b2435,#0f1522);display:grid;place-items:center;margin:12px 0;border:1px solid var(--line);position:relative;overflow:hidden}
+.page{width:120px;height:160px;background:#f4f4ef;border-radius:4px;box-shadow:0 10px 30px rgba(0,0,0,.5);padding:14px 12px}
+.page b{display:block;height:7px;background:#c7c7bd;border-radius:2px;margin-bottom:7px}.page b:first-child{width:70%;background:#8a8a80;height:9px}
+.kv{display:grid;grid-template-columns:90px 1fr;gap:8px 10px;font-size:13px;margin:12px 0}.kv span:nth-child(odd){color:var(--muted)}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.ghost{background:none;border:1px solid var(--line);border-radius:99px;padding:8px 14px}
+/* filtros laterais (B) */
+.rail{width:250px;flex:none}.layoutB{display:flex;gap:24px}
+.fg{margin-bottom:18px}.fg h3{margin:0 0 8px;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.fi{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-radius:10px;color:var(--muted);font-size:13px}
+.fi:hover{background:rgba(255,255,255,.05)}.fi.on{background:rgba(107,142,35,.2);color:#fff}.fi small{opacity:.6}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px;flex:1}
+.card{background:var(--surface);border-radius:var(--r);overflow:hidden;border:1px solid transparent}
+.card:hover{border-color:var(--sec);transform:translateY(-2px);transition:.15s}
+.thumb{height:130px;display:grid;place-items:center;background:linear-gradient(160deg,#1b2435,#0f1522)}
+.thumb .page{width:76px;height:100px;padding:9px 8px}.thumb .page b{height:4px;margin-bottom:5px}.thumb .page b:first-child{height:6px}
+.cb{padding:12px 14px}.cb .nm{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* C */
+.hero{background:linear-gradient(135deg,rgba(47,79,47,.7),rgba(107,142,35,.25)),var(--surface);border-radius:28px;padding:28px;margin-bottom:20px}
+.hero .search{background:rgba(11,15,25,.65);margin-top:14px;padding:14px 20px;font-size:15px}
+.facet{display:flex;gap:10px;align-items:center;margin:10px 0}.facet b{width:64px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em}
+.fs{display:flex;gap:7px;overflow:auto;padding-bottom:2px;flex:1;scrollbar-width:none}
+.shelf{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.mini{background:var(--surface);border-radius:16px;padding:14px;display:flex;gap:12px;align-items:center}
+.note{max-width:900px;margin:18px 28px 0;padding:12px 16px;border-radius:14px;background:var(--elev);color:var(--muted);font-size:13px}
+@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.split{grid-template-columns:1fr}.row{grid-template-columns:36px 1fr}.row>:nth-child(n+3){display:none}.rail{display:none}.shelf{grid-template-columns:1fr 1fr}.panel{position:static}}
+</style>
+</head>
+<body>
+<div class="switch">
+  <button class="on" data-d="a">A · Estilo Drive</button>
+  <button data-d="b">B · Galeria + filtros laterais</button>
+  <button data-d="c">C · Explorar por facetas</button>
+</div>
+
+<!-- SIDEBAR reutilizável -->
+<template id="side">
+  <aside class="side">
+    <div class="brand"><span class="logo"></span>Portal de Ensino</div>
+    <div class="nav on"><span class="dot">▤</span>Início · Biblioteca</div>
+    <div class="nav"><span class="dot">☰</span>Plano pedagógico</div>
+    <div class="nav"><span class="dot">⇪</span>Fila de revisão <span style="margin-left:auto;background:var(--err);border-radius:99px;padding:0 7px;font-size:11px;color:#fff">2</span></div>
+    <div class="nav"><span class="dot">💬</span>Fórum <small style="margin-left:auto;opacity:.5">em breve</small></div>
+    <div class="nav"><span class="dot">⚙</span>Grupo de professores</div>
+    <div class="sp"></div>
+    <div class="who">Jackson Felipe<br><small>Curador · Sair</small></div>
+  </aside>
+</template>
+
+<!-- ============ A ============ -->
+<section class="dir on" id="a">
+<div class="app">
+<div data-side></div>
+<div class="main">
+  <div class="top">
+    <div class="search">🔍 Buscar por nome na biblioteca…</div>
+    <button class="btn">＋ Enviar material</button>
+    <div class="bell">🔔<i></i></div>
+  </div>
+  <h1>Biblioteca</h1><p class="sub">Materiais publicados pelos curadores. 128 itens.</p>
+  <div class="chips">
+    <button class="chip">Tipo ▾</button><button class="chip on">Assunto: Cristologia ✕</button><button class="chip add">＋ Assunto</button><button class="chip">Faixa etária ▾</button>
+    <button class="chip" style="margin-left:auto">Limpar filtros</button>
+  </div>
+  <div class="split">
+    <div class="list">
+      <div class="row head"><span></span><span>Nome</span><span>Tags</span><span>Publicado</span><span>Tamanho</span></div>
+      <div class="row sel"><span class="ico pdf">PDF</span><div><div class="nm">Cristologia na Confissão de Westminster</div><div class="meta">Por Allan Pires</div></div><div class="tg"><span class="t">Aula</span><span class="t s">Cristologia</span><span class="t a">Adultos</span></div><span class="meta">12 out 2026</span><span class="meta">2,4 MB</span></div>
+      <div class="row"><span class="ico ppt">PPT</span><div><div class="nm">As duas naturezas de Cristo — slides</div><div class="meta">Por Cleuza Silva</div></div><div class="tg"><span class="t">Slides</span><span class="t s">Cristologia</span><span class="t a">Jovens</span></div><span class="meta">3 out 2026</span><span class="meta">8,1 MB</span></div>
+      <div class="row"><span class="ico lnk">URL</span><div><div class="nm">Série de vídeos sobre Calcedônia</div><div class="meta">Por Jackson Felipe</div></div><div class="tg"><span class="t">Vídeo</span><span class="t s">Cristologia</span><span class="t s">História</span></div><span class="meta">28 set 2026</span><span class="meta">link ↗</span></div>
+      <div class="row"><span class="ico doc">DOC</span><div><div class="nm">Plano de aula — Ofícios de Cristo</div><div class="meta">Por Allan Pires</div></div><div class="tg"><span class="t">Plano de aula</span><span class="t s">Cristologia</span></div><span class="meta">19 set 2026</span><span class="meta">310 KB</span></div>
+      <div class="row"><span class="ico img">IMG</span><div><div class="nm">Linha do tempo dos concílios</div><div class="meta">Por Cleuza Silva</div></div><div class="tg"><span class="t">Imagem</span><span class="t s">História</span><span class="t a">Todas</span></div><span class="meta">02 set 2026</span><span class="meta">1,1 MB</span></div>
+    </div>
+    <aside class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:start"><b style="font-size:16px">Cristologia na Confissão de Westminster</b><span class="meta">✕</span></div>
+      <div class="prev"><div class="page"><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div></div>
+      <div class="kv"><span>Enviado por</span><span>Allan Pires</span><span>Publicado</span><span>12 out 2026 · aprovado por 2 curadores</span><span>Tamanho</span><span>2,4 MB · PDF · 18 págs</span><span>Tags</span><span class="tg"><span class="t">Aula</span><span class="t s">Cristologia</span><span class="t a">Adultos</span></span></div>
+      <div class="acts"><button class="btn">Abrir / baixar</button><button class="ghost">Editar tags</button><button class="ghost">⋯</button></div>
+    </aside>
+  </div>
+</div></div>
+<div class="note"><b>Direção A.</b> Mais próxima do Drive: busca grande no topo, filtros como chips (clique abre lista com busca), lista densa e <b>painel lateral fixo</b> com prévia, metadados e ações (substitui a janela larga; a URL <code>?item=ID</code> abre o painel). Menor mudança de código, uso rápido.</div>
+</section>
+
+<!-- ============ B ============ -->
+<section class="dir" id="b">
+<div class="app">
+<div data-side></div>
+<div class="main">
+  <div class="top">
+    <div class="search">🔍 Buscar por nome na biblioteca…</div>
+    <button class="btn">＋ Enviar material</button>
+    <div class="bell">🔔<i></i></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;align-items:end;margin-bottom:14px"><div><h1>Biblioteca</h1><p class="sub" style="margin:0">42 de 128 itens · Cristologia</p></div>
+    <div class="chips" style="margin:0"><button class="chip on">▦ Grade</button><button class="chip">☰ Lista</button><button class="chip">Mais recentes ▾</button></div></div>
+  <div class="layoutB">
+    <aside class="rail">
+      <div class="fg"><h3>Tipo</h3>
+        <div class="fi">Aula <small>34</small></div><div class="fi">Slides <small>21</small></div><div class="fi">Plano de aula <small>18</small></div><div class="fi">Vídeo <small>12</small></div><div class="fi" style="color:var(--sec)">Ver todos (8)</div></div>
+      <div class="fg"><h3>Assunto</h3>
+        <div class="search" style="padding:7px 12px;margin-bottom:6px;font-size:13px">Filtrar assuntos…</div>
+        <div class="fi on">✓ Cristologia <small>42</small></div><div class="fi">Soteriologia <small>31</small></div><div class="fi">Eclesiologia <small>27</small></div><div class="fi">História da Igreja <small>19</small></div><div class="fi" style="color:var(--sec)">Ver todos (25)</div></div>
+      <div class="fg"><h3>Faixa etária</h3><div class="fi">Crianças <small>20</small></div><div class="fi">Jovens <small>38</small></div><div class="fi">Adultos <small>70</small></div></div>
+    </aside>
+    <div class="grid">
+      <div class="card"><div class="thumb"><div class="page"><b></b><b></b><b></b><b></b><b></b></div></div><div class="cb"><div class="nm">Cristologia na Confissão de Westminster</div><div class="meta"><span class="ico pdf" style="display:inline-grid;width:auto;padding:1px 6px;height:auto;border-radius:6px">PDF</span> Allan Pires · 12 out</div></div></div>
+      <div class="card"><div class="thumb" style="background:linear-gradient(160deg,#5b3d1f,#2b1d0d)"><span style="font-size:34px">▶</span></div><div class="cb"><div class="nm">As duas naturezas de Cristo — slides</div><div class="meta"><span class="ico ppt" style="display:inline-grid;width:auto;padding:1px 6px;height:auto;border-radius:6px">PPT</span> Cleuza Silva · 03 out</div></div></div>
+      <div class="card"><div class="thumb" style="background:linear-gradient(160deg,#1f4a3f,#0d2b24)"><span style="font-size:34px">↗</span></div><div class="cb"><div class="nm">Série de vídeos sobre Calcedônia</div><div class="meta"><span class="ico lnk" style="display:inline-grid;width:auto;padding:1px 6px;height:auto;border-radius:6px">LINK</span> Jackson · 28 set</div></div></div>
+      <div class="card"><div class="thumb"><div class="page"><b></b><b></b><b></b><b></b></div></div><div class="cb"><div class="nm">Plano de aula — Ofícios de Cristo</div><div class="meta"><span class="ico doc" style="display:inline-grid;width:auto;padding:1px 6px;height:auto;border-radius:6px">DOC</span> Allan Pires · 19 set</div></div></div>
+      <div class="card"><div class="thumb" style="background:linear-gradient(160deg,#3d2f5b,#1c1530)"><span style="font-size:34px">🖼</span></div><div class="cb"><div class="nm">Linha do tempo dos concílios</div><div class="meta"><span class="ico img" style="display:inline-grid;width:auto;padding:1px 6px;height:auto;border-radius:6px">IMG</span> Cleuza · 02 set</div></div></div>
+      <div class="card"><div class="thumb"><div class="page"><b></b><b></b><b></b><b></b><b></b><b></b></div></div><div class="cb"><div class="nm">Catecismo Maior — perguntas 36–45</div><div class="meta"><span class="ico pdf" style="display:inline-grid;width:auto;padding:1px 6px;height:auto;border-radius:6px">PDF</span> Allan Pires · 21 ago</div></div></div>
+    </div>
+  </div>
+</div></div>
+<div class="note"><b>Direção B.</b> Filtros viram uma <b>barra lateral com contagens</b> e busca dentro dos 25 assuntos (resolve a lista corrida de caixas); resultados em <b>grade com miniatura</b> (alternável para lista). Clicar num card abre a janela/painel do item. Mais visual e mais "arrojada"; ocupa mais largura.</div>
+</section>
+
+<!-- ============ C ============ -->
+<section class="dir" id="c">
+<div class="app">
+<div data-side></div>
+<div class="main">
+  <div class="hero">
+    <div style="display:flex;justify-content:space-between;align-items:start"><div><h1 style="font-size:26px">Olá, Jackson</h1><p class="sub" style="margin:0">O que você quer ensinar hoje?</p></div><div style="display:flex;gap:10px"><button class="btn">＋ Enviar material</button><div class="bell">🔔<i></i></div></div></div>
+    <div class="search">🔍 Buscar aulas, planos, slides, vídeos…</div>
+    <div class="facet"><b>Tipo</b><div class="fs"><button class="chip">Aula</button><button class="chip">Slides</button><button class="chip">Plano de aula</button><button class="chip">Vídeo</button><button class="chip">Texto</button><button class="chip">Imagem</button></div></div>
+    <div class="facet"><b>Assunto</b><div class="fs"><button class="chip on">Cristologia ✕</button><button class="chip">Soteriologia</button><button class="chip">Eclesiologia</button><button class="chip">História</button><button class="chip">Escatologia</button><button class="chip">Ética</button><button class="chip">Oração</button><button class="chip">+ 18</button></div></div>
+    <div class="facet"><b>Faixa</b><div class="fs"><button class="chip">Crianças</button><button class="chip">Jovens</button><button class="chip on">Adultos ✕</button></div></div>
+  </div>
+  <h2>Adicionados recentemente</h2>
+  <div class="shelf">
+    <div class="mini"><span class="ico pdf">PDF</span><div style="min-width:0"><div class="nm">Cristologia em Westminster</div><div class="meta">12 out</div></div></div>
+    <div class="mini"><span class="ico ppt">PPT</span><div style="min-width:0"><div class="nm">Duas naturezas de Cristo</div><div class="meta">03 out</div></div></div>
+    <div class="mini"><span class="ico lnk">URL</span><div style="min-width:0"><div class="nm">Vídeos sobre Calcedônia</div><div class="meta">28 set</div></div></div>
+    <div class="mini"><span class="ico doc">DOC</span><div style="min-width:0"><div class="nm">Ofícios de Cristo</div><div class="meta">19 set</div></div></div>
+  </div>
+  <h2>Resultados · 9 itens</h2>
+  <div class="list">
+    <div class="row"><span class="ico pdf">PDF</span><div><div class="nm">Cristologia na Confissão de Westminster</div><div class="meta">Allan Pires</div></div><div class="tg"><span class="t">Aula</span><span class="t s">Cristologia</span></div><span class="meta">12 out 2026</span><span class="meta">2,4 MB</span></div>
+    <div class="row"><span class="ico doc">DOC</span><div><div class="nm">Plano de aula — Ofícios de Cristo</div><div class="meta">Allan Pires</div></div><div class="tg"><span class="t">Plano de aula</span><span class="t s">Cristologia</span></div><span class="meta">19 set 2026</span><span class="meta">310 KB</span></div>
+  </div>
+</div></div>
+<div class="note"><b>Direção C.</b> Página de "descoberta": cabeçalho com busca grande e <b>uma linha de chips por tipo de tag</b> (rolagem horizontal, escolha em 1 clique, sem menus), prateleira de recentes e resultados em lista. Item abre em gaveta lateral. Boa para quem não sabe o nome do material.</div>
+</section>
+
+<script>
+document.querySelectorAll('[data-side]').forEach(e=>e.replaceWith(document.getElementById('side').content.cloneNode(true)));
+document.querySelectorAll('.switch button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.switch button,.dir').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');document.getElementById(b.dataset.d).classList.add('on');});
+</script>
+</body>
+</html>

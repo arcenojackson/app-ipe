@@ -125,7 +125,7 @@ describe("LibraryContent", () => {
   it("carregando sem itens mostra Carregando…", () => {
     state = {...state, items: [], loading: true, done: false};
     renderPage();
-    expect(screen.getByText("Carregando…")).toBeInTheDocument();
+    expect(screen.getByRole("status", {name: "Carregando"})).toBeInTheDocument();
   });
 
   it("erro mostra alerta", () => {
@@ -142,10 +142,21 @@ describe("LibraryContent", () => {
     expect(screen.queryByRole("navigation", {name: /Caminho/i})).not.toBeInTheDocument();
   });
 
-  it("clicar num arquivo abre ?item=ID", () => {
+  it("na lista, clicar num arquivo mostra o resumo e Visualizar abre ?item=ID", () => {
     const navigate = renderPage();
     fireEvent.click(screen.getByRole("button", {name: /Santidade/}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?item=a");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(screen.getByRole("complementary", {name: "Resumo do item"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Visualizar"}));
+    expect(navigate).toHaveBeenCalledWith("/ensino?item=a");
+  });
+
+  it("na grade, clicar num arquivo abre direto ?item=ID", () => {
+    const navigate = renderPage();
+    fireEvent.click(screen.getByRole("button", {name: /Grade/}));
+    fireEvent.click(screen.getByRole("button", {name: /Santidade/}));
+    expect(navigate).toHaveBeenCalledWith("/ensino?item=a");
+    expect(screen.queryByRole("complementary", {name: "Resumo do item"})).not.toBeInTheDocument();
   });
 
   it("falha ao carregar as tags mostra aviso nos filtros", () => {
@@ -164,6 +175,6 @@ describe("LibraryContent", () => {
     const navigate = renderPage(teacher, "a");
     expect(screen.getByTestId("item-modal")).toHaveTextContent("a");
     fireEvent.click(screen.getByRole("button", {name: "Fechar janela"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca");
+    expect(navigate).toHaveBeenCalledWith("/ensino");
   });
 });

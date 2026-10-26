@@ -1,11 +1,12 @@
 "use client";
 
 import {useState} from "react";
-import {TextField} from "@/core/ui/TextField";
 import {TAGS_LOAD_HINT, TAG_FIELD, TAG_KINDS, TAG_KIND_LABEL, tagName, type ItemTags, type Tag, type TagKind} from "../tags";
 
-// Filtros da biblioteca: menus de Tipo/Assunto/Faixa, chips dos filtros ativos
-// e busca por texto.
+const SEARCHABLE_FROM = 8;
+
+// Filtros da biblioteca: busca, um chip por tipo de tag (Tipo/Assunto/Faixa)
+// com seleção múltipla e chips dos filtros ativos.
 export function TagFilterBar({
   tags,
   value,
@@ -22,6 +23,7 @@ export function TagFilterBar({
   onTextChange: (text: string) => void;
 }) {
   const [open, setOpen] = useState<TagKind | null>(null);
+  const [query, setQuery] = useState("");
   const byId = new Map(tags.map((t) => [t.id, t]));
 
   const toggle = (field: keyof ItemTags, id: string) => {
@@ -33,58 +35,95 @@ export function TagFilterBar({
     value[TAG_FIELD[kind]].map((id) => ({kind, id}))
   );
 
+  const toggleMenu = (kind: TagKind) => {
+    setQuery("");
+    setOpen(open === kind ? null : kind);
+  };
+
   return (
     <div className="space-y-3">
       {loadError && <p role="alert" className="text-sm text-error">{`${loadError} ${TAGS_LOAD_HINT}`}</p>}
-      <div className="flex flex-wrap items-end gap-3">
-        {TAG_KINDS.map((kind) => (
-          <div key={kind} className="relative">
-            <button
-              type="button"
-              aria-expanded={open === kind}
-              onClick={() => setOpen(open === kind ? null : kind)}
-              className="rounded-button border border-white/20 px-4 py-2 text-sm hover:bg-white/10"
-            >
-              {TAG_KIND_LABEL[kind]} ▾
-            </button>
-            {open === kind && (
-              <div className="absolute z-10 mt-1 max-h-72 min-w-56 overflow-y-auto rounded-card bg-surface-elevated p-3 shadow-lg">
-                {tags
-                  .filter((t) => t.kind === kind && t.active)
-                  .map((t) => (
-                    <label key={t.id} className="flex items-center gap-2 py-1 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={value[TAG_FIELD[kind]].includes(t.id)}
-                        onChange={() => toggle(TAG_FIELD[kind], t.id)}
-                      />
-                      {t.name}
-                    </label>
-                  ))}
-              </div>
-            )}
-          </div>
-        ))}
-        <div className="min-w-[14rem] flex-1">
-          <TextField id="library-search" label="Buscar na biblioteca" value={text} onChange={(e) => onTextChange(e.target.value)} />
-        </div>
+      <div className="flex items-center gap-3 rounded-full bg-surface-elevated px-5 py-3">
+        <span aria-hidden className="text-white/60">🔍</span>
+        <input
+          type="search"
+          aria-label="Buscar na biblioteca"
+          placeholder="Buscar por nome na biblioteca…"
+          value={text}
+          onChange={(e) => onTextChange(e.target.value)}
+          className="w-full bg-transparent outline-none placeholder:text-white/50"
+        />
       </div>
-      {selected.length > 0 && (
-        <ul className="flex flex-wrap gap-2">
-          {selected.map(({kind, id}) => (
-            <li key={`${kind}-${id}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        {TAG_KINDS.map((kind) => {
+          const count = value[TAG_FIELD[kind]].length;
+          const options = tags.filter((t) => t.kind === kind && t.active);
+          const shown = options.filter((t) => t.name.toLowerCase().includes(query.trim().toLowerCase()));
+          return (
+            <div key={kind} className="relative">
               <button
                 type="button"
-                aria-label={`Remover ${tagName(byId, id)}`}
-                onClick={() => toggle(TAG_FIELD[kind], id)}
-                className="rounded-full bg-white/10 px-3 py-1 text-xs hover:bg-white/20"
+                aria-expanded={open === kind}
+                onClick={() => toggleMenu(kind)}
+                className={`rounded-full border px-4 py-1.5 text-sm hover:bg-white/10 ${
+                  count > 0 ? "border-secondary bg-secondary/20" : "border-white/20 text-white/80"
+                }`}
               >
-                {tagName(byId, id)} ✕
+                {TAG_KIND_LABEL[kind]}
+                {count > 0 ? ` · ${count}` : ""} ▾
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
+              {open === kind && (
+                <div className="absolute z-10 mt-2 w-64 rounded-card bg-surface-elevated p-3 shadow-xl ring-1 ring-white/10">
+                  {options.length >= SEARCHABLE_FROM && (
+                    <input
+                      type="search"
+                      aria-label={`Filtrar ${TAG_KIND_LABEL[kind].toLowerCase()}`}
+                      placeholder="Filtrar…"
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      className="mb-2 w-full rounded-full bg-background/60 px-4 py-1.5 text-sm outline-none"
+                    />
+                  )}
+                  <div className="max-h-64 overflow-y-auto">
+                    {shown.map((t) => (
+                      <label key={t.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-white/5">
+                        <input
+                          type="checkbox"
+                          checked={value[TAG_FIELD[kind]].includes(t.id)}
+                          onChange={() => toggle(TAG_FIELD[kind], t.id)}
+                          className="accent-secondary"
+                        />
+                        {t.name}
+                      </label>
+                    ))}
+                    {shown.length === 0 && <p className="px-2 py-1.5 text-sm text-white/60">Nenhuma tag encontrada.</p>}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {selected.map(({kind, id}) => (
+          <button
+            key={`${kind}-${id}`}
+            type="button"
+            aria-label={`Remover ${tagName(byId, id)}`}
+            onClick={() => toggle(TAG_FIELD[kind], id)}
+            className="rounded-full border border-secondary bg-secondary/20 px-3 py-1.5 text-sm hover:bg-secondary/30"
+          >
+            {tagName(byId, id)} ✕
+          </button>
+        ))}
+        {selected.length > 0 && (
+          <button
+            type="button"
+            onClick={() => onChange({typeTags: [], subjectTags: [], ageTags: []})}
+            className="ml-auto rounded-full px-3 py-1.5 text-sm text-white/70 hover:bg-white/10"
+          >
+            Limpar filtros
+          </button>
+        )}
+      </div>
     </div>
   );
 }
