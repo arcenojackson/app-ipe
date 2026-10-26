@@ -1824,11 +1824,11 @@ export {
   electionApplyBoard,
   electionCastVote,
   electionCheckIn,
-  electionCloseRound,
+  electionCloseScrutiny,
   electionCreate,
-  electionOpenRound,
   electionReviewVoter,
   electionSetStatus,
+  electionStartScrutiny,
   electionVoteRecorded,
 } from "./elections";
 

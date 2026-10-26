@@ -2,7 +2,9 @@ import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import {assertNotAnonymous} from "./common";
 import {applyBoard, createElection, setElectionStatus} from "./lifecycle";
-import {bumpVotedCount, castVote, closeRound, openRound} from "./rounds";
+import {
+  bumpVotedCount, castVote, closeScrutiny, startScrutiny,
+} from "./scrutinies";
 import {checkIn, reviewVoter} from "./voters";
 
 const needAuth = (context: functions.https.CallableContext) => {
@@ -32,7 +34,7 @@ const needDirectorAuth = (context: functions.https.CallableContext) => {
 export const electionCreate = functions.https.onCall((data, context) =>
   createElection(admin.firestore(), needDirectorAuth(context).uid, data));
 
-export const electionSetStatus =functions.https.onCall((data, context) =>
+export const electionSetStatus = functions.https.onCall((data, context) =>
   setElectionStatus(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionCheckIn = functions.https.onCall((data, context) => {
@@ -48,14 +50,14 @@ export const electionCheckIn = functions.https.onCall((data, context) => {
 export const electionReviewVoter = functions.https.onCall((data, context) =>
   reviewVoter(admin.firestore(), needDirectorAuth(context).uid, data));
 
-export const electionOpenRound = functions.https.onCall((data, context) =>
-  openRound(admin.firestore(), needDirectorAuth(context).uid, data));
+export const electionStartScrutiny = functions.https.onCall((data, context) =>
+  startScrutiny(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionCastVote = functions.https.onCall((data, context) =>
   castVote(admin.firestore(), needAuth(context).uid, data));
 
-export const electionCloseRound = functions.https.onCall((data, context) =>
-  closeRound(admin.firestore(), needDirectorAuth(context).uid, data));
+export const electionCloseScrutiny = functions.https.onCall((data, context) =>
+  closeScrutiny(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionApplyBoard = functions.https.onCall((data, context) =>
   applyBoard(admin.firestore(), needDirectorAuth(context).uid, data));

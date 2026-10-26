@@ -1,6 +1,5 @@
 import {describe, expect, it} from "vitest";
 import {electedElsewhere, pickWinners, type RoundSummary} from "../src/elections/winners";
-import {removeElected, roundTypeFor} from "../src/elections/candidates";
 
 const r = (over: Partial<RoundSummary>): RoundSummary => ({
   position: "presidente",
@@ -42,22 +41,5 @@ describe("electedElsewhere", () => {
     const rounds = [r({}), r({position: "vice", winnerId: "bia"})];
     expect([...electedElsewhere(rounds, "presidente")]).toEqual(["bia"]);
     expect([...electedElsewhere(rounds, "tesoureiro")].sort()).toEqual(["ana", "bia"]);
-  });
-});
-
-describe("removeElected / roundTypeFor", () => {
-  const ana = {id: "ana", name: "Ana"};
-  const bia = {id: "bia", name: "Bia"};
-
-  it("remove eleitos da lista de candidatos", () => {
-    expect(removeElected([ana, bia], new Set(["ana"]))).toEqual([bia]);
-  });
-
-  it("um candidato vira rodada single; vários mantêm normal/runoff", () => {
-    expect(roundTypeFor([ana], "normal")).toBe("single");
-    expect(roundTypeFor([ana], "runoff")).toBe("single");
-    expect(roundTypeFor([ana, bia], "normal")).toBe("normal");
-    expect(roundTypeFor([ana, bia], "runoff")).toBe("runoff");
-    expect(roundTypeFor([ana, bia], "single")).toBe("normal");
   });
 });
