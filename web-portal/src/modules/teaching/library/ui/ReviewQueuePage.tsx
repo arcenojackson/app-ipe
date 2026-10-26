@@ -1,31 +1,22 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {useEffect, useMemo, useState} from "react";
+import {useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
+import {Button} from "@/core/ui/Button";
 import {REQUIRED_APPROVALS} from "../files";
-import {itemPermissions} from "../permissions";
-import {loadReviewQueue, loadVotes} from "../repository";
+import {createLink} from "../mutations";
+import {iVoted} from "../reviewQueue";
 import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
-import {buildBreadcrumbs, indexById, sortItems} from "../tree";
 import type {LibraryItem, LibraryVote} from "../types";
 import {viewerFrom} from "../types";
 import {libraryUrl} from "../url";
-import {NO_VIEWER, useCatalog} from "../useLibrary";
+import {useReviewQueue} from "../useReviewQueue";
+import {useTags} from "../useTags";
 import {CuratorWarning} from "./CuratorWarning";
-import {ItemRow} from "./ItemRow";
-
-interface Entry {
-  item: LibraryItem;
-  votes: LibraryVote[];
-}
-
-// Já votei na versão atual (publicação) ou no pedido atual (exclusão)?
-function iVoted(item: LibraryItem, votes: LibraryVote[], uid: string): boolean {
-  return votes.some((v) =>
-    v.voterId === uid &&
-    (item.deleteRequest ? v.requestId === item.deleteRequest.id : v.version === item.version));
-}
+import {LinkDialog} from "./Dialogs";
+import {QueueRow} from "./QueueRow";
+import {UploadPanel} from "./UploadPanel";
 
 export default function ReviewQueuePage() {
   const {state} = useAuth();
@@ -34,84 +25,99 @@ export default function ReviewQueuePage() {
     () => (state.status === "signedIn" ? viewerFrom(state.user.uid, state.claims) : null),
     [state]
   );
-  const catalog = useCatalog(viewer ?? NO_VIEWER);
-  const [reviews, setReviews] = useState<Entry[] | null>(null);
-  const [deletions, setDeletions] = useState<Entry[] | null>(null);
-  const [showAll, setShowAll] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const queue = await loadReviewQueue();
-        const withVotes = async (items: LibraryItem[]): Promise<Entry[]> =>
-          Promise.all(items.map(async (item) => ({item, votes: await loadVotes(item.id).catch(() => [])})));
-        const [r, d] = await Promise.all([withVotes(queue.inReview), withVotes(queue.deleteRequests)]);
-        if (!active) return;
-        setReviews(r);
-        setDeletions(d);
-      } catch {
-        if (active) setError("Não foi possível carregar a fila de revisão.");
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const {queue, votes, error} = useReviewQueue(viewer);
+  const {byId: tagById} = useTags();
+  const [showVoted, setShowVoted] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
 
   if (!viewer) return null;
-  const byId = indexById(catalog.items ?? []);
-  const pathOf = (item: LibraryItem) => {
-    const names = buildBreadcrumbs(byId, item.parentId).map((f) => f.name);
-    return names.length > 0 ? names.join(" / ") : "Biblioteca";
-  };
-  const open = (item: LibraryItem) => router.push(libraryUrl({pasta: item.parentId, item: item.id}));
+  const privileged = viewer.isCurator || viewer.isAdmin;
+  const open = (item: LibraryItem) => router.push(libraryUrl({item: item.id}));
+  const votesOf = (item: LibraryItem): LibraryVote[] => votes[item.id] ?? [];
+  const pending = (item: LibraryItem) => showVoted || !iVoted(item, votesOf(item), viewer.uid);
 
-  const visibleReviews = (reviews ?? []).filter(({item, votes}) =>
-    showAll || (itemPermissions(item, viewer).canVote && !iVoted(item, votes, viewer.uid)));
-  const visibleDeletions = (deletions ?? []).filter(({item, votes}) =>
-    showAll || (itemPermissions(item, viewer).canVoteDelete && !iVoted(item, votes, viewer.uid)));
-  const empty = reviews !== null && visibleReviews.length === 0 && visibleDeletions.length === 0;
-
-  const rows = (entries: Entry[], deletion: boolean) => {
-    const votesOf = new Map(entries.map((e) => [e.item.id, e.votes]));
-    return sortItems(entries.map((e) => e.item)).map((item) => {
-      const votes = votesOf.get(item.id) ?? [];
-      const approvals = deletion ? countDeleteApprovals(item, votes) : countApprovals(item, votes);
-      const reason = deletion && item.deleteRequest?.reason ? `: ${item.deleteRequest.reason}` : "";
-      const subtitle = deletion ? `${pathOf(item)} · Pedido de exclusão${reason}` : pathOf(item);
-      return (
-        <div key={item.id} className="space-y-1">
-          <ItemRow item={item} badge={statusBadge(item, countApprovals(item, votes))} view="list" subtitle={subtitle} onOpen={() => open(item)} />
-          <p className="px-4 text-xs text-white/60">{`${approvals}/${REQUIRED_APPROVALS} aprovações`}</p>
-        </div>
-      );
-    });
+  const row = (item: LibraryItem, kind: "mine" | "review" | "delete") => {
+    const itemVotes = votesOf(item);
+    const deletion = kind === "delete";
+    const approvals = deletion ? countDeleteApprovals(item, itemVotes) : countApprovals(item, itemVotes);
+    const reason = item.deleteRequest?.reason;
+    const note =
+      kind === "mine" && item.status === "returned" && item.returnComment ?
+        `Devolvido: ${item.returnComment}` :
+        deletion ? `Pedido de exclusão${reason ? `: ${reason}` : ""}` : undefined;
+    const showProgress = deletion || item.status === "in_review";
+    return (
+      <QueueRow
+        key={`${kind}-${item.id}`}
+        item={item}
+        badge={statusBadge(item, countApprovals(item, itemVotes))}
+        byTagId={tagById}
+        note={note}
+        progress={showProgress ? `${approvals}/${REQUIRED_APPROVALS} aprovações` : undefined}
+        onOpen={() => open(item)}
+      />
+    );
   };
+
+  const toReview = (queue?.toReview ?? []).filter(pending);
+  const deleteRequests = (queue?.deleteRequests ?? []).filter(pending);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Fila de revisão</h1>
-      <CuratorWarning />
-      <label className="flex items-center gap-2 text-sm text-white/70">
-        <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} aria-label="Mostrar todos os envios em revisão" />
-        Mostrar também o que não precisa do meu voto
-      </label>
-      {error && <p role="alert" className="text-sm text-error">{error}</p>}
-      {reviews === null && !error && <p className="text-white/70">Carregando…</p>}
-      {empty && <p className="rounded-card bg-surface-elevated p-6 text-center text-white/70">Nada aguardando a sua revisão.</p>}
-      {visibleReviews.length > 0 && (
-        <section aria-label="Envios em revisão" className="space-y-2">
-          <h2 className="font-semibold">Envios em revisão</h2>
-          {rows(visibleReviews, false)}
-        </section>
+      {privileged && <CuratorWarning />}
+
+      <section aria-label="Enviar material" className="space-y-3">
+        <h2 className="font-semibold">Enviar material</h2>
+        <UploadPanel uid={viewer.uid} onUploaded={() => undefined} />
+        <Button type="button" variant="text" onClick={() => setLinkOpen(true)}>Adicionar link</Button>
+      </section>
+      {linkOpen && (
+        <LinkDialog
+          withTags
+          submitLabel="Adicionar"
+          onSubmit={async (value) => {
+            if (!value.tags) return;
+            await createLink(viewer.uid, {...value, tags: value.tags});
+          }}
+          onClose={() => setLinkOpen(false)}
+        />
       )}
-      {visibleDeletions.length > 0 && (
-        <section aria-label="Pedidos de exclusão" className="space-y-2">
-          <h2 className="font-semibold">Pedidos de exclusão</h2>
-          {rows(visibleDeletions, true)}
-        </section>
+
+      {error && <p role="alert" className="text-sm text-error">{error}</p>}
+      {!queue && !error && <p className="text-white/70">Carregando…</p>}
+
+      {queue && (
+        <>
+          <section aria-label="Meus envios" className="space-y-2">
+            <h2 className="font-semibold">Meus envios</h2>
+            {queue.mine.length === 0 ?
+              <p className="text-sm text-white/70">Você ainda não enviou nada.</p> :
+              queue.mine.map((item) => row(item, "mine"))}
+          </section>
+
+          {privileged && (
+            <>
+              <label className="flex items-center gap-2 text-sm text-white/70">
+                <input type="checkbox" checked={showVoted} onChange={(e) => setShowVoted(e.target.checked)}
+                  aria-label="Mostrar também o que já votei" />
+                Mostrar também o que já votei
+              </label>
+              <section aria-label="Para revisar" className="space-y-2">
+                <h2 className="font-semibold">Para revisar</h2>
+                {toReview.length === 0 ?
+                  <p className="text-sm text-white/70">Nada aguardando a sua revisão.</p> :
+                  toReview.map((item) => row(item, "review"))}
+              </section>
+              <section aria-label="Pedidos de exclusão" className="space-y-2">
+                <h2 className="font-semibold">Pedidos de exclusão</h2>
+                {deleteRequests.length === 0 ?
+                  <p className="text-sm text-white/70">Nenhum pedido de exclusão.</p> :
+                  deleteRequests.map((item) => row(item, "delete"))}
+              </section>
+            </>
+          )}
+        </>
       )}
     </div>
   );

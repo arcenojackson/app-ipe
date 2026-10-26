@@ -1,395 +1,154 @@
-import {render, screen, waitFor, fireEvent} from "@testing-library/react";
-import {useState} from "react";
-import {beforeEach, describe, expect, it, vi} from "vitest";
+import {act, fireEvent, render, screen} from "@testing-library/react";
+import {afterEach, beforeEach, describe, expect, it, vi} from "vitest";
+import type {Tag} from "../tags";
 import type {LibraryItem, Viewer} from "../types";
 import {LibraryContent} from "./LibraryPage";
 
-const repo = vi.hoisted(() => ({
-  subscribeFolder: vi.fn(),
-  loadAllVisible: vi.fn(),
-  subscribeItem: vi.fn(),
-  subscribeVotes: vi.fn(),
-  loadUserNames: vi.fn(),
-  canReadVotes: vi.fn(),
-  countCurators: vi.fn(),
+const page = vi.hoisted(() => ({useLibraryPage: vi.fn()}));
+vi.mock("../useLibraryPage", () => page);
+
+const tagList: Tag[] = [
+  {id: "tipo-artigos", kind: "type", name: "Artigos", order: 1, active: true},
+  {id: "assunto-trindade", kind: "subject", name: "Trindade", order: 1, active: true},
+  {id: "faixa-ump", kind: "age", name: "UMP", order: 1, active: true},
+];
+vi.mock("../useTags", () => ({
+  useTags: () => ({
+    tags: tagList,
+    error: null,
+    byId: new Map(tagList.map((t) => [t.id, t])),
+    active: (kind: string) => tagList.filter((t) => t.kind === kind && t.active),
+  }),
 }));
+
+const repo = vi.hoisted(() => ({loadUserNames: vi.fn()}));
 vi.mock("../repository", () => repo);
 
 const notifications = vi.hoisted(() => ({subscribeNotifications: vi.fn()}));
 vi.mock("../notifications", () => notifications);
 
-const storageAccess = vi.hoisted(() => ({downloadUrl: vi.fn()}));
-vi.mock("../storageAccess", () => storageAccess);
-
-const mutations = vi.hoisted(() => ({
-  createFolder: vi.fn(),
-  createLink: vi.fn(),
-  uploadFile: vi.fn(),
-  renameItem: vi.fn(),
-  moveItem: vi.fn(),
-  requestDelete: vi.fn(),
+vi.mock("./ItemModal", () => ({
+  ItemModal: ({itemId, onClose}: {itemId: string; onClose: () => void}) => (
+    <div data-testid="item-modal">
+      {itemId}
+      <button type="button" onClick={onClose}>Fechar janela</button>
+    </div>
+  ),
 }));
-vi.mock("../mutations", () => mutations);
 
 const item = (id: string, name: string, extra: Partial<LibraryItem> = {}): LibraryItem => ({
-  id, name, type: "file", parentId: null, authorId: "a", status: "published", version: 1, ...extra,
+  id, name, type: "file", parentId: null, authorId: "u1", status: "published", version: 1,
+  typeTags: [], subjectTags: [], ageTags: [], publishedAt: 1_700_000_000_000, ...extra,
 });
-const folder = (id: string, name: string, parentId: string | null = null) =>
-  item(id, name, {type: "folder", status: "active", parentId});
-
-const catalog = [
-  folder("f1", "Crianças"),
-  folder("f2", "Antigo Testamento", "f1"),
-  item("i1", "Catecismo Menor"),
-  item("i2", "Aula 2", {parentId: "f1"}),
-  item("i3", "Aula 10", {parentId: "f1", status: "in_review"}),
-  item("i4", "Livro", {parentId: "f1", type: "link", url: "https://x.org", status: "returned"}),
-];
 
 const teacher: Viewer = {uid: "t1", isCurator: false, isAdmin: false};
-const folderData = (id: string | null) => catalog.filter((i) => i.parentId === id);
+const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
 
-let unsubscribe: ReturnType<typeof vi.fn>;
-beforeEach(() => {
-  unsubscribe = vi.fn();
-  repo.subscribeFolder.mockReset().mockImplementation((id, _viewer, onData) => {
-    onData(folderData(id));
-    return unsubscribe;
-  });
-  repo.loadAllVisible.mockReset().mockResolvedValue(catalog);
-  mutations.createFolder.mockReset().mockResolvedValue("new");
-  mutations.createLink.mockReset().mockResolvedValue("new");
-  mutations.uploadFile.mockReset().mockResolvedValue("new");
-  repo.subscribeItem.mockReset().mockImplementation((id, onData) => {
-    onData(catalog.find((i) => i.id === id) ?? null);
-    return vi.fn();
-  });
-  repo.subscribeVotes.mockReset().mockImplementation((_id, onData) => {
-    onData([]);
-    return vi.fn();
-  });
-  repo.loadUserNames.mockReset().mockResolvedValue({});
-  repo.canReadVotes.mockReset().mockReturnValue(false);
-  repo.countCurators.mockReset().mockResolvedValue(3);
-  notifications.subscribeNotifications.mockReset().mockImplementation((_uid, onData) => {
-    onData([]);
-    return vi.fn();
-  });
-  storageAccess.downloadUrl.mockReset().mockResolvedValue("https://files.example/a.pdf");
-});
+let state: {items: LibraryItem[]; loading: boolean; error: string | null; done: boolean; loadMore: ReturnType<typeof vi.fn>};
+const lastFilters = () => page.useLibraryPage.mock.calls.at(-1)?.[0];
 
-function renderAt(folderId: string | null, navigate = vi.fn(), itemId: string | null = null) {
-  render(<LibraryContent viewer={teacher} folderId={folderId} itemId={itemId} navigate={navigate} />);
+function renderPage(viewer: Viewer = teacher, itemId: string | null = null, navigate = vi.fn()) {
+  render(<LibraryContent viewer={viewer} itemId={itemId} navigate={navigate} />);
   return navigate;
 }
 
+beforeEach(() => {
+  state = {items: [item("a", "Santidade"), item("b", "Aula 2")], loading: false, error: null, done: true, loadMore: vi.fn()};
+  page.useLibraryPage.mockReset().mockImplementation(() => state);
+  repo.loadUserNames.mockReset().mockResolvedValue({u1: "Felipe"});
+  notifications.subscribeNotifications.mockReset().mockReturnValue(() => undefined);
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("LibraryContent", () => {
-  it("lista a raiz com pastas primeiro e selos de estado", async () => {
-    renderAt(null);
-    expect(await screen.findByText("Crianças")).toBeInTheDocument();
-    const rows = screen.getAllByRole("button", {name: /Abrir /});
-    expect(rows.map((r) => r.getAttribute("aria-label"))).toEqual(["Abrir Crianças", "Abrir Catecismo Menor"]);
-    expect(screen.getByText("Catecismo Menor")).toBeInTheDocument();
-    expect(screen.getByText("Publicado")).toBeInTheDocument();
+  it("lista o que o hook devolve, com o autor", async () => {
+    renderPage();
+    expect(screen.getByRole("button", {name: /Santidade/})).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: /Aula 2/})).toBeInTheDocument();
+    expect((await screen.findAllByText("Felipe")).length).toBe(2);
+    expect(repo.loadUserNames).toHaveBeenCalledWith(["u1"]);
   });
 
-  it("em uma pasta mostra em revisão e devolvido", async () => {
-    renderAt("f1");
-    expect(await screen.findByText("Aula 10")).toBeInTheDocument();
-    const rows = screen.getAllByRole("button", {name: /Abrir /});
-    expect(rows[0]).toHaveAccessibleName("Abrir Antigo Testamento");
-    expect(screen.getByText("Em revisão")).toBeInTheDocument();
-    expect(screen.getByText("Devolvido")).toBeInTheDocument();
+  it("filtro marcado passa os filtros ao hook", () => {
+    renderPage();
+    fireEvent.click(screen.getByRole("button", {name: /Faixa/}));
+    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
+    expect(lastFilters()).toEqual({typeTags: [], subjectTags: [], ageTags: ["faixa-ump"], text: ""});
   });
 
-  it("abrir uma pasta navega para ?pasta=; abrir um arquivo mantém a pasta e adiciona ?item=", async () => {
-    const navigate = renderAt("f1");
-    fireEvent.click(await screen.findByRole("button", {name: "Abrir Antigo Testamento"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f2");
-    fireEvent.click(screen.getByRole("button", {name: "Abrir Aula 2"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1&item=i2");
-  });
-
-  it("migalhas: da biblioteca até a pasta, clicáveis", async () => {
-    const navigate = renderAt("f2");
-    await screen.findByText("Esta pasta está vazia.");
-    const nav = screen.getByRole("navigation", {name: "Caminho"});
-    expect(nav).toHaveTextContent("Biblioteca");
-    expect(nav).toHaveTextContent("Crianças");
-    fireEvent.click(screen.getByRole("button", {name: "Crianças"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1");
-    fireEvent.click(screen.getByRole("button", {name: "Biblioteca"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca");
-  });
-
-  it("a busca filtra todos os itens visíveis pelo nome, sem acento nem maiúscula", async () => {
-    renderAt(null);
-    await screen.findByText("Crianças");
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "AULA"}});
-    expect(await screen.findByText("Aula 2")).toBeInTheDocument();
-    expect(screen.getByText("Aula 10")).toBeInTheDocument();
-    expect(screen.queryByText("Catecismo Menor")).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "zzz"}});
-    expect(await screen.findByText("Nada encontrado.")).toBeInTheDocument();
-  });
-
-  it("pasta inexistente ou sem acesso mostra aviso com volta para a raiz", async () => {
-    const navigate = renderAt("fantasma");
-    expect(await screen.findByText("Pasta não encontrada ou sem acesso.")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", {name: "Voltar para a biblioteca"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca");
-  });
-
-  it("erro ao carregar a pasta mostra alerta", async () => {
-    repo.subscribeFolder.mockImplementation((_id, _viewer, _onData, onError) => {
-      onError(new Error("permission-denied"));
-      return unsubscribe;
+  it("a busca só chega ao hook depois de 300 ms", () => {
+    vi.useFakeTimers();
+    renderPage();
+    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "fé"}});
+    expect(lastFilters().text).toBe("");
+    act(() => {
+      vi.advanceTimersByTime(299);
     });
-    renderAt(null);
-    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar esta pasta.");
-    expect(screen.queryByText("Esta pasta está vazia.")).not.toBeInTheDocument();
+    expect(lastFilters().text).toBe("");
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(lastFilters().text).toBe("fé");
   });
 
-  it("enquanto a pasta nova não responde mostra Carregando e nada da pasta anterior", async () => {
-    const { rerender } = render(<LibraryContent viewer={teacher} folderId="f1" itemId={null} navigate={vi.fn()} />);
-    await screen.findByText("Aula 2");
-    repo.subscribeFolder.mockImplementation(() => unsubscribe);
-    rerender(<LibraryContent viewer={teacher} folderId="f2" itemId={null} navigate={vi.fn()} />);
-    expect(await screen.findByText("Carregando…")).toBeInTheDocument();
-    expect(screen.queryByText("Aula 2")).not.toBeInTheDocument();
-    expect(screen.queryByText("Esta pasta está vazia.")).not.toBeInTheDocument();
+  it("mostra Carregar mais enquanto done=false e chama loadMore", () => {
+    state.done = false;
+    renderPage();
+    fireEvent.click(screen.getByRole("button", {name: "Carregar mais"}));
+    expect(state.loadMore).toHaveBeenCalled();
   });
 
-  it("busca com o catálogo ainda carregando mostra Carregando, não Nada encontrado", async () => {
-    repo.loadAllVisible.mockReturnValue(new Promise(() => {}));
-    renderAt(null);
-    await screen.findByText("Crianças");
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "x"}});
+  it("não mostra Carregar mais quando done=true", () => {
+    renderPage();
+    expect(screen.queryByRole("button", {name: "Carregar mais"})).not.toBeInTheDocument();
+  });
+
+  it("zero itens e done mostra Nenhum arquivo encontrado.", () => {
+    state.items = [];
+    renderPage();
+    expect(screen.getByText("Nenhum arquivo encontrado.")).toBeInTheDocument();
+  });
+
+  it("zero itens com done=false mantém Carregar mais em vez de dizer que não há nada", () => {
+    state = {...state, items: [], done: false};
+    renderPage();
+    expect(screen.queryByText("Nenhum arquivo encontrado.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "Carregar mais"})).toBeInTheDocument();
+  });
+
+  it("carregando sem itens mostra Carregando…", () => {
+    state = {...state, items: [], loading: true, done: false};
+    renderPage();
     expect(screen.getByText("Carregando…")).toBeInTheDocument();
-    expect(screen.queryByText("Nada encontrado.")).not.toBeInTheDocument();
   });
 
-  it("busca com erro no catálogo mostra só o alerta", async () => {
-    repo.loadAllVisible.mockRejectedValue(new Error("x"));
-    renderAt(null);
-    await screen.findByText("Crianças");
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "x"}});
-    expect(await screen.findByRole("alert")).toHaveTextContent("Não foi possível carregar a biblioteca.");
-    expect(screen.queryByText("Nada encontrado.")).not.toBeInTheDocument();
-    expect(screen.queryByText("Carregando…")).not.toBeInTheDocument();
+  it("erro mostra alerta", () => {
+    state.error = "Não foi possível carregar a biblioteca.";
+    renderPage();
+    expect(screen.getByRole("alert")).toHaveTextContent("Não foi possível carregar a biblioteca.");
   });
 
-  function Harness() {
-    const [folderId, setFolderId] = useState<string | null>(null);
-    return (
-      <LibraryContent
-        viewer={teacher}
-        folderId={folderId}
-        itemId={null}
-        navigate={(url) => setFolderId(new URL(url, "http://x").searchParams.get("pasta"))}
-      />
-    );
-  }
-
-  it("navegar limpa a busca e mostra o conteúdo da pasta (clique em resultado)", async () => {
-    render(<Harness />);
-    await screen.findByText("Crianças");
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "crian"}});
-    fireEvent.click(await screen.findByRole("button", {name: "Abrir Crianças"}));
-    expect(screen.getByLabelText("Buscar na biblioteca")).toHaveValue("");
-    expect(await screen.findByText("Aula 2")).toBeInTheDocument();
-    expect(screen.queryByText("Catecismo Menor")).not.toBeInTheDocument();
+  it("não há botões de pasta, envio nem breadcrumbs, nem para curador", () => {
+    renderPage(curator);
+    for (const name of [/Nova pasta/, /Enviar/, /Adicionar link/, /Gerenciar pasta/]) {
+      expect(screen.queryByRole("button", {name})).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("navigation", {name: /Caminho/i})).not.toBeInTheDocument();
   });
 
-  it("navegar limpa a busca (migalha)", async () => {
-    render(<Harness />);
-    fireEvent.click(await screen.findByRole("button", {name: "Abrir Crianças"}));
-    await screen.findByText("Aula 2");
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "catec"}});
-    expect(await screen.findByText("Catecismo Menor")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", {name: "Biblioteca"}));
-    expect(screen.getByLabelText("Buscar na biblioteca")).toHaveValue("");
-    expect(await screen.findByText("Crianças")).toBeInTheDocument();
+  it("clicar num arquivo abre ?item=ID", () => {
+    const navigate = renderPage();
+    fireEvent.click(screen.getByRole("button", {name: /Santidade/}));
+    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?item=a");
   });
 
-  it("resultados da busca mostram o caminho de cada item", async () => {
-    renderAt(null);
-    await screen.findByText("Crianças");
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "catec"}});
-    expect(await screen.findByText("Biblioteca", {selector: "span.block"})).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "aula 2"}});
-    expect(await screen.findByText("Crianças", {selector: "span.block.text-xs"})).toBeInTheDocument();
-  });
-
-  it("trocar de pasta cancela a escuta anterior e assina a nova", async () => {
-    const {rerender} = render(<LibraryContent viewer={teacher} folderId="f1" itemId={null} navigate={vi.fn()} />);
-    await screen.findByText("Aula 2");
-    rerender(<LibraryContent viewer={teacher} folderId="f2" itemId={null} navigate={vi.fn()} />);
-    await waitFor(() => expect(unsubscribe).toHaveBeenCalled());
-    expect(repo.subscribeFolder).toHaveBeenLastCalledWith("f2", teacher, expect.any(Function), expect.any(Function));
-    expect(await screen.findByText("Esta pasta está vazia.")).toBeInTheDocument();
-  });
-
-  it("alterna entre lista e grade", async () => {
-    renderAt(null);
-    await screen.findByText("Crianças");
-    expect(screen.getByRole("button", {name: "Ver em lista"})).toHaveAttribute("aria-pressed", "true");
-    fireEvent.click(screen.getByRole("button", {name: "Ver em grade"}));
-    expect(screen.getByRole("button", {name: "Ver em grade"})).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", {name: "Ver em lista"})).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "grid");
-    fireEvent.click(screen.getByRole("button", {name: "Ver em lista"}));
-    expect(screen.getByTestId("folder-view")).toHaveAttribute("data-view", "list");
-  });
-});
-
-describe("LibraryContent: detalhe do item", () => {
-  it("com itemId abre o painel do item e, ao fechar, navega para a pasta do item", async () => {
-    const navigate = renderAt("f1", vi.fn(), "i2");
-    expect(await screen.findByRole("heading", {name: "Aula 2", level: 2})).toBeInTheDocument();
-    expect(repo.subscribeItem).toHaveBeenCalledWith("i2", expect.any(Function), expect.any(Function));
-    fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1");
-  });
-
-  it("sem itemId não assina nenhum item", async () => {
-    renderAt("f1");
-    await screen.findByText("Aula 2");
-    expect(repo.subscribeItem).not.toHaveBeenCalled();
-  });
-
-  it("a listagem da pasta continua visível abaixo do painel", async () => {
-    renderAt("f1", vi.fn(), "i2");
-    expect(await screen.findByRole("heading", {name: "Aula 2", level: 2})).toBeInTheDocument();
-    expect(await screen.findByRole("button", {name: "Abrir Aula 10"})).toBeInTheDocument();
-  });
-
-  it("ação de curadoria no painel recarrega o catálogo", async () => {
-    const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
-    mutations.renameItem.mockResolvedValue(undefined);
-    render(<LibraryContent viewer={curator} folderId="f1" itemId="i2" navigate={vi.fn()} />);
-    await screen.findByRole("heading", {name: "Aula 2", level: 2});
-    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(1));
-    fireEvent.click(await screen.findByRole("button", {name: "Renomear"}));
-    fireEvent.change(screen.getByLabelText("Novo nome"), {target: {value: "Aula 2b"}});
-    fireEvent.click(screen.getByRole("button", {name: "Salvar"}));
-    await waitFor(() => expect(mutations.renameItem).toHaveBeenCalledWith("c1", "i2", "Aula 2b"));
-    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
-  });
-});
-
-describe("LibraryContent: gerenciar pasta", () => {
-  const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
-
-  it("curador dentro de uma subpasta vê Gerenciar pasta e abre o detalhe da pasta", async () => {
-    const navigate = vi.fn();
-    render(<LibraryContent viewer={curator} folderId="f2" itemId={null} navigate={navigate} />);
-    fireEvent.click(await screen.findByRole("button", {name: "Gerenciar pasta"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1&item=f2");
-  });
-
-  it("pasta na raiz: o link usa só ?item=", async () => {
-    const navigate = vi.fn();
-    render(<LibraryContent viewer={curator} folderId="f1" itemId={null} navigate={navigate} />);
-    fireEvent.click(await screen.findByRole("button", {name: "Gerenciar pasta"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?item=f1");
-  });
-
-  it("não aparece para professor nem na raiz", async () => {
-    const {unmount} = render(<LibraryContent viewer={teacher} folderId="f1" itemId={null} navigate={vi.fn()} />);
-    await screen.findByText("Aula 2");
-    expect(screen.queryByRole("button", {name: "Gerenciar pasta"})).not.toBeInTheDocument();
-    unmount();
-    render(<LibraryContent viewer={curator} folderId={null} itemId={null} navigate={vi.fn()} />);
-    await screen.findByText("Crianças");
-    expect(screen.queryByRole("button", {name: "Gerenciar pasta"})).not.toBeInTheDocument();
-  });
-
-  it("fechar o detalhe da pasta volta para a pasta pai", async () => {
-    const navigate = vi.fn();
-    render(<LibraryContent viewer={curator} folderId="f1" itemId="f2" navigate={navigate} />);
-    expect(await screen.findByRole("heading", {name: "Antigo Testamento", level: 2})).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
-    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?pasta=f1");
-  });
-
-  it("curador renomeia, move e pede exclusão da pasta pelo detalhe", async () => {
-    mutations.renameItem.mockResolvedValue(undefined);
-    mutations.moveItem.mockResolvedValue(undefined);
-    mutations.requestDelete.mockResolvedValue(undefined);
-    render(<LibraryContent viewer={curator} folderId="f1" itemId="f2" navigate={vi.fn()} />);
-    await screen.findByRole("heading", {name: "Antigo Testamento", level: 2});
-    fireEvent.click(await screen.findByRole("button", {name: "Renomear"}));
-    fireEvent.change(screen.getByLabelText("Novo nome"), {target: {value: "AT"}});
-    fireEvent.click(screen.getByRole("button", {name: "Salvar"}));
-    await waitFor(() => expect(mutations.renameItem).toHaveBeenCalledWith("c1", "f2", "AT"));
-    fireEvent.click(await screen.findByRole("button", {name: "Mover"}));
-    fireEvent.click(screen.getByRole("button", {name: "Biblioteca (raiz)"}));
-    await waitFor(() => expect(mutations.moveItem).toHaveBeenCalledWith("c1", "f2", null));
-    fireEvent.click(await screen.findByRole("button", {name: "Pedir exclusão"}));
-    fireEvent.click(screen.getByRole("button", {name: "Enviar pedido"}));
-    await waitFor(() => expect(mutations.requestDelete).toHaveBeenCalledWith("c1", "f2", undefined));
-  });
-});
-
-describe("LibraryContent: criar e enviar", () => {
-  const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
-  const renderAs = (viewer: Viewer, folderId: string | null = null) =>
-    render(<LibraryContent viewer={viewer} folderId={folderId} itemId={null} navigate={vi.fn()} />);
-
-  it("professor não vê o botão Nova pasta; curador vê", async () => {
-    const {unmount} = renderAs(teacher);
-    await screen.findByText("Crianças");
-    expect(screen.queryByRole("button", {name: "Nova pasta"})).not.toBeInTheDocument();
-    unmount();
-    renderAs(curator);
-    expect(await screen.findByRole("button", {name: "Nova pasta"})).toBeInTheDocument();
-  });
-
-  it("Nova pasta chama createFolder(uid, nome, pastaAtual) e recarrega o catálogo", async () => {
-    renderAs(curator, "f1");
-    await screen.findByText("Aula 2");
-    expect(repo.loadAllVisible).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", {name: "Nova pasta"}));
-    fireEvent.change(screen.getByLabelText("Nome da pasta"), {target: {value: "Novo"}});
-    fireEvent.click(screen.getByRole("button", {name: "Criar"}));
-    await waitFor(() => expect(mutations.createFolder).toHaveBeenCalledWith("c1", "Novo", "f1"));
-    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-  });
-
-  it("Adicionar link chama createLink com os dados e recarrega o catálogo", async () => {
-    renderAs(teacher, "f1");
-    await screen.findByText("Aula 2");
-    fireEvent.click(screen.getByRole("button", {name: "Adicionar link"}));
-    fireEvent.change(screen.getByLabelText("Nome"), {target: {value: "Site"}});
-    fireEvent.change(screen.getByLabelText("Endereço (URL)"), {target: {value: "https://x.org"}});
-    fireEvent.change(screen.getByLabelText("Descrição (opcional)"), {target: {value: "Bom"}});
-    fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
-    await waitFor(() =>
-      expect(mutations.createLink).toHaveBeenCalledWith("t1", {
-        name: "Site", url: "https://x.org", description: "Bom", parentId: "f1",
-      })
-    );
-    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
-  });
-
-  it("painel de envio aparece para todos", async () => {
-    const {unmount} = renderAs(teacher);
-    await screen.findByText("Crianças");
-    expect(screen.getByTestId("drop-zone")).toBeInTheDocument();
-    unmount();
-    renderAs(curator);
-    expect(await screen.findByTestId("drop-zone")).toBeInTheDocument();
-  });
-
-  it("envio concluído recarrega o catálogo", async () => {
-    renderAs(teacher, "f1");
-    await screen.findByText("Aula 2");
-    fireEvent.change(screen.getByLabelText("Escolher arquivos"), {
-      target: {files: [new File(["x"], "a.pdf", {type: "application/pdf"})]},
-    });
-    await waitFor(() => expect(mutations.uploadFile).toHaveBeenCalledWith("t1", "f1", expect.any(File), expect.any(Function)));
-    await waitFor(() => expect(repo.loadAllVisible).toHaveBeenCalledTimes(2));
+  it("?item=ID renderiza a janela do item e fechar volta à biblioteca", () => {
+    const navigate = renderPage(teacher, "a");
+    expect(screen.getByTestId("item-modal")).toHaveTextContent("a");
+    fireEvent.click(screen.getByRole("button", {name: "Fechar janela"}));
+    expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca");
   });
 });

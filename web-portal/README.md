@@ -33,11 +33,44 @@ Menu e guarda de acesso passam a valer sozinhos.
 
 ## Biblioteca e curadoria
 
-- Rotas: `/ensino/biblioteca` (parâmetros `?pasta={id}` abre uma pasta e `?item={id}` abre o detalhe de um item), `/ensino/revisao` (fila do curador) e `/ensino/notificacoes`.
-- Código em `src/modules/teaching/library/`: lógica pura (`tree`, `permissions`, `status`, `files`, `payloads`, `convert`), camada de dados (`repository`, `mutations`, `notifications`, `uploadFlow`) e telas em `ui/`.
-- As permissões reais estão nas regras do Firestore/Storage e nas Cloud Functions (`functions/src/teaching/library/`); a interface só esconde o que o papel não pode.
-- Regras do produto: todo envio é revisado e precisa de 2 aprovações de curadores diferentes do autor; devolver é 1 curador; rejeitar e apagar exigem 2 curadores (e qualquer curador pode recusar um pedido de exclusão); só curador gerencia pastas.
-- O portal precisa de pelo menos 3 curadores para aprovar envios de curadores e exclusões (a tela avisa).
+A biblioteca é uma lista de arquivos e links **sem pastas**, organizada por tags.
+
+- Rotas: `/ensino/biblioteca` (só leitura: itens publicados, com filtros e busca),
+  `/ensino/revisao` (Fila de Revisão: tudo o que é envio e revisão) e
+  `/ensino/notificacoes`. `?item={id}` abre a janela do item em qualquer tela.
+- Tags (coleção `teaching_tags`, editada à mão no banco): três tipos — **tipo**
+  (`type`), **assunto** (`subject`) e **faixa etária** (`age`). Todo envio e reenvio
+  exige pelo menos uma tag de cada tipo. Cada documento é
+  `{kind, name, order, active}`; `active: false` esconde a tag dos filtros sem
+  quebrar os arquivos que a usam. A semente inicial está em
+  `functions/src/teaching/tagSeed.ts` (`npm --prefix functions run seed-tags:dry`
+  e `seed-tags`; só cria as que não existem).
+- Biblioteca: consulta só `status == "published"`, ordenada por `publishedAt` (gravado
+  pela Cloud Function ao publicar), com paginação por cursor. O servidor aplica um
+  filtro principal (busca por prefixo em `searchTokens`, senão assunto, tipo ou faixa)
+  e o cliente reaplica todos (dentro de um tipo de tag vale "ou"; entre tipos, "e").
+  Índices em `firestore.indexes.json`.
+- Fila de Revisão: professor vê só os próprios envios; curador também vê o que
+  aguarda revisão e os pedidos de exclusão. Aprovado sai da Fila.
+- Visualização: PDF, imagens e DOCX são desenhados no navegador (`pdfjs-dist`,
+  `docx-preview`), lendo os bytes pelo Storage autenticado — sem URL pública.
+  Isso exige CORS no bucket (`storage-cors.json`). Outros tipos mostram nome,
+  tipo, tamanho e Baixar. Links abrem em nova aba.
+- Código em `src/modules/teaching/library/`: lógica pura (`libraryQuery`,
+  `searchTokens`, `tags`, `reviewQueue`, `permissions`, `status`, `files`,
+  `payloads`, `convert`), camada de dados (`repository`, `mutations`,
+  `notifications`, `uploadFlow`) e telas em `ui/`.
+- As permissões reais estão nas regras do Firestore/Storage e nas Cloud Functions
+  (`functions/src/teaching/library/`); a interface só esconde o que o papel não pode.
+- Regras do produto: todo envio é revisado e precisa de 2 aprovações de curadores
+  diferentes do autor; devolver é 1 curador; rejeitar e apagar exigem 2 curadores
+  (e qualquer curador pode recusar um pedido de exclusão). Curadores podem corrigir
+  tags durante a revisão (sem zerar aprovações; o autor é avisado).
+- O portal precisa de pelo menos 3 curadores para aprovar envios de curadores e
+  exclusões (a tela avisa).
+- Limpeza da biblioteca antiga (uma vez, com autorização): `npm --prefix functions run
+  purge-library:dry` conta o que seria apagado; `purge-library` apaga itens, votos,
+  notificações e arquivos (mantém `teaching_log`, `teaching_tags` e usuários).
 
 ## Acesso
 

@@ -3,18 +3,11 @@ import type {LibraryItem, Viewer} from "./types";
 export interface ItemPermissions {
   canVote: boolean;
   canRename: boolean;
-  canMove: boolean;
   canRequestDelete: boolean;
   canCancelDelete: boolean;
   canVoteDelete: boolean;
   canResubmit: boolean;
-}
-
-export function libraryPermissions(viewer: Viewer) {
-  return {
-    canCreateFolder: viewer.isCurator,
-    canAddLink: true,
-  };
+  canEditTags: boolean;
 }
 
 // Espelha as regras do Firestore; as regras continuam sendo a barreira real.
@@ -22,11 +15,11 @@ export function itemPermissions(item: LibraryItem, viewer: Viewer): ItemPermissi
   const none: ItemPermissions = {
     canVote: false,
     canRename: false,
-    canMove: false,
     canRequestDelete: false,
     canCancelDelete: false,
     canVoteDelete: false,
     canResubmit: false,
+    canEditTags: false,
   };
   if (item.deleting) return none;
 
@@ -39,7 +32,6 @@ export function itemPermissions(item: LibraryItem, viewer: Viewer): ItemPermissi
       item.status === "in_review" &&
       item.authorId !== viewer.uid,
     canRename: viewer.isCurator,
-    canMove: viewer.isCurator,
     canRequestDelete:
       viewer.isCurator &&
       request === null &&
@@ -49,5 +41,6 @@ export function itemPermissions(item: LibraryItem, viewer: Viewer): ItemPermissi
       viewer.isCurator && request !== null && request.requestedBy !== viewer.uid,
     canResubmit:
       decided && item.status === "returned" && item.authorId === viewer.uid,
+    canEditTags: viewer.isCurator,
   };
 }

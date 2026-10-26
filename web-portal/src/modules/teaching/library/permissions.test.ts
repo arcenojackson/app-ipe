@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {itemPermissions, libraryPermissions} from "./permissions";
+import {itemPermissions} from "./permissions";
 import type {LibraryItem, Viewer} from "./types";
 
 const teacher: Viewer = {uid: "t1", isCurator: false, isAdmin: false};
@@ -11,11 +11,13 @@ const adminOnly: Viewer = {uid: "a1", isCurator: false, isAdmin: true};
 const base: LibraryItem = {id: "i1", type: "file", name: "Aula", parentId: null, authorId: "t1", status: "in_review", version: 1};
 const make = (extra: Partial<LibraryItem>): LibraryItem => ({...base, ...extra});
 
-describe("libraryPermissions", () => {
-  it("só curador cria pasta; todos enviam arquivo e link", () => {
-    expect(libraryPermissions(curator)).toEqual({canCreateFolder: true, canAddLink: true});
-    expect(libraryPermissions(teacher)).toEqual({canCreateFolder: false, canAddLink: true});
-    expect(libraryPermissions(adminOnly).canCreateFolder).toBe(false);
+describe("itemPermissions — editar tags", () => {
+  it("curador edita tags de item publicado e em revisão; professor, admin sem papel e item em exclusão não", () => {
+    expect(itemPermissions(make({status: "published"}), curator).canEditTags).toBe(true);
+    expect(itemPermissions(make({}), curator2).canEditTags).toBe(true);
+    expect(itemPermissions(make({}), teacher).canEditTags).toBe(false);
+    expect(itemPermissions(make({}), adminOnly).canEditTags).toBe(false);
+    expect(itemPermissions(make({deleting: "execute"}), curator).canEditTags).toBe(false);
   });
 });
 
@@ -35,15 +37,15 @@ describe("itemPermissions — votar na publicação", () => {
 
   it("nada é permitido enquanto o item está sendo apagado (deleting)", () => {
     const p = itemPermissions(make({deleting: "reject"}), curator2);
-    expect(p).toMatchObject({canVote: false, canRename: false, canMove: false, canRequestDelete: false, canVoteDelete: false, canResubmit: false});
+    expect(p).toMatchObject({canVote: false, canRename: false, canRequestDelete: false, canVoteDelete: false, canResubmit: false});
   });
 });
 
 describe("itemPermissions — organizar e excluir", () => {
-  it("só curador renomeia e move", () => {
-    expect(itemPermissions(make({status: "published"}), curator)).toMatchObject({canRename: true, canMove: true});
-    expect(itemPermissions(make({status: "published"}), teacher)).toMatchObject({canRename: false, canMove: false});
-    expect(itemPermissions(make({status: "published"}), adminOnly)).toMatchObject({canRename: false, canMove: false});
+  it("só curador renomeia", () => {
+    expect(itemPermissions(make({status: "published"}), curator)).toMatchObject({canRename: true});
+    expect(itemPermissions(make({status: "published"}), teacher)).toMatchObject({canRename: false});
+    expect(itemPermissions(make({status: "published"}), adminOnly)).toMatchObject({canRename: false});
   });
 
   it("curador pede exclusão de item publicado ou pasta ativa, uma vez só", () => {

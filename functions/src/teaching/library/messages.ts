@@ -27,6 +27,13 @@ export function reviewRequestedMessage(
   };
 }
 
+export function tagsEditedMessage(item: ItemDoc): Message {
+  return {
+    title: "Tags ajustadas na revisão",
+    body: clip(`As tags de ${quoted(item)} foram ajustadas na revisão.`),
+  };
+}
+
 export function publishedMessage(item: ItemDoc): Message {
   return {
     title: "Material publicado",

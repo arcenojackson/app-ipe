@@ -1,8 +1,16 @@
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {describe, expect, it, vi} from "vitest";
-import {indexById} from "../tree";
-import type {LibraryItem} from "../types";
-import {LinkDialog, MoveDialog, ReasonDialog, TextPromptDialog, eligibleTargets} from "./Dialogs";
+import type {Tag} from "../tags";
+import {LinkDialog, ReasonDialog, TagEditDialog, TextPromptDialog} from "./Dialogs";
+
+const tagList: Tag[] = [
+  {id: "tipo-artigos", kind: "type", name: "Artigos", order: 1, active: true},
+  {id: "assunto-trindade", kind: "subject", name: "Trindade", order: 1, active: true},
+  {id: "faixa-ump", kind: "age", name: "UMP", order: 1, active: true},
+];
+vi.mock("../useTags", () => ({
+  useTags: () => ({tags: tagList, error: null, byId: new Map(tagList.map((t) => [t.id, t])), active: () => tagList}),
+}));
 
 describe("TextPromptDialog", () => {
   const setup = (onSubmit = vi.fn().mockResolvedValue(undefined)) => {
@@ -69,6 +77,57 @@ describe("LinkDialog", () => {
   });
 });
 
+describe("LinkDialog com tags", () => {
+  const fill = () => {
+    fireEvent.change(screen.getByLabelText("Nome"), {target: {value: "Livro"}});
+    fireEvent.change(screen.getByLabelText("Endereço (URL)"), {target: {value: "https://x.org"}});
+  };
+
+  it("não envia sem uma tag de cada tipo e envia com elas", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<LinkDialog withTags submitLabel="Adicionar" onSubmit={onSubmit} onClose={vi.fn()} />);
+    fill();
+    fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("Escolha pelo menos uma tag de tipo.");
+    expect(onSubmit).not.toHaveBeenCalled();
+    for (const name of ["Artigos", "Trindade", "UMP"]) fireEvent.click(screen.getByRole("checkbox", {name}));
+    fireEvent.click(screen.getByRole("button", {name: "Adicionar"}));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({
+      name: "Livro", url: "https://x.org", description: "",
+      tags: {typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]},
+    }));
+  });
+
+  it("sem withTags não pede tags", () => {
+    render(<LinkDialog submitLabel="Adicionar" onSubmit={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.queryByRole("checkbox", {name: "Artigos"})).not.toBeInTheDocument();
+  });
+});
+
+describe("TagEditDialog", () => {
+  const initial = {typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]};
+
+  it("não deixa esvaziar um tipo de tag", () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TagEditDialog initial={initial} onSubmit={onSubmit} onClose={vi.fn()} />);
+    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
+    fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("Escolha pelo menos uma tag de faixa.");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("envia as tags novas e fecha", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const onClose = vi.fn();
+    render(<TagEditDialog initial={initial} onSubmit={onSubmit} onClose={onClose} />);
+    fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
+    fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
+    fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(initial));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
+});
+
 describe("ReasonDialog", () => {
   it("obrigatório recusa vazio e texto longo demais", async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
@@ -88,32 +147,5 @@ describe("ReasonDialog", () => {
     render(<ReasonDialog title="Pedir exclusão" label="Motivo (opcional)" submitLabel="Pedir exclusão" onSubmit={onSubmit} onClose={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", {name: "Pedir exclusão"}));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(""));
-  });
-});
-
-describe("eligibleTargets e MoveDialog", () => {
-  const f = (id: string, name: string, parentId: string | null = null): LibraryItem => ({
-    id, name, type: "folder", parentId, authorId: "c1", status: "active", version: 1,
-  });
-  const folders = [f("A", "Crianças"), f("B", "Antigo", "A"), f("C", "Gênesis", "B"), f("D", "Jovens")];
-  const byId = indexById(folders);
-
-  it("não oferece a própria pasta nem descendentes", () => {
-    expect(eligibleTargets(folders[0], folders, byId).map((i) => i.id)).toEqual(["D"]);
-    expect(eligibleTargets(folders[1], folders, byId).map((i) => i.id)).toEqual(["A", "D"]);
-  });
-
-  it("arquivo pode ir para qualquer pasta", () => {
-    const file: LibraryItem = {id: "x", name: "Aula", type: "file", parentId: "A", authorId: "t", status: "published", version: 1};
-    expect(eligibleTargets(file, folders, byId).map((i) => i.id)).toEqual(["A", "B", "C", "D"]);
-  });
-
-  it("MoveDialog lista a raiz e as pastas e devolve a escolha", async () => {
-    const onPick = vi.fn().mockResolvedValue(undefined);
-    render(<MoveDialog item={folders[2]} folders={folders} byId={byId} onPick={onPick} onClose={vi.fn()} />);
-    fireEvent.click(screen.getByRole("button", {name: "Biblioteca (raiz)"}));
-    await waitFor(() => expect(onPick).toHaveBeenCalledWith(null));
-    fireEvent.click(screen.getByRole("button", {name: "Crianças / Antigo"}));
-    await waitFor(() => expect(onPick).toHaveBeenCalledWith("B"));
   });
 });

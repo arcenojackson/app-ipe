@@ -16,6 +16,8 @@ function toWrite(patch: ItemPatch): Record<string, unknown> {
         ...req,
         requestedAt: admin.firestore.Timestamp.fromMillis(req.requestedAt),
       };
+    } else if (key === "publishedAt") {
+      data[key] = admin.firestore.FieldValue.serverTimestamp();
     } else {
       data[key] = value;
     }

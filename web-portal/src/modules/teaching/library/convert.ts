@@ -28,6 +28,9 @@ function millis(value: unknown): number {
 const str = (value: unknown): string | undefined =>
   typeof value === "string" ? value : undefined;
 
+const strings = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((v): v is string => typeof v === "string") : [];
+
 export function toItem(id: string, data: Data): LibraryItem | null {
   const type = data.type as ItemType;
   const status = data.status as ItemStatus;
@@ -58,6 +61,11 @@ export function toItem(id: string, data: Data): LibraryItem | null {
     storagePath: str(data.storagePath),
     url: str(data.url),
     description: str(data.description),
+    typeTags: strings(data.typeTags),
+    subjectTags: strings(data.subjectTags),
+    ageTags: strings(data.ageTags),
+    searchTokens: Array.isArray(data.searchTokens) ? strings(data.searchTokens) : undefined,
+    publishedAt: data.publishedAt ? millis(data.publishedAt) : undefined,
     returnComment: str(data.returnComment) ?? null,
     returnedBy: str(data.returnedBy) ?? null,
     deleteRequest: request,

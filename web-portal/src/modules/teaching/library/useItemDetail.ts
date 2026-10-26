@@ -2,7 +2,6 @@
 
 import {useEffect, useState} from "react";
 import {canReadVotes, loadUserNames, subscribeItem, subscribeVotes} from "./repository";
-import {downloadUrl} from "./storageAccess";
 import type {LibraryItem, LibraryVote, Viewer} from "./types";
 
 export const ITEM_ACCESS_ERROR = "Item não encontrado ou sem acesso.";
@@ -17,7 +16,7 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
     {id: itemId, list: [], loaded: false, failed: false}
   );
   const [names, setNames] = useState<Record<string, string>>({});
-  const [file, setFile] = useState<{path: string; url: string | null; failed: boolean} | null>(null);
+  const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     // Para professor, item inexistente também chega como permission-denied; o
@@ -62,19 +61,18 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
     };
   }, [voterKey]);
 
-  const path = item?.type === "file" ? item.storagePath : undefined;
+  const authorId = item?.authorId;
   useEffect(() => {
-    if (!path) return;
+    if (!authorId) return;
     let active = true;
-    downloadUrl(path)
-      .then((url) => active && setFile({path, url, failed: false}))
-      .catch(() => active && setFile({path, url: null, failed: true}));
+    loadUserNames([authorId])
+      .then((map) => active && setAuthorNames((known) => ({...known, ...map})))
+      .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [path]);
+  }, [authorId]);
 
-  const current = path && file?.path === path ? file : null;
   return {
     item,
     error: loaded?.id === itemId ? loaded.error : null,
@@ -82,7 +80,6 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
     votesLoaded,
     votesError,
     names,
-    fileUrl: current?.url ?? null,
-    fileUrlError: current?.failed ?? false,
+    authorName: authorId ? authorNames[authorId] : undefined,
   };
 }

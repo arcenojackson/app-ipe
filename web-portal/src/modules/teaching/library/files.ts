@@ -19,8 +19,6 @@ const EXTENSION_TYPES: Record<string, string> = {
   webp: "image/webp",
 };
 
-const ALLOWED_TYPES = new Set(Object.values(EXTENSION_TYPES));
-
 export function validateName(name: string): string | null {
   const trimmed = name.trim();
   if (trimmed.length === 0) return "Informe um nome.";
@@ -46,17 +44,18 @@ export function validateDescription(description: string): string | null {
   return null;
 }
 
-function isAllowedType(type: string): boolean {
-  return type.startsWith("image/") || ALLOWED_TYPES.has(type);
-}
+const GENERIC_TYPES = new Set(["", "application/octet-stream"]);
+export const FALLBACK_CONTENT_TYPE = "application/octet-stream";
 
-// Alguns navegadores entregam `type` vazio ou genérico (ex.: octet-stream
-// para .docx no Windows): se o tipo não é permitido, usa a extensão.
+// Qualquer tipo de arquivo é aceito. Alguns navegadores entregam `type` vazio
+// ou genérico (ex.: octet-stream para .docx no Windows): então vale a extensão
+// conhecida; sem ela, o tipo genérico (as regras exigem um texto não vazio).
 export function contentTypeFor(file: {name: string; type: string}): string {
-  if (file.type && isAllowedType(file.type)) return file.type;
+  if (!GENERIC_TYPES.has(file.type)) return file.type;
   const dot = file.name.lastIndexOf(".");
   const extension = dot >= 0 ? file.name.slice(dot + 1).toLowerCase() : "";
-  return Object.hasOwn(EXTENSION_TYPES, extension) ? EXTENSION_TYPES[extension] : file.type;
+  if (Object.hasOwn(EXTENSION_TYPES, extension)) return EXTENSION_TYPES[extension];
+  return file.type || FALLBACK_CONTENT_TYPE;
 }
 
 export function validateFile(file: {
@@ -71,7 +70,6 @@ export function validateFile(file: {
   if (safeName.length > 200) {
     return "O nome do arquivo é muito longo.";
   }
-  if (!isAllowedType(contentTypeFor(file))) return "Tipo de arquivo não permitido. Use PDF, Office ou imagem.";
   return null;
 }
 

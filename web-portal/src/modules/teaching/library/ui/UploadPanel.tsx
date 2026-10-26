@@ -3,6 +3,9 @@
 import {useRef, useState, type DragEvent} from "react";
 import {Button} from "@/core/ui/Button";
 import {uploadFile} from "../mutations";
+import {EMPTY_TAGS, validateTags, type ItemTags} from "../tags";
+import {useTags} from "../useTags";
+import {TagPicker} from "./TagPicker";
 import {UploadError} from "../uploadFlow";
 
 interface Entry {
@@ -15,14 +18,15 @@ interface Entry {
 
 export function UploadPanel({
   uid,
-  parentId,
   onUploaded,
 }: {
   uid: string;
-  parentId: string | null;
   onUploaded: () => void;
 }) {
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [tags, setTags] = useState<ItemTags>(EMPTY_TAGS);
+  const [tagError, setTagError] = useState<string | null>(null);
+  const {tags: tagList} = useTags();
   const counter = useRef(0);
   const input = useRef<HTMLInputElement>(null);
 
@@ -31,11 +35,14 @@ export function UploadPanel({
   }
 
   async function start(files: File[]) {
+    const problem = validateTags(tags);
+    setTagError(problem);
+    if (problem) return;
     for (const file of files) {
       const key = counter.current++;
       setEntries((list) => [...list, {key, name: file.name, progress: 0, status: "uploading"}]);
       try {
-        await uploadFile(uid, parentId, file, (progress) => patch(key, {progress}));
+        await uploadFile(uid, file, {tags, onProgress: (progress) => patch(key, {progress})});
         patch(key, {status: "done", progress: 1});
         onUploaded();
       } catch (error) {
@@ -53,14 +60,15 @@ export function UploadPanel({
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} error={tagError} />
       <div
         data-testid="drop-zone"
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
         className="rounded-card border border-dashed border-white/20 p-4 text-center text-sm text-white/70"
       >
-        Arraste arquivos aqui (PDF, Office ou imagem, até 100 MB) ou{" "}
+        Arraste arquivos aqui (qualquer tipo, até 100 MB) ou{" "}
         <Button type="button" variant="text" className="px-1 py-0" onClick={() => input.current?.click()}>
           Enviar arquivos
         </Button>

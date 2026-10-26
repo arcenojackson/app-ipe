@@ -1,11 +1,12 @@
 "use client";
 
-import {useState, type FormEvent, type ReactNode} from "react";
+import {useState, type FormEvent} from "react";
 import {Button} from "@/core/ui/Button";
 import {TextField} from "@/core/ui/TextField";
 import {validateDescription, validateName, validateUrl} from "../files";
-import {buildBreadcrumbs} from "../tree";
-import type {LibraryItem} from "../types";
+import {EMPTY_TAGS, validateTags, type ItemTags} from "../tags";
+import {useTags} from "../useTags";
+import {TagPicker} from "./TagPicker";
 import {Dialog} from "./Dialog";
 
 const GENERIC_ERROR = "Não foi possível concluir. Tente novamente.";
@@ -74,14 +75,18 @@ export function TextPromptDialog({
 }
 
 export function LinkDialog({
-  title = "Adicionar link", initial, submitLabel, onSubmit, onClose,
+  title = "Adicionar link", initial, submitLabel, withTags = false, onSubmit, onClose,
 }: {
   title?: string;
   initial?: {name: string; url: string; description: string};
   submitLabel: string;
-  onSubmit: (value: {name: string; url: string; description: string}) => Promise<void>;
+  // Pede uma tag de cada tipo (criação de link novo).
+  withTags?: boolean;
+  onSubmit: (value: {name: string; url: string; description: string; tags?: ItemTags}) => Promise<void>;
   onClose: () => void;
 }) {
+  const [tags, setTags] = useState<ItemTags>(EMPTY_TAGS);
+  const {tags: tagList} = useTags();
   const [name, setName] = useState(initial?.name ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -91,15 +96,42 @@ export function LinkDialog({
       <form className="space-y-3" onSubmit={(e: FormEvent) => {
         e.preventDefault();
         void run(
-          validateName(name) ?? validateUrl(url) ?? validateDescription(description),
-          () => onSubmit({name, url, description})
+          validateName(name) ?? validateUrl(url) ?? validateDescription(description) ??
+            (withTags ? validateTags(tags) : null),
+          () => onSubmit(withTags ? {name, url, description, tags} : {name, url, description})
         );
       }}>
         <TextField id="link-name" label="Nome" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         <TextField id="link-url" label="Endereço (URL)" value={url} onChange={(e) => setUrl(e.target.value)} />
         <TextField id="link-description" label="Descrição (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} />
+        {withTags && <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} />}
         <ErrorLine error={error} />
         <Actions busy={busy} submitLabel={submitLabel} onClose={onClose} />
+      </form>
+    </Dialog>
+  );
+}
+
+// Curador corrige ou acrescenta tags (no momento da revisão ou depois).
+export function TagEditDialog({
+  initial, onSubmit, onClose,
+}: {
+  initial: ItemTags;
+  onSubmit: (tags: ItemTags) => Promise<void>;
+  onClose: () => void;
+}) {
+  const [tags, setTags] = useState<ItemTags>(initial);
+  const {tags: tagList} = useTags();
+  const {error, busy, run} = useSubmit(onClose);
+  return (
+    <Dialog title="Editar tags" onClose={onClose} wide>
+      <form onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        void run(validateTags(tags), () => onSubmit(tags));
+      }}>
+        <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} />
+        <ErrorLine error={error} />
+        <Actions busy={busy} submitLabel="Salvar tags" onClose={onClose} />
       </form>
     </Dialog>
   );
@@ -137,53 +169,6 @@ export function ReasonDialog({
         <ErrorLine error={error} />
         <Actions busy={busy} submitLabel={submitLabel} onClose={onClose} />
       </form>
-    </Dialog>
-  );
-}
-
-// Pastas para onde o item pode ir: nunca ele mesmo nem seus descendentes.
-export function eligibleTargets(
-  item: LibraryItem,
-  folders: LibraryItem[],
-  byId: Map<string, LibraryItem>
-): LibraryItem[] {
-  return folders.filter((folder) => {
-    if (folder.id === item.id) return false;
-    if (item.type !== "folder") return true;
-    return !buildBreadcrumbs(byId, folder.id).some((p) => p.id === item.id);
-  });
-}
-
-export function MoveDialog({
-  item, folders, byId, onPick, onClose,
-}: {
-  item: LibraryItem;
-  folders: LibraryItem[];
-  byId: Map<string, LibraryItem>;
-  onPick: (parentId: string | null) => Promise<void>;
-  onClose: () => void;
-}) {
-  const {error, busy, run} = useSubmit(onClose);
-  const targets = eligibleTargets(item, folders, byId);
-  const pathOf = (folder: LibraryItem) => buildBreadcrumbs(byId, folder.id).map((p) => p.name).join(" / ");
-  const choice = (label: ReactNode, parentId: string | null, key: string) => (
-    <li key={key}>
-      <button type="button" disabled={busy} onClick={() => void run(null, () => onPick(parentId))}
-        className="w-full rounded-button px-3 py-2 text-left hover:bg-white/10 disabled:opacity-50">
-        {label}
-      </button>
-    </li>
-  );
-  return (
-    <Dialog title={`Mover "${item.name}"`} onClose={onClose}>
-      <ul className="max-h-72 space-y-1 overflow-y-auto">
-        {choice("Biblioteca (raiz)", null, "raiz")}
-        {targets.map((folder) => choice(pathOf(folder), folder.id, folder.id))}
-      </ul>
-      <ErrorLine error={error} />
-      <div className="mt-4 flex justify-end">
-        <Button type="button" variant="text" onClick={onClose}>Cancelar</Button>
-      </div>
     </Dialog>
   );
 }

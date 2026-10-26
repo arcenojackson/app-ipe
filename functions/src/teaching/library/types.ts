@@ -25,6 +25,9 @@ export interface ItemDoc {
   version: number;
   updatedBy?: string;
   storagePath?: string;
+  typeTags?: string[];
+  subjectTags?: string[];
+  ageTags?: string[];
   deleteRequest?: DeleteRequest | null;
   returnComment?: string | null;
   returnedBy?: string | null;
@@ -46,6 +49,8 @@ export interface VoteDoc {
 // Campos que as Functions podem gravar no item.
 export interface ItemPatch {
   status?: ItemStatus;
+  // true = grava o horário do servidor (publicação).
+  publishedAt?: true;
   returnComment?: string | null;
   returnedBy?: string | null;
   parentId?: string | null;
