@@ -1,8 +1,9 @@
 import {hasAccess, type AccessClaims} from "@/core/auth/access";
+import {electionsModule} from "@/modules/elections/module";
 import {teachingModule} from "@/modules/teaching/module";
 import type {NavGroup, PortalModule} from "./types";
 
-export const portalModules: PortalModule[] = [teachingModule];
+export const portalModules: PortalModule[] = [teachingModule, electionsModule];
 
 function isUnder(pathname: string, base: string): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);

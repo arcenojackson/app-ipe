@@ -4,6 +4,7 @@ enum BoardPosition {
   presidente('Presidente'),
   vice('Vice'),
   secretario('Secretario(a)'),
+  secretario2('2º Secretario(a)'),
   tesoureiro('Tesoureiro(a)');
 
   const BoardPosition(this.label);

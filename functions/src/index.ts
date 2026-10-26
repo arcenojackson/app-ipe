@@ -1820,6 +1820,21 @@ export const sendEloAvailabilityReminder = functions
   });
 
 export {syncTeachingClaimsOnUserWrite} from "./teaching/syncClaims";
+export {
+  electionApplyBoard,
+  electionCastVote,
+  electionCheckIn,
+  electionCloseScrutiny,
+  electionCreate,
+  electionPickOldest,
+  electionRemoveCandidate,
+  electionRestartCargo,
+  electionReviewVoter,
+  electionSetStatus,
+  electionStartScrutiny,
+  electionVoteRecorded,
+} from "./elections";
+
 
 export {
   onTeachingItemCreated,

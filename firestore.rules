@@ -184,6 +184,48 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
 
+    // Eleição de diretoria das sociedades.
+    // Toda gravação (criar, votar, mudar de fase) passa pelas Cloud Functions;
+    // o Admin SDK ignora estas regras. O cliente só lê, e só quem é diretor da
+    // eleição (`directorIds`, snapshot da diretoria) enxerga o andamento.
+    function isElectionDirector(electionId) {
+      return request.auth != null
+        && request.auth.uid in get(/databases/$(database)/documents/elections/$(electionId)).data.directorIds;
+    }
+
+    match /elections/{electionId} {
+      // O documento não guarda nada secreto; a página de voto o lê antes do login.
+      allow get: if true;
+      // O app lista com where('directorIds', arrayContains: uid).
+      allow list: if request.auth != null
+        && request.auth.uid in resource.data.directorIds;
+
+      // Opções do escrutínio (nomes de membros), necessárias para votar.
+      match /rounds/{roundId} {
+        allow read: if request.auth != null;
+
+        // O eleitor lê só a própria marca; o diretor lê a lista (quem votou).
+        match /voted/{voterId} {
+          allow read: if request.auth != null
+            && (request.auth.uid == voterId || isElectionDirector(electionId));
+        }
+        // Sem regra para ballots: nenhum cliente lê ou escreve votos.
+      }
+
+      match /cargos/{position} {
+        allow read: if isElectionDirector(electionId);
+      }
+
+      match /voters/{voterId} {
+        allow read: if request.auth != null
+          && (request.auth.uid == voterId || isElectionDirector(electionId));
+      }
+
+      match /events/{eventId} {
+        allow read: if isElectionDirector(electionId);
+      }
+    }
+
     // ===== Biblioteca de ensino (etapas 2 e 3) =====
     // Papéis vêm das custom claims geradas por syncTeachingClaimsOnUserWrite.
     // Nenhuma regra acima foi alterada.
