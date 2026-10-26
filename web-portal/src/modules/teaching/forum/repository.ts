@@ -58,12 +58,12 @@ const toTopics = (docs: QueryDocumentSnapshot<DocumentData>[]): Topic[] =>
     return topic ? [topic] : [];
   });
 
-// Tópicos fixados (até 5), respeitando o assunto/busca ativos.
+// Tópicos fixados (poucos, só moderador fixa), respeitando o assunto/busca ativos.
 export async function loadPinnedTopics(filters: TopicFilters): Promise<Topic[]> {
   const {constraints, words} = filterConstraints(filters);
   const snapshot = await getDocs(
     query(topics(), where("deleted", "==", false), where("pinned", "==", true),
-      ...constraints, limit(LIMITS.maxPinned))
+      ...constraints)
   );
   return toTopics(snapshot.docs)
     .filter((t) => matchesWords(t, words))

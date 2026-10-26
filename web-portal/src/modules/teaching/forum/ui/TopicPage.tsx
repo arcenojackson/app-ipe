@@ -70,9 +70,15 @@ export default function TopicPage({topicId}: {topicId: string}) {
     };
   }, [fetchAll, uid]);
 
+  // A gravação já deu certo quando chegamos aqui: falha ao recarregar não
+  // pode virar erro de salvar (o usuário repetiria e duplicaria).
   const reload = useCallback(async () => {
-    const result = await fetchAll();
-    if (result) setLoaded(result);
+    try {
+      const result = await fetchAll();
+      if (result) setLoaded(result);
+    } catch {
+      setFailure("Salvo, mas não foi possível atualizar a página. Recarregue.");
+    }
   }, [fetchAll]);
 
   if (!viewer || !user) return null;
@@ -185,15 +191,19 @@ export default function TopicPage({topicId}: {topicId: string}) {
       {can.canComment && (
         <CommentForm label="Novo comentário" submitLabel="Comentar" onSubmit={addComment} />
       )}
-      <h2 className="text-lg font-semibold">
-        {topic.commentCount} {topic.commentCount === 1 ? "comentário" : "comentários"}
-      </h2>
-      <ul className="space-y-2">
-        {tree.map((node) => (
-          <CommentNode key={node.comment.id} node={node} topic={topic} viewer={viewer}
-            myVotes={loaded.myVotes} actions={actions} />
-        ))}
-      </ul>
+      {can.visibleBody && (
+        <>
+          <h2 className="text-lg font-semibold">
+            {topic.commentCount} {topic.commentCount === 1 ? "comentário" : "comentários"}
+          </h2>
+          <ul className="space-y-2">
+            {tree.map((node) => (
+              <CommentNode key={node.comment.id} node={node} topic={topic} viewer={viewer}
+                myVotes={loaded.myVotes} actions={actions} />
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }

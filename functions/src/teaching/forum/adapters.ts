@@ -61,8 +61,13 @@ export const createForumDb = (firestore: Firestore): ForumDb => {
     async setTopicStats(topicId, stats) {
       const patch: Record<string, unknown> = {commentCount: stats.commentCount};
       if (stats.lastActivityAt) {
-        patch.lastActivityAt =
-          admin.firestore.Timestamp.fromDate(stats.lastActivityAt);
+        // Nunca volta no tempo (retentativa tardia de comentário antigo).
+        const current = (await topic(topicId).get())
+          .get("lastActivityAt") as admin.firestore.Timestamp | undefined;
+        if (!current || current.toDate() < stats.lastActivityAt) {
+          patch.lastActivityAt =
+            admin.firestore.Timestamp.fromDate(stats.lastActivityAt);
+        }
       }
       await topic(topicId).update(patch);
     },
