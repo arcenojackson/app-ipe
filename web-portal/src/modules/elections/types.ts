@@ -56,6 +56,40 @@ export interface RoundResult {
   divergence: boolean;
 }
 
+/** Eleição como a tela de condução a lê. */
+export interface ConductElection extends Election {
+  positions: string[];
+  directorIds: string[];
+}
+
+export interface Cargo {
+  position: string;
+  stage: CargoStage;
+  cycle: number;
+  candidates: CandidateVotes[];
+  tiedIds: string[];
+  winnerId: string | null;
+}
+
+export interface ConductRound {
+  id: string;
+  position: string;
+  number: 1 | 2 | 3;
+  cycle: number;
+  status: "open" | "closed";
+  options: Candidate[];
+  votedCount: number;
+  result?: RoundResult;
+}
+
+export interface ConductVoter {
+  id: string;
+  name: string;
+  email: string;
+  kind: "member" | "guest";
+  status: VoterStatus;
+}
+
 const POSITION_LABELS: Record<string, string> = {
   presidente: "Presidente",
   vice: "Vice",
