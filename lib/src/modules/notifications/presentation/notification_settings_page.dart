@@ -1,3 +1,4 @@
+import '../../teaching_forum/models/teaching_access.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/state/app_state.dart';
@@ -202,7 +203,16 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                                         .where(
                                           (type) =>
                                               type !=
-                                              NotificationType.eventUpdate,
+                                                  NotificationType
+                                                      .eventUpdate &&
+                                              (type !=
+                                                      NotificationType
+                                                          .teachingForum ||
+                                                  canUseTeachingForum(
+                                                    context
+                                                        .read<AppState>()
+                                                        .currentUser,
+                                                  )),
                                         )
                                         .toList();
                                     return Column(
