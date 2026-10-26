@@ -33,6 +33,11 @@ describe("TagPicker", () => {
     expect(onChange).toHaveBeenLastCalledWith(EMPTY_TAGS);
   });
 
+  it("mostra o aviso quando as tags não carregaram", () => {
+    render(<TagPicker tags={[]} loadError="Não foi possível carregar as tags." value={EMPTY_TAGS} onChange={() => undefined} />);
+    expect(screen.getByText("Não foi possível carregar as tags. Recarregue a página.")).toBeInTheDocument();
+  });
+
   it("mostra o erro em role=alert", () => {
     render(
       <TagPicker tags={tags} value={EMPTY_TAGS} onChange={() => undefined} error="Escolha pelo menos uma tag de tipo." />

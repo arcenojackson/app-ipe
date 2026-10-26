@@ -26,7 +26,7 @@ export function UploadPanel({
   const [entries, setEntries] = useState<Entry[]>([]);
   const [tags, setTags] = useState<ItemTags>(EMPTY_TAGS);
   const [tagError, setTagError] = useState<string | null>(null);
-  const {tags: tagList} = useTags();
+  const {tags: tagList, error: tagsError} = useTags();
   const counter = useRef(0);
   const input = useRef<HTMLInputElement>(null);
 
@@ -61,7 +61,7 @@ export function UploadPanel({
 
   return (
     <div className="space-y-3">
-      <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} error={tagError} />
+      <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} error={tagError} loadError={tagsError} />
       <div
         data-testid="drop-zone"
         onDragOver={(e) => e.preventDefault()}

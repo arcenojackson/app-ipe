@@ -2,7 +2,7 @@
 
 import {useState} from "react";
 import {TextField} from "@/core/ui/TextField";
-import {TAG_FIELD, TAG_KINDS, TAG_KIND_LABEL, tagName, type ItemTags, type Tag, type TagKind} from "../tags";
+import {TAGS_LOAD_HINT, TAG_FIELD, TAG_KINDS, TAG_KIND_LABEL, tagName, type ItemTags, type Tag, type TagKind} from "../tags";
 
 // Filtros da biblioteca: menus de Tipo/Assunto/Faixa, chips dos filtros ativos
 // e busca por texto.
@@ -12,7 +12,9 @@ export function TagFilterBar({
   onChange,
   text,
   onTextChange,
+  loadError,
 }: {
+  loadError?: string | null;
   tags: Tag[];
   value: ItemTags;
   onChange: (next: ItemTags) => void;
@@ -33,6 +35,7 @@ export function TagFilterBar({
 
   return (
     <div className="space-y-3">
+      {loadError && <p role="alert" className="text-sm text-error">{`${loadError} ${TAGS_LOAD_HINT}`}</p>}
       <div className="flex flex-wrap items-end gap-3">
         {TAG_KINDS.map((kind) => (
           <div key={kind} className="relative">

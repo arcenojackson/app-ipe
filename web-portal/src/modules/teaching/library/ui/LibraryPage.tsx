@@ -31,7 +31,7 @@ export function LibraryContent({
   const [text, setText] = useState("");
   const [debouncedText, setDebouncedText] = useState("");
   const [authorNames, setAuthorNames] = useState<Record<string, string>>({});
-  const {tags, byId} = useTags();
+  const {tags, byId, error: tagsError} = useTags();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedText(text), SEARCH_DEBOUNCE_MS);
@@ -68,7 +68,7 @@ export function LibraryContent({
         <h1 className="text-2xl font-semibold">Biblioteca</h1>
         <NotificationBell uid={viewer.uid} />
       </div>
-      <TagFilterBar tags={tags ?? []} value={tagFilters} onChange={setTagFilters} text={text} onTextChange={setText} />
+      <TagFilterBar tags={tags ?? []} value={tagFilters} onChange={setTagFilters} text={text} onTextChange={setText} loadError={tagsError} />
       {library.error && <p role="alert" className="text-sm text-error">{library.error}</p>}
       {library.loading && empty ? (
         <p className="text-white/70">Carregando…</p>
@@ -92,7 +92,7 @@ export function LibraryContent({
           )}
         </>
       )}
-      {itemId && <ItemModal itemId={itemId} viewer={viewer} onClose={() => navigate(libraryUrl({}))} />}
+      {itemId && <ItemModal itemId={itemId} viewer={viewer} onClose={() => navigate(libraryUrl({}))} onChanged={library.reload} />}
     </div>
   );
 }

@@ -14,6 +14,7 @@ const input = {
   mine: [item("m1", {authorId: "c1", createdAt: 1}), item("m2", {authorId: "c1", status: "returned", createdAt: 2})],
   inReview: [item("m1", {authorId: "c1"}), item("o1", {authorId: "t2"}), item("o2", {authorId: "t3"})],
   deleteRequested: [item("d1", {status: "published"})],
+  returned: [item("m2", {authorId: "c1", status: "returned"}), item("r1", {authorId: "t2", status: "returned"})],
 };
 
 describe("buildReviewQueue", () => {
@@ -22,6 +23,7 @@ describe("buildReviewQueue", () => {
     expect(queue.mine.map((i) => i.id)).toEqual(["m2", "m1"]);
     expect(queue.toReview).toEqual([]);
     expect(queue.deleteRequests).toEqual([]);
+    expect(queue.returned).toEqual([]);
   });
 
   it("curador também vê os envios de outros em revisão (sem os próprios) e os pedidos de exclusão", () => {
@@ -29,6 +31,10 @@ describe("buildReviewQueue", () => {
     expect(queue.mine.map((i) => i.id)).toEqual(["m2", "m1"]);
     expect(queue.toReview.map((i) => i.id)).toEqual(["o1", "o2"]);
     expect(queue.deleteRequests.map((i) => i.id)).toEqual(["d1"]);
+  });
+
+  it("curador vê os devolvidos de outros autores (sem os próprios), para poder pedir a exclusão", () => {
+    expect(buildReviewQueue(curator, input).returned.map((i) => i.id)).toEqual(["r1"]);
   });
 
   it("admin sem papel de curador lê a fila como curador", () => {

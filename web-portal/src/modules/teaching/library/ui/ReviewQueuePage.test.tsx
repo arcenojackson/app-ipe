@@ -53,6 +53,7 @@ beforeEach(() => {
       item("m2", "Meu devolvido", {authorId: "c1", status: "returned", returnComment: "Falta a fonte"}),
     ],
     toReview: [item("i1", "Aula 1"), item("i3", "Já votei")],
+    returned: [item("r1", "Parado no autor", {authorId: "t2", status: "returned", returnComment: "Sem resposta do autor"})],
     deleteRequests: [item("d1", "Livro antigo", {status: "published", deleteRequest: {id: "r1", requestedBy: "c9", requestedAt: 1, reason: "Obsoleto"}})],
   };
   repo.subscribeReviewQueue.mockReset().mockImplementation((_viewer, onData) => {
@@ -65,16 +66,17 @@ const section = (name: string) => within(screen.getByRole("region", {name}));
 
 describe("ReviewQueuePage — professor", () => {
   it("vê o envio de material e só os próprios envios", async () => {
-    queue = {mine: [item("m1", "Meu envio")], toReview: [], deleteRequests: []};
+    queue = {mine: [item("m1", "Meu envio")], toReview: [], returned: [], deleteRequests: []};
     asTeacher();
     expect(await screen.findByTestId("upload-panel")).toBeInTheDocument();
     expect(section("Meus envios").getByText("Meu envio")).toBeInTheDocument();
     expect(screen.queryByRole("region", {name: "Para revisar"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", {name: "Devolvidos aguardando o autor"})).not.toBeInTheDocument();
     expect(screen.queryByRole("region", {name: "Pedidos de exclusão"})).not.toBeInTheDocument();
   });
 
   it("sem envios mostra a mensagem da seção", async () => {
-    queue = {mine: [], toReview: [], deleteRequests: []};
+    queue = {mine: [], toReview: [], returned: [], deleteRequests: []};
     asTeacher();
     expect(await screen.findByText("Você ainda não enviou nada.")).toBeInTheDocument();
   });
@@ -88,6 +90,14 @@ describe("ReviewQueuePage — curador", () => {
     expect(section("Para revisar").getByText("1/2 aprovações")).toBeInTheDocument();
     expect(section("Pedidos de exclusão").getByText("Livro antigo")).toBeInTheDocument();
     expect(screen.getByText(/Obsoleto/)).toBeInTheDocument();
+  });
+
+  it("lista os devolvidos de outros autores, para o curador abrir e pedir a exclusão", async () => {
+    renderAs("c1");
+    await screen.findByText("Parado no autor");
+    expect(section("Devolvidos aguardando o autor").getByText(/Sem resposta do autor/)).toBeInTheDocument();
+    fireEvent.click(section("Devolvidos aguardando o autor").getByRole("button", {name: "Abrir Parado no autor"}));
+    expect(nav.push).toHaveBeenCalledWith("/ensino/biblioteca?item=r1");
   });
 
   it("mostra as tags de cada item", async () => {
@@ -119,7 +129,7 @@ describe("ReviewQueuePage — curador", () => {
   });
 
   it("nada para revisar mostra a mensagem da seção", async () => {
-    queue = {mine: [], toReview: [], deleteRequests: []};
+    queue = {mine: [], toReview: [], returned: [], deleteRequests: []};
     renderAs("c1");
     expect(await screen.findByText("Nada aguardando a sua revisão.")).toBeInTheDocument();
     expect(screen.getByText("Nenhum pedido de exclusão.")).toBeInTheDocument();

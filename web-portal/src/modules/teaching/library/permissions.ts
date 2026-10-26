@@ -35,7 +35,7 @@ export function itemPermissions(item: LibraryItem, viewer: Viewer): ItemPermissi
     canRequestDelete:
       viewer.isCurator &&
       request === null &&
-      (item.status === "published" || item.status === "active"),
+      (item.status === "published" || item.status === "active" || item.status === "returned"),
     canCancelDelete: viewer.isCurator && request?.requestedBy === viewer.uid,
     canVoteDelete:
       viewer.isCurator && request !== null && request.requestedBy !== viewer.uid,

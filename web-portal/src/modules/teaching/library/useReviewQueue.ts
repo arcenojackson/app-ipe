@@ -28,7 +28,7 @@ export function useReviewQueue(viewer: Viewer | null) {
       (queue) => {
         if (failed) return;
         const current = ++sequence;
-        const ids = [...new Set([...queue.mine, ...queue.toReview, ...queue.deleteRequests].map((i) => i.id))];
+        const ids = [...new Set([...queue.mine, ...queue.toReview, ...queue.returned, ...queue.deleteRequests].map((i) => i.id))];
         Promise.all(ids.map(async (id) => [id, await loadVotes(id).catch((): LibraryVote[] => [])] as const)).then(
           (entries) => {
             if (active && current === sequence) setLoaded({queue, votes: Object.fromEntries(entries)});
