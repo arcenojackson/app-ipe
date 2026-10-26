@@ -72,9 +72,10 @@ Preferência de push: nova chave `teaching_forum` em `users.disabled_notificatio
 
 Padrão do projeto: o cliente escreve só campos permitidos; **Functions decidem** contadores. Nenhuma regra existente é alterada.
 
-- `canUseForum()` = `canUseTeaching()` hoje (ponto único para ampliar depois).
+- `canUseForum()` = `canUseTeaching()` hoje (ponto único para ampliar depois). `canUseTeaching()` já aceita admin (claim `admin`) e `teacher`/`curator` (claim `teaching_role`). Novo `isModerator()` = `isCurator() || hasAdminClaim()`; no web, o mesmo cálculo a partir das claims já expostas por `core/` (mesmas claims, sem lógica nova).
 - Tópico: `read` se `canUseForum()`. `create` se `canUseForum()`, `authorUid == uid`, `authorName` string, título/corpo nos limites, `tagIds ≤3`, `refs ≤3`, `pinned == false`, `locked == false`, `deleted == false`, `commentCount == 0`, `createdAt == request.time`, `lastActivityAt == request.time`. `update`: (a) **autor** altera só `title, body, tagIds, refs, searchTokens, updatedAt, editedAt` e `deleted: false→true`, em tópico não removido; (b) **curador/admin** altera só `pinned, locked, deleted`; contadores e `lastActivityAt` nunca pelo cliente. Sem `delete` pelo cliente.
-- Comentário: `read` se `canUseForum()`. `create` se `canUseForum()`, tópico existente, não removido e **não trancado** (lido com `get`), `authorUid == uid`, `score == 0`, `deleted == false`, `depth` entre 1 e 3 e coerente com o pai (`parentId == null` ⇒ `depth == 1`; caso contrário o pai existe, não removido, e `depth == pai.depth + 1`). `update`: autor altera só `body, refs, editedAt` e `deleted: false→true`; curador/admin só `deleted: false→true`. `score` só Function. Sem `delete`.
+- Comentário: `read` se `canUseForum()`. `create` se `canUseForum()`, `authorName` string, `body` 1–5000, `refs ≤3`, `createdAt == request.time`, tópico existente, não removido e **não trancado** (lido com `get`), `authorUid == uid`, `score == 0`, `deleted == false`, `depth` entre 1 e 3 e coerente com o pai (`parentId == null` ⇒ `depth == 1`; caso contrário o pai existe, não removido, e `depth == pai.depth + 1`). `update`: autor altera só `body, refs, editedAt` e `deleted: false→true`; curador/admin só `deleted: false→true`. `score` só Function. Sem `delete`.
+- Tópico removido continua legível por URL direta (a regra de leitura não olha `deleted`); a interface mostra "Tópico removido" para quem não é moderador nem autor, e o conteúdo para moderador e autor. Comentário removido vira "[removido]" para todos (corpo oculto pela interface) e **não aceita novas respostas** (sem botão Responder; a regra exige pai não removido); as respostas já existentes continuam visíveis.
 - Voto: `read` do próprio; `create/update` se `canUseForum()`, `{uid}` do documento == `request.auth.uid`, `value in [1,-1]`, tópico não trancado/removido, comentário não removido e `authorUid != uid`; `delete` do próprio voto.
 - Testes de regras (emulador, `rules-tests`) cobrindo cada caminho permitido e negado.
 
@@ -83,16 +84,16 @@ Padrão do projeto: o cliente escreve só campos permitidos; **Functions decidem
 Lógica pura testável com portas em memória; gatilhos finos.
 
 - `onForumCommentCreated`: incrementa `commentCount` e atualiza `lastActivityAt` do tópico; notifica (a) o autor do comentário-pai (se `parentId`) ou o autor do tópico (se resposta direta), exceto se for o próprio autor; se pai e tópico têm autores diferentes, notifica só o destinatário imediato (pai). Cria `teaching_notifications` (id determinístico `forum_reply_<commentId>`, idempotente) e envia push respeitando `disabled_notifications`.
-- `onForumCommentUpdated`: quando `deleted` vira `true`, decrementa `commentCount`.
-- `onForumVoteWritten` (create/update/delete): recalcula `score` do comentário por delta (`after.value − before.value`, ausente = 0) com transação/`FieldValue.increment`; idempotente por evento.
+- `onForumCommentUpdated`: quando `deleted` vira `true`, **recalcula** `commentCount` (conta comentários com `deleted == false`; também idempotente). Quando o tópico é removido, comentários e contadores ficam como estão; o tópico some das listas.
+- `onForumVoteWritten` (create/update/delete): **recalcula** `score` do comentário somando a subcoleção `votes` (consulta de agregação `sum`), em vez de aplicar delta — assim a retentativa ligada não conta em dobro (idempotente por construção).
 - `searchTokens` do tópico é calculado no **cliente** (como na Biblioteca) e validado em tamanho pelas regras.
 
 ## 8. Portal web (Etapa 1)
 
 Módulo novo `web-portal/src/modules/teaching/forum/` (pastas `data/`, `ui/`, lógica pura ao lado dos testes), rotas finas em `src/app/(portal)/ensino/forum/` (`page.tsx` lista; `novo/page.tsx` criar; `[topicId]/page.tsx` tópico). Reutiliza `core/ui` (`Button`, `Card`, `TextField`, `GlassCard`) **sem restilizar**. Texto em português; mobile funciona (portal responsivo).
 
-- **Lista**: tópicos ordenados por `lastActivityAt` (desc), fixados no topo (consulta própria de `pinned == true`); filtro por assunto (`array-contains` em `tagIds`); busca por prefixo de palavra do título (`searchTokens`); paginação por cursor ("carregar mais"); cada linha mostra título, autor, assuntos, nº de comentários, última atividade, selos "Fixado"/"Trancado". Tópicos removidos não aparecem (curador/admin vê "[removido]"? **decisão do builder**).
-- **Criar/editar tópico**: título, mensagem, assuntos opcionais (seletor das tags de assunto ativas), citações. 
+- **Lista**: tópicos ordenados por `lastActivityAt` (desc), fixados no topo (consulta própria de `pinned == true`); filtro por assunto (`array-contains` em `tagIds`) **ou** busca por prefixo de palavra do título (`searchTokens`) — **mutuamente exclusivos na v1** (o Firestore permite um `array-contains` por consulta; escolher um assunto limpa a busca e vice-versa; decisão minha); fixados aparecem no topo respeitando o filtro/busca ativo, máximo de 5 fixados (limite aplicado pela interface, decisão minha); paginação por cursor ("carregar mais"); cada linha mostra título, autor, assuntos, nº de comentários, última atividade, selos "Fixado"/"Trancado". Tópicos removidos não aparecem (curador/admin vê "[removido]"? **decisão do builder**).
+- **Criar/editar tópico**: título, mensagem, assuntos opcionais (seletor das tags `teaching_tags` com `kind == "subject"` e `active == true`; a validação de que o id existe é só no cliente, as regras só limitam a quantidade), citações. 
 - **Tópico**: cabeçalho + mensagem; árvore de comentários até profundidade 3 (no nível 3 o botão "Responder" não existe; responder a um nível 3 não é permitido); cada comentário: autor, data, "(editado)", citações, saldo com botões 👍/👎 (voto atual destacado), Responder, Editar/Apagar (autor), Apagar (curador/admin). Curador/admin: Fixar/Trancar no cabeçalho. Tópico trancado mostra aviso e esconde Responder/votos.
 - **Citar documento/aula**: seletor com busca. Biblioteca: **só itens `status == "published"`** (reaproveita `libraryQuery`/repositório da Biblioteca em modo leitura, sem editar arquivos dela); Plano: aulas de `teaching_plan`. A citação grava `{kind, id, label}`; renderiza como cartão/link: documento abre a Biblioteca no item (`/ensino/biblioteca?item=<id>`), aula abre `/ensino/plano` (âncora da aula se existir). Se o alvo deixou de existir/publicado, mostra só o rótulo.
 - **Sino/notificações**: tratar `forum_reply` na página de notificações existente (ver §5) e contador de não lidas já existente no portal.
@@ -107,7 +108,7 @@ Testes: Vitest + Testing Library (sem `user-event`; usar `fireEvent`) para lógi
 
 ## 10. Operação e publicação
 
-Nada é publicado sem autorização: regras, índices (`firestore.indexes.json` recebe os novos índices sem remover os existentes), Functions (`--force`), merge. Índices esperados: `forum_topics` por `(pinned, lastActivityAt desc)`, por `(tagIds array-contains, lastActivityAt desc)` e por `(searchTokens array-contains, lastActivityAt desc)`; `comments` por `createdAt` (índice simples). O builder confirma e ajusta.
+Nada é publicado sem autorização: regras, índices (`firestore.indexes.json` recebe os novos índices sem remover os existentes), Functions (`--force`), merge. As listas filtram `deleted == false` no servidor. Índices esperados: `forum_topics` por `(deleted, pinned, lastActivityAt desc)`, `(deleted, tagIds array-contains, lastActivityAt desc)` e `(deleted, searchTokens array-contains, lastActivityAt desc)`; `comments` por `createdAt` (índice simples). O builder confirma e ajusta.
 
 ## 11. Deixado ao builder
 
