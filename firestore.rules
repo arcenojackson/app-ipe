@@ -452,6 +452,157 @@ service cloud.firestore {
       // create/delete: só Cloud Functions.
     }
 
+    // Fórum de professores. O cliente escreve só o conteúdo e as ações de
+    // moderação; contadores (commentCount, lastActivityAt, score) são das
+    // Cloud Functions. Mesmo acesso do ensino hoje; ampliar só aqui.
+    function canUseForum() {
+      return canUseTeaching();
+    }
+
+    function isModerator() {
+      return isCurator() || hasAdminClaim();
+    }
+
+    function forumTopicPath(topicId) {
+      return /databases/$(database)/documents/forum_topics/$(topicId);
+    }
+
+    function forumCommentPath(topicId, commentId) {
+      return /databases/$(database)/documents/forum_topics/$(topicId)/comments/$(commentId);
+    }
+
+    function forumTopicOpen(topicId) {
+      return exists(forumTopicPath(topicId)) &&
+        get(forumTopicPath(topicId)).data.deleted == false &&
+        get(forumTopicPath(topicId)).data.locked == false;
+    }
+
+    function forumBody(d) {
+      return d.body is string && d.body.size() >= 1 && d.body.size() <= 5000;
+    }
+
+    function forumTopicContent(d) {
+      return d.title is string && d.title.size() >= 3 &&
+        d.title.size() <= 120 && forumBody(d) &&
+        d.tagIds is list && d.tagIds.size() <= 3 &&
+        d.refs is list && d.refs.size() <= 3 &&
+        d.searchTokens is list && d.searchTokens.size() <= 150;
+    }
+
+    // `deleted` só pode ficar igual ou virar true (nunca é desfeito).
+    function forumOnlyDeletes(before, after) {
+      return after.deleted is bool &&
+        (after.deleted == before.deleted || after.deleted == true);
+    }
+
+    function validForumTopicCreate(d) {
+      return d.keys().hasOnly(['title', 'body', 'authorUid', 'authorName',
+          'tagIds', 'refs', 'searchTokens', 'pinned', 'locked', 'deleted',
+          'commentCount', 'createdAt', 'updatedAt', 'lastActivityAt']) &&
+        d.keys().hasAll(['title', 'body', 'authorUid', 'authorName', 'tagIds',
+          'refs', 'searchTokens', 'pinned', 'locked', 'deleted',
+          'commentCount', 'createdAt', 'updatedAt', 'lastActivityAt']) &&
+        forumTopicContent(d) &&
+        d.authorUid == request.auth.uid &&
+        d.authorName is string && d.authorName.size() <= 120 &&
+        d.pinned == false && d.locked == false && d.deleted == false &&
+        d.commentCount == 0 &&
+        d.createdAt == request.time && d.updatedAt == request.time &&
+        d.lastActivityAt == request.time;
+    }
+
+    function forumTopicAuthorEdit() {
+      return resource.data.authorUid == request.auth.uid &&
+        resource.data.deleted == false &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['title', 'body', 'tagIds', 'refs', 'searchTokens', 'updatedAt',
+            'editedAt', 'deleted']) &&
+        forumTopicContent(request.resource.data) &&
+        forumOnlyDeletes(resource.data, request.resource.data) &&
+        (!('updatedAt' in request.resource.data.diff(resource.data)
+          .affectedKeys()) || request.resource.data.updatedAt == request.time);
+    }
+
+    function forumTopicModeration() {
+      return isModerator() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['pinned', 'locked', 'deleted']) &&
+        request.resource.data.pinned is bool &&
+        request.resource.data.locked is bool &&
+        forumOnlyDeletes(resource.data, request.resource.data);
+    }
+
+    function forumParentOk(topicId, d) {
+      return (d.parentId == null && d.depth == 1) ||
+        (d.parentId is string && d.depth > 1 && d.depth <= 3 &&
+          exists(forumCommentPath(topicId, d.parentId)) &&
+          get(forumCommentPath(topicId, d.parentId)).data.deleted == false &&
+          get(forumCommentPath(topicId, d.parentId)).data.depth ==
+            d.depth - 1);
+    }
+
+    function validForumCommentCreate(topicId, d) {
+      return d.keys().hasOnly(['body', 'authorUid', 'authorName', 'parentId',
+          'depth', 'refs', 'score', 'deleted', 'createdAt']) &&
+        d.keys().hasAll(['body', 'authorUid', 'authorName', 'parentId',
+          'depth', 'refs', 'score', 'deleted', 'createdAt']) &&
+        forumBody(d) && d.refs is list && d.refs.size() <= 3 &&
+        d.authorUid == request.auth.uid &&
+        d.authorName is string && d.authorName.size() <= 120 &&
+        d.score == 0 && d.deleted == false &&
+        d.createdAt == request.time &&
+        d.depth is int && forumTopicOpen(topicId) &&
+        forumParentOk(topicId, d);
+    }
+
+    function forumCommentAuthorEdit() {
+      return resource.data.authorUid == request.auth.uid &&
+        resource.data.deleted == false &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(
+          ['body', 'refs', 'editedAt', 'deleted']) &&
+        forumBody(request.resource.data) &&
+        request.resource.data.refs is list &&
+        request.resource.data.refs.size() <= 3 &&
+        forumOnlyDeletes(resource.data, request.resource.data);
+    }
+
+    function forumCommentModeration() {
+      return isModerator() &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['deleted']) &&
+        request.resource.data.deleted == true;
+    }
+
+    match /forum_topics/{topicId} {
+      allow read: if canUseForum();
+      allow create: if canUseForum() &&
+        validForumTopicCreate(request.resource.data);
+      allow update: if canUseForum() &&
+        (forumTopicAuthorEdit() || forumTopicModeration());
+      // delete: nunca pelo cliente (remoção é lógica, campo `deleted`).
+
+      match /comments/{commentId} {
+        allow read: if canUseForum();
+        allow create: if canUseForum() &&
+          validForumCommentCreate(topicId, request.resource.data);
+        allow update: if canUseForum() &&
+          (forumCommentAuthorEdit() || forumCommentModeration());
+
+        match /votes/{voterId} {
+          allow read: if canUseForum() && request.auth.uid == voterId;
+          allow create, update: if canUseForum() &&
+            request.auth.uid == voterId &&
+            request.resource.data.keys().hasOnly(['value']) &&
+            request.resource.data.value in [1, -1] &&
+            forumTopicOpen(topicId) &&
+            get(forumCommentPath(topicId, commentId)).data.deleted == false &&
+            get(forumCommentPath(topicId, commentId)).data.authorUid !=
+              request.auth.uid;
+          allow delete: if canUseForum() && request.auth.uid == voterId;
+        }
+      }
+    }
+
     // teaching_log: sem acesso do cliente (negado por padrão).
   }
 }    
