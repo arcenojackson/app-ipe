@@ -1,7 +1,7 @@
 import {beforeEach, describe, expect, it} from "vitest";
 import {checkIn, reviewVoter} from "../src/elections/voters";
 import {
-  ADMIN, ELECTION, MEMBER, OUTSIDER, clearDb, db, expectCode, seedBase,
+  DIRECTOR, OTHER_DIRECTOR, ADMIN, ELECTION, MEMBER, OUTSIDER, clearDb, db, expectCode, seedBase,
 } from "./helpers";
 
 const member = {uid: MEMBER, isAnonymous: false, email: "ana@ipe.org"};
@@ -86,7 +86,7 @@ describe("checkIn", () => {
 
   it("check-in repetido é idempotente e NÃO derruba a aprovação", async () => {
     await checkIn(db, google, {electionId: ELECTION});
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
+    await reviewVoter(db, DIRECTOR, {electionId: ELECTION, voterId: "g1", decision: "approved"});
     const again = await checkIn(db, {...google, name: "Outro nome"}, {electionId: ELECTION});
     expect(again).toEqual({status: "approved", kind: "guest"});
     expect((await voterDoc("g1"))?.name).toBe("Gabi Google");
@@ -105,44 +105,47 @@ describe("checkIn", () => {
 });
 
 describe("reviewVoter", () => {
-  it("só admin aprova", async () => {
+  it("só diretor da eleição aprova (nem membro, nem diretor de outra sociedade, nem admin global)", async () => {
     await checkIn(db, google, {electionId: ELECTION});
-    await expectCode(
-      reviewVoter(db, MEMBER, {electionId: ELECTION, voterId: "g1", decision: "approved"}),
-      "permission-denied"
-    );
+    for (const uid of [MEMBER, OTHER_DIRECTOR, ADMIN]) {
+      await expectCode(
+        reviewVoter(db, uid, {electionId: ELECTION, voterId: "g1", decision: "approved"}),
+        "permission-denied"
+      );
+    }
+    expect((await voterDoc("g1"))?.status).toBe("pending");
   });
 
   it("admin aprova e recusa, registrando quem decidiu", async () => {
     await checkIn(db, google, {electionId: ELECTION});
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
+    await reviewVoter(db, DIRECTOR, {electionId: ELECTION, voterId: "g1", decision: "approved"});
     expect((await voterDoc("g1"))?.status).toBe("approved");
-    expect((await voterDoc("g1"))?.reviewedBy).toBe(ADMIN);
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "rejected"});
+    expect((await voterDoc("g1"))?.reviewedBy).toBe(DIRECTOR);
+    await reviewVoter(db, DIRECTOR, {electionId: ELECTION, voterId: "g1", decision: "rejected"});
     expect((await voterDoc("g1"))?.status).toBe("rejected");
   });
 
   it("aprovar na eleição não aprova o usuário no app", async () => {
     await checkIn(db, google, {electionId: ELECTION});
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
+    await reviewVoter(db, DIRECTOR, {electionId: ELECTION, voterId: "g1", decision: "approved"});
     expect((await userDoc("g1"))?.is_pending).toBe(true);
   });
 
   it("decisão inválida e eleitor inexistente", async () => {
     await expectCode(
-      reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "x", decision: "approved"}),
+      reviewVoter(db, DIRECTOR, {electionId: ELECTION, voterId: "x", decision: "approved"}),
       "not-found"
     );
     await checkIn(db, google, {electionId: ELECTION});
     await expectCode(
-      reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "maybe"}),
+      reviewVoter(db, DIRECTOR, {electionId: ELECTION, voterId: "g1", decision: "maybe"}),
       "invalid-argument"
     );
   });
 
   it("grava eventos de auditoria do check-in e da decisão", async () => {
     await checkIn(db, google, {electionId: ELECTION});
-    await reviewVoter(db, ADMIN, {electionId: ELECTION, voterId: "g1", decision: "approved"});
+    await reviewVoter(db, DIRECTOR, {electionId: ELECTION, voterId: "g1", decision: "approved"});
     const events = await db.collection(`elections/${ELECTION}/events`).get();
     const types = events.docs.map((d) => d.get("type")).sort();
     expect(types).toEqual(["checkin", "voter_reviewed"]);

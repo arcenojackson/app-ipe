@@ -1,9 +1,72 @@
-import {FieldValue, type Firestore} from "firebase-admin/firestore";
+import {FieldValue, Timestamp, type Firestore} from "firebase-admin/firestore";
 import {applyWinners} from "./board";
 import {
   assertAdmin, fail, getElection, logEvent, requireString, summarizeRound,
 } from "./common";
+import {assertElectionDirector, directorIdsOf} from "./directors";
+import {normalizePositions} from "./positions";
 import {pickWinners} from "./winners";
+
+// Cria a eleição em rascunho. Só quem está na diretoria *atual* da sociedade
+// cria; a lista de diretores vira o snapshot `directorIds` da eleição.
+export const createElection = async (
+  db: Firestore,
+  uid: string,
+  data: unknown
+): Promise<{electionId: string}> => {
+  const societyId = requireString(data, "societyId");
+  const title = requireString(data, "title");
+  const scheduledAtMs = (data as {scheduledAtMs?: unknown}).scheduledAtMs;
+  if (typeof scheduledAtMs !== "number" || !Number.isFinite(scheduledAtMs)) {
+    throw fail("invalid-argument", "Informe a data e a hora da eleição.");
+  }
+  const positions = normalizePositions(
+    (data as {positions?: unknown}).positions
+  );
+
+  const society = await db.doc(`societies/${societyId}`).get();
+  if (!society.exists) throw fail("not-found", "Sociedade não encontrada.");
+  const directorIds = directorIdsOf(society.get("board"));
+  if (directorIds.length === 0) {
+    throw fail(
+      "failed-precondition",
+      "A sociedade não tem diretoria cadastrada. " +
+        "Cadastre a diretoria em Sociedades antes de criar a eleição."
+    );
+  }
+  if (!directorIds.includes(uid)) {
+    throw fail(
+      "permission-denied",
+      "Apenas os diretores desta sociedade podem criar a eleição."
+    );
+  }
+
+  const electionRef = db.collection("elections").doc();
+  const batch = db.batch();
+  batch.set(electionRef, {
+    societyId,
+    societyName: String(society.get("name") ?? ""),
+    title,
+    scheduledAt: Timestamp.fromMillis(scheduledAtMs),
+    status: "draft",
+    positions,
+    directorIds,
+    createdBy: uid,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  for (const position of positions) {
+    batch.set(electionRef.collection("cargos").doc(position), {
+      stage: "idle",
+      cycle: 1,
+      candidates: [],
+      tiedIds: [],
+      winnerId: null,
+    });
+  }
+  await batch.commit();
+  await logEvent(db, electionRef.id, {type: "election_created", actorId: uid});
+  return {electionId: electionRef.id};
+};
 
 export const applyBoard = async (
   db: Firestore,
@@ -50,13 +113,12 @@ export const setElectionStatus = async (
   uid: string,
   data: unknown
 ): Promise<void> => {
-  await assertAdmin(db, uid);
   const electionId = requireString(data, "electionId");
   const target = requireString(data, "status");
+  const election = await assertElectionDirector(db, uid, electionId);
   if (target !== "open" && target !== "closed") {
     throw fail("invalid-argument", "Status inválido.");
   }
-  const election = await getElection(db, electionId);
   const ref = db.doc(`elections/${electionId}`);
 
   if (target === "open") {

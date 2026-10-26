@@ -1825,6 +1825,7 @@ export {
   electionCastVote,
   electionCheckIn,
   electionCloseRound,
+  electionCreate,
   electionOpenRound,
   electionReviewVoter,
   electionSetStatus,

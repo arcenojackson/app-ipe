@@ -1,7 +1,7 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import {assertNotAnonymous} from "./common";
-import {applyBoard, setElectionStatus} from "./lifecycle";
+import {applyBoard, createElection, setElectionStatus} from "./lifecycle";
 import {bumpVotedCount, castVote, closeRound, openRound} from "./rounds";
 import {checkIn, reviewVoter} from "./voters";
 
@@ -21,15 +21,19 @@ interface AuthLike {
 const isAnonymousAuth = (auth: AuthLike) =>
   auth.token.firebase?.sign_in_provider === "anonymous";
 
-// Operações de admin: exigem conta de verdade (nunca sessão anônima).
-const needAdminAuth = (context: functions.https.CallableContext) => {
+// Operações de diretor: exigem conta de verdade (nunca sessão anônima); a
+// checagem de diretoria é feita dentro de cada função.
+const needDirectorAuth = (context: functions.https.CallableContext) => {
   const auth = needAuth(context);
   assertNotAnonymous(isAnonymousAuth(auth));
   return auth;
 };
 
-export const electionSetStatus = functions.https.onCall((data, context) =>
-  setElectionStatus(admin.firestore(), needAdminAuth(context).uid, data));
+export const electionCreate = functions.https.onCall((data, context) =>
+  createElection(admin.firestore(), needDirectorAuth(context).uid, data));
+
+export const electionSetStatus =functions.https.onCall((data, context) =>
+  setElectionStatus(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionCheckIn = functions.https.onCall((data, context) => {
   const auth = needAuth(context);
@@ -42,19 +46,19 @@ export const electionCheckIn = functions.https.onCall((data, context) => {
 });
 
 export const electionReviewVoter = functions.https.onCall((data, context) =>
-  reviewVoter(admin.firestore(), needAdminAuth(context).uid, data));
+  reviewVoter(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionOpenRound = functions.https.onCall((data, context) =>
-  openRound(admin.firestore(), needAdminAuth(context).uid, data));
+  openRound(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionCastVote = functions.https.onCall((data, context) =>
   castVote(admin.firestore(), needAuth(context).uid, data));
 
 export const electionCloseRound = functions.https.onCall((data, context) =>
-  closeRound(admin.firestore(), needAdminAuth(context).uid, data));
+  closeRound(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionApplyBoard = functions.https.onCall((data, context) =>
-  applyBoard(admin.firestore(), needAdminAuth(context).uid, data));
+  applyBoard(admin.firestore(), needDirectorAuth(context).uid, data));
 
 // Contador ao vivo "X de Y votaram": roda fora da transação do voto.
 export const electionVoteRecorded = functions.firestore

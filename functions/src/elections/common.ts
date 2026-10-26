@@ -15,6 +15,8 @@ export const fail = (code: ErrorCode, message: string) =>
 export interface ElectionDoc {
   status: ElectionStatus;
   societyId: string;
+  directorIds?: string[];
+  positions?: string[];
   [key: string]: unknown;
 }
 

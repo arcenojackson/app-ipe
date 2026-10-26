@@ -1,6 +1,6 @@
 import {FieldValue, type Firestore} from "firebase-admin/firestore";
+import {assertElectionDirector} from "./directors";
 import {
-  assertAdmin,
   assertNotAnonymous,
   fail,
   getElection,
@@ -95,14 +95,13 @@ export const reviewVoter = async (
   uid: string,
   data: unknown
 ): Promise<void> => {
-  await assertAdmin(db, uid);
   const electionId = requireString(data, "electionId");
   const voterId = requireString(data, "voterId");
   const decision = requireString(data, "decision");
+  await assertElectionDirector(db, uid, electionId);
   if (decision !== "approved" && decision !== "rejected") {
     throw fail("invalid-argument", "Decisão inválida.");
   }
-  await getElection(db, electionId);
   const voterRef = db.doc(`elections/${electionId}/voters/${voterId}`);
   if (!(await voterRef.get()).exists) {
     throw fail("not-found", "Eleitor não encontrado.");
