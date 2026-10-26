@@ -49,6 +49,17 @@ describe("NotificationsPage", () => {
     expect(nav.push).toHaveBeenCalledWith("/ensino?item=i1");
   });
 
+  it("resposta do Fórum abre o tópico", async () => {
+    notifications.subscribeNotifications.mockImplementation((_uid, onData) => {
+      onData([{id: "f1", toUid: "t1", type: "forum_reply", itemId: "", topicId: "top1", title: "Nova resposta no Fórum", body: "Ana: oi", createdAt: 9, readAt: null}]);
+      return vi.fn();
+    });
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", {name: /Nova resposta no Fórum/}));
+    await waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith("f1"));
+    expect(nav.push).toHaveBeenCalledWith("/ensino/forum/top1");
+  });
+
   it("não remarca uma notificação já lida", async () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", {name: /Material devolvido/}));

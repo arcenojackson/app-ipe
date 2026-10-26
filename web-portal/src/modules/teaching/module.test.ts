@@ -13,6 +13,11 @@ describe("teachingModule", () => {
     expect(item?.access).toBe("teacher");
   });
 
+  it("o Fórum é aberto a professores, com ícone", () => {
+    const item = teachingModule.navItems.find((i) => i.href === "/ensino/forum");
+    expect(item).toMatchObject({label: "Fórum", access: "teacher", icon: "forum"});
+  });
+
   it("Biblioteca (a Início) e Notificações são de professores; o grupo é do admin", () => {
     const access = (href: string) => teachingModule.navItems.find((i) => i.href === href)?.access;
     expect(access("/ensino")).toBe("teacher");

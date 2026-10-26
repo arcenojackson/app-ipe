@@ -63,6 +63,7 @@ export interface LibraryNotification {
   toUid: string;
   type: string;
   itemId: string;
+  topicId?: string;
   title: string;
   body: string;
   createdAt: number;
