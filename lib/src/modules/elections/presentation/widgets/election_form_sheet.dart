@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../shared/state/app_state.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../societies/data/societies_repository.dart';
 import '../../../societies/models/society.dart';
 import '../../data/elections_repository.dart';
 import '../../models/election_logic.dart';
+
+/// Cargos que toda eleição precisa ter.
+const _requiredPositions = {BoardPosition.presidente, BoardPosition.vice};
 
 class ElectionFormSheet extends StatefulWidget {
   const ElectionFormSheet({super.key});
@@ -37,10 +41,11 @@ class _ElectionFormSheetState extends State<ElectionFormSheet> {
 
   Future<void> _load() async {
     try {
-      final list = await context.read<SocietiesRepository>().fetchAll();
+      final userId = context.read<AppState>().currentUser?.id ?? '';
+      final all = await context.read<SocietiesRepository>().fetchAll();
       if (!mounted) return;
       setState(() {
-        _societies = list;
+        _societies = directorSocieties(all, userId);
         _loading = false;
       });
     } catch (e) {
@@ -85,18 +90,14 @@ class _ElectionFormSheetState extends State<ElectionFormSheet> {
   Future<void> _save() async {
     final society = _society;
     final title = _titleController.text.trim();
-    if (society == null || title.isEmpty || _positions.isEmpty) {
-      showErrorToast(
-        context,
-        'Escolha a sociedade, o título e ao menos um cargo.',
-      );
+    if (society == null || title.isEmpty) {
+      showErrorToast(context, 'Escolha a sociedade e o título.');
       return;
     }
     setState(() => _saving = true);
     try {
       await context.read<ElectionsRepository>().createElection(
             societyId: society.id,
-            societyName: society.name,
             title: title,
             scheduledAt: _scheduledAt,
             positions: [
@@ -132,60 +133,79 @@ class _ElectionFormSheetState extends State<ElectionFormSheet> {
               height: 160,
               child: Center(child: CircularProgressIndicator()),
             )
-          : SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Nova eleição',
-                    style: Theme.of(context).textTheme.titleLarge,
+          : _societies.isEmpty
+              ? const SizedBox(
+                  height: 160,
+                  child: Center(
+                    child: Text(
+                      'Você não está na diretoria de nenhuma sociedade.',
+                      textAlign: TextAlign.center,
+                    ),
                   ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<SocietyModel>(
-                    initialValue: _society,
-                    decoration: const InputDecoration(labelText: 'Sociedade'),
-                    items: [
-                      for (final s in _societies)
-                        DropdownMenuItem(value: s, child: Text(s.name)),
-                    ],
-                    onChanged: _selectSociety,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _titleController,
-                    decoration: const InputDecoration(labelText: 'Título'),
-                  ),
-                  const SizedBox(height: 12),
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.event),
-                    title: Text(_formatted(_scheduledAt)),
-                    subtitle: const Text('Data e hora da eleição'),
-                    onTap: _pickDateTime,
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
+                )
+              : SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      for (final p in BoardPosition.values)
-                        FilterChip(
-                          label: Text(p.label),
-                          selected: _positions.contains(p),
-                          onSelected: (on) => setState(() {
-                            on ? _positions.add(p) : _positions.remove(p);
-                          }),
-                        ),
+                      Text(
+                        'Nova eleição',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<SocietyModel>(
+                        initialValue: _society,
+                        decoration: const InputDecoration(labelText: 'Sociedade'),
+                        items: [
+                          for (final s in _societies)
+                            DropdownMenuItem(value: s, child: Text(s.name)),
+                        ],
+                        onChanged: _selectSociety,
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _titleController,
+                        decoration: const InputDecoration(labelText: 'Título'),
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.event),
+                        title: Text(_formatted(_scheduledAt)),
+                        subtitle: const Text('Data e hora da eleição'),
+                        onTap: _pickDateTime,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Cargos (Presidente e Vice são obrigatórios)',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          for (final p in BoardPosition.values)
+                            FilterChip(
+                              label: Text(p.label),
+                              selected: _positions.contains(p),
+                              onSelected: _requiredPositions.contains(p)
+                                  ? null
+                                  : (on) => setState(() {
+                                        on
+                                            ? _positions.add(p)
+                                            : _positions.remove(p);
+                                      }),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        onPressed: _saving ? null : _save,
+                        child: Text(_saving ? 'Criando...' : 'Criar eleição'),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  FilledButton(
-                    onPressed: _saving ? null : _save,
-                    child: Text(_saving ? 'Criando...' : 'Criar eleição'),
-                  ),
-                ],
-              ),
-            ),
+                ),
     );
   }
 }

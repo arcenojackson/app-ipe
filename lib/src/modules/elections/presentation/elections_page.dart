@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../shared/state/app_state.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../data/elections_repository.dart';
 import '../models/election.dart';
@@ -20,7 +21,8 @@ class _ElectionsPageState extends State<ElectionsPage> {
   @override
   void initState() {
     super.initState();
-    _stream = context.read<ElectionsRepository>().watchElections();
+    final userId = context.read<AppState>().currentUser?.id ?? '';
+    _stream = context.read<ElectionsRepository>().watchElections(userId);
   }
 
   String _statusLabel(ElectionStatus s) => switch (s) {

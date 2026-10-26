@@ -28,20 +28,10 @@ enum ElectionStatus {
 }
 
 enum RoundStatus {
-  pending,
   open,
   closed;
 
-  static RoundStatus parse(Object? raw) =>
-      _parse(values, raw, RoundStatus.pending);
-}
-
-enum RoundType {
-  normal,
-  single,
-  runoff;
-
-  static RoundType parse(Object? raw) => _parse(values, raw, RoundType.normal);
+  static RoundStatus parse(Object? raw) => _parse(values, raw, RoundStatus.open);
 }
 
 enum VoterStatus {
@@ -60,6 +50,20 @@ enum VoterKind {
   static VoterKind parse(Object? raw) => _parse(values, raw, VoterKind.guest);
 }
 
+/// Fase de um cargo no rito dos escrutínios.
+enum CargoStage {
+  idle,
+  scrutiny1,
+  confirming,
+  scrutiny2,
+  awaiting3,
+  scrutiny3,
+  tiebreak,
+  decided;
+
+  static CargoStage parse(Object? raw) => _parse(values, raw, CargoStage.idle);
+}
+
 class Candidate {
   const Candidate({required this.id, required this.name});
 
@@ -74,19 +78,42 @@ class Candidate {
   Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
 
+/// Candidato que sobrou do 1º escrutínio, com os votos que recebeu nele.
+class CandidateVotes {
+  const CandidateVotes({
+    required this.id,
+    required this.name,
+    required this.votes,
+  });
+
+  final String id;
+  final String name;
+  final int votes;
+
+  factory CandidateVotes.fromJson(Map<String, dynamic> json) => CandidateVotes(
+        id: json['id']?.toString() ?? '',
+        name: json['name']?.toString() ?? '',
+        votes: (json['votes'] as num?)?.toInt() ?? 0,
+      );
+}
+
 class RoundResult {
   const RoundResult({
     required this.counts,
+    required this.blank,
     required this.total,
-    required this.votedCount,
+    required this.presentCount,
+    required this.threshold,
     required this.winnerId,
     required this.tie,
     required this.divergence,
   });
 
   final Map<String, int> counts;
+  final int blank;
   final int total;
-  final int votedCount;
+  final int presentCount;
+  final int threshold;
   final String? winnerId;
   final List<String> tie;
   final bool divergence;
@@ -97,8 +124,10 @@ class RoundResult {
       counts: rawCounts is Map
           ? rawCounts.map((k, v) => MapEntry(k.toString(), (v as num).toInt()))
           : const {},
+      blank: (json['blank'] as num?)?.toInt() ?? 0,
       total: (json['total'] as num?)?.toInt() ?? 0,
-      votedCount: (json['votedCount'] as num?)?.toInt() ?? 0,
+      presentCount: (json['presentCount'] as num?)?.toInt() ?? 0,
+      threshold: (json['threshold'] as num?)?.toInt() ?? 0,
       winnerId: json['winnerId']?.toString(),
       tie: _strings(json['tie']),
       divergence: json['divergence'] == true,
@@ -115,6 +144,7 @@ class Election {
     required this.scheduledAt,
     required this.status,
     required this.positions,
+    required this.directorIds,
     this.boardAppliedAt,
   });
 
@@ -125,6 +155,7 @@ class Election {
   final DateTime scheduledAt;
   final ElectionStatus status;
   final List<String> positions;
+  final List<String> directorIds;
   final DateTime? boardAppliedAt;
 
   factory Election.fromJson(String id, Map<String, dynamic> json) => Election(
@@ -136,17 +167,56 @@ class Election {
             _date(json['scheduledAt']) ?? DateTime.fromMillisecondsSinceEpoch(0),
         status: ElectionStatus.parse(json['status']),
         positions: _strings(json['positions']),
+        directorIds: _strings(json['directorIds']),
         boardAppliedAt: _date(json['boardAppliedAt']),
       );
 }
 
+/// Estado de um cargo (documento `cargos/{position}`).
+class ElectionCargo {
+  const ElectionCargo({
+    required this.position,
+    required this.stage,
+    required this.cycle,
+    required this.candidates,
+    required this.tiedIds,
+    required this.winnerId,
+  });
+
+  final String position;
+  final CargoStage stage;
+  final int cycle;
+  final List<CandidateVotes> candidates;
+  final List<String> tiedIds;
+  final String? winnerId;
+
+  factory ElectionCargo.fromJson(String position, Map<String, dynamic> json) {
+    final raw = json['candidates'];
+    return ElectionCargo(
+      position: position,
+      stage: CargoStage.parse(json['stage']),
+      cycle: (json['cycle'] as num?)?.toInt() ?? 1,
+      candidates: raw is List
+          ? raw
+              .map((c) =>
+                  CandidateVotes.fromJson(Map<String, dynamic>.from(c as Map)))
+              .toList()
+          : const [],
+      tiedIds: _strings(json['tiedIds']),
+      winnerId: json['winnerId']?.toString(),
+    );
+  }
+}
+
+/// Um escrutínio (documento `rounds/{id}`).
 class ElectionRound {
   const ElectionRound({
     required this.id,
     required this.position,
-    required this.candidates,
-    required this.type,
+    required this.cycle,
+    required this.number,
     required this.status,
+    required this.options,
     required this.votedCount,
     this.result,
     this.closedAt,
@@ -154,27 +224,28 @@ class ElectionRound {
 
   final String id;
   final String position;
-  final List<Candidate> candidates;
-  final RoundType type;
+  final int cycle;
+  final int number;
   final RoundStatus status;
+  final List<Candidate> options;
   final int votedCount;
   final RoundResult? result;
   final DateTime? closedAt;
 
   factory ElectionRound.fromJson(String id, Map<String, dynamic> json) {
-    final rawCandidates = json['candidates'];
+    final rawOptions = json['options'];
     final rawResult = json['result'];
     return ElectionRound(
       id: id,
       position: json['position']?.toString() ?? '',
-      candidates: rawCandidates is List
-          ? rawCandidates
-              .map((c) =>
-                  Candidate.fromJson(Map<String, dynamic>.from(c as Map)))
+      cycle: (json['cycle'] as num?)?.toInt() ?? 1,
+      number: (json['number'] as num?)?.toInt() ?? 1,
+      status: RoundStatus.parse(json['status']),
+      options: rawOptions is List
+          ? rawOptions
+              .map((c) => Candidate.fromJson(Map<String, dynamic>.from(c as Map)))
               .toList()
           : const [],
-      type: RoundType.parse(json['type']),
-      status: RoundStatus.parse(json['status']),
       votedCount: (json['votedCount'] as num?)?.toInt() ?? 0,
       result: rawResult is Map
           ? RoundResult.fromJson(Map<String, dynamic>.from(rawResult))
