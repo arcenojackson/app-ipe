@@ -1,6 +1,6 @@
 "use client";
 
-import {useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {Icon} from "@/core/ui/icons";
 import {TAG_KIND_STYLE} from "../tagKindStyle";
 import {TAGS_LOAD_HINT, TAG_FIELD, TAG_KINDS, TAG_KIND_LABEL, tagName, type ItemTags, type Tag, type TagKind} from "../tags";
@@ -27,6 +27,24 @@ export function TagFilterBar({
   const [open, setOpen] = useState<TagKind | null>(null);
   const [query, setQuery] = useState("");
   const byId = new Map(tags.map((t) => [t.id, t]));
+  const menus = useRef<HTMLDivElement>(null);
+
+  // Fecha o menu aberto ao clicar fora dele ou ao apertar Esc.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!menus.current?.contains(event.target as Node)) setOpen(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(null);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
 
   const toggle = (field: keyof ItemTags, id: string) => {
     const current = value[field];
@@ -56,7 +74,7 @@ export function TagFilterBar({
           className="w-full bg-transparent outline-none placeholder:text-white/50"
         />
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div ref={menus} className="flex flex-wrap items-center gap-2">
         {TAG_KINDS.map((kind) => {
           const count = value[TAG_FIELD[kind]].length;
           const options = tags.filter((t) => t.kind === kind && t.active);

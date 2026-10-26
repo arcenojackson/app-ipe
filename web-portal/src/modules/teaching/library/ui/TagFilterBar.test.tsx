@@ -40,4 +40,18 @@ describe("TagFilterBar", () => {
     fireEvent.change(screen.getByLabelText("Buscar na biblioteca"), {target: {value: "fé"}});
     expect(onTextChange).toHaveBeenCalledWith("fé");
   });
+
+  it("o menu fecha ao clicar fora e com Esc; abrir outro tipo fecha o anterior", () => {
+    render(<TagFilterBar {...base} />);
+    fireEvent.click(screen.getByRole("button", {name: /Assunto/}));
+    expect(screen.getByRole("checkbox", {name: "Trindade"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: /Faixa/}));
+    expect(screen.queryByRole("checkbox", {name: "Trindade"})).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", {name: "UMP"})).toBeInTheDocument();
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole("checkbox", {name: "UMP"})).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: /Tipo/}));
+    fireEvent.keyDown(document, {key: "Escape"});
+    expect(screen.queryByRole("checkbox", {name: "Artigos"})).not.toBeInTheDocument();
+  });
 });
