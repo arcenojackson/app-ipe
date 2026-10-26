@@ -11,6 +11,7 @@ import 'src/modules/auth/data/auth_repository.dart';
 import 'src/modules/events/data/events_repository.dart';
 import 'src/modules/musics/data/musics_repository.dart';
 import 'src/modules/people/data/people_repository.dart';
+import 'src/modules/elections/data/elections_repository.dart';
 import 'src/modules/societies/data/societies_repository.dart';
 import 'src/modules/events/data/weekly_team_assignments_repository.dart';
 import 'src/modules/music_evaluations/data/music_evaluations_repository.dart';
@@ -63,6 +64,7 @@ void main() async {
         Provider<SocietiesRepository>.value(
           value: societiesRepository,
         ),
+        Provider<ElectionsRepository>.value(value: ElectionsRepository()),
         Provider<WeeklyTeamAssignmentsRepository>.value(
           value: WeeklyTeamAssignmentsRepository(),
         ),
