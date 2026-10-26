@@ -21,12 +21,14 @@ interface Data {
 // Biblioteca paginada: recarrega do zero quando os filtros mudam (comparados
 // por valor) e ignora respostas de consultas antigas.
 export function useLibraryPage(filters: LibraryFilters) {
-  const key = JSON.stringify(filters);
+  const [reloads, setReloads] = useState(0);
+  // O contador entra na chave: recarregar zera a lista como se os filtros mudassem.
+  const key = JSON.stringify({filters, reloads});
   const [data, setData] = useState<Data | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    loadLibraryPage(JSON.parse(key) as LibraryFilters, null, PAGE_SIZE)
+    loadLibraryPage((JSON.parse(key) as {filters: LibraryFilters}).filters, null, PAGE_SIZE)
       .then((page) => {
         if (cancelled) return;
         setData({key, items: page.items, cursor: page.cursor, done: page.done, loadingMore: false, error: null});
@@ -45,7 +47,7 @@ export function useLibraryPage(filters: LibraryFilters) {
   const loadMore = useCallback(() => {
     if (!current || current.done || current.loadingMore) return;
     setData({...current, loadingMore: true, error: null});
-    loadLibraryPage(JSON.parse(key) as LibraryFilters, current.cursor, PAGE_SIZE)
+    loadLibraryPage((JSON.parse(key) as {filters: LibraryFilters}).filters, current.cursor, PAGE_SIZE)
       .then((page) =>
         setData((d) =>
           d && d.key === key ?
@@ -56,11 +58,14 @@ export function useLibraryPage(filters: LibraryFilters) {
       .catch(() => setData((d) => (d && d.key === key ? {...d, loadingMore: false, error: LOAD_ERROR} : d)));
   }, [current, key]);
 
+  const reload = useCallback(() => setReloads((n) => n + 1), []);
+
   return {
     items: current?.items ?? [],
     loading: !current || current.loadingMore,
     error: current?.error ?? null,
     done: current?.done ?? false,
     loadMore,
+    reload,
   };
 }

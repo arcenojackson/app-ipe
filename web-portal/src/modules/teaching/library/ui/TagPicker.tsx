@@ -1,6 +1,6 @@
 "use client";
 
-import {TAG_FIELD, TAG_KINDS, TAG_KIND_LABEL, type ItemTags, type Tag} from "../tags";
+import {TAGS_LOAD_HINT, TAG_FIELD, TAG_KINDS, TAG_KIND_LABEL, type ItemTags, type Tag} from "../tags";
 
 // Escolha de tags (três grupos); só oferece as tags ativas.
 export function TagPicker({
@@ -8,11 +8,14 @@ export function TagPicker({
   value,
   onChange,
   error,
+  loadError,
 }: {
   tags: Tag[];
   value: ItemTags;
   onChange: (next: ItemTags) => void;
   error?: string | null;
+  // Falha ao carregar as tags (de useTags).
+  loadError?: string | null;
 }) {
   const toggle = (field: keyof ItemTags, id: string) => {
     const current = value[field];
@@ -22,6 +25,7 @@ export function TagPicker({
 
   return (
     <div className="flex flex-col gap-3">
+      {loadError && <p role="alert" className="text-sm text-error">{`${loadError} ${TAGS_LOAD_HINT}`}</p>}
       {TAG_KINDS.map((kind) => {
         const field = TAG_FIELD[kind];
         return (

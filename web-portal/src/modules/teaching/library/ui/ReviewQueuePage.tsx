@@ -36,13 +36,13 @@ export default function ReviewQueuePage() {
   const votesOf = (item: LibraryItem): LibraryVote[] => votes[item.id] ?? [];
   const pending = (item: LibraryItem) => showVoted || !iVoted(item, votesOf(item), viewer.uid);
 
-  const row = (item: LibraryItem, kind: "mine" | "review" | "delete") => {
+  const row = (item: LibraryItem, kind: "mine" | "review" | "returned" | "delete") => {
     const itemVotes = votesOf(item);
     const deletion = kind === "delete";
     const approvals = deletion ? countDeleteApprovals(item, itemVotes) : countApprovals(item, itemVotes);
     const reason = item.deleteRequest?.reason;
     const note =
-      kind === "mine" && item.status === "returned" && item.returnComment ?
+      (kind === "mine" || kind === "returned") && item.status === "returned" && item.returnComment ?
         `Devolvido: ${item.returnComment}` :
         deletion ? `Pedido de exclusão${reason ? `: ${reason}` : ""}` : undefined;
     const showProgress = deletion || item.status === "in_review";
@@ -61,6 +61,7 @@ export default function ReviewQueuePage() {
 
   const toReview = (queue?.toReview ?? []).filter(pending);
   const deleteRequests = (queue?.deleteRequests ?? []).filter(pending);
+  const returned = queue?.returned ?? [];
 
   return (
     <div className="space-y-6">
@@ -109,6 +110,15 @@ export default function ReviewQueuePage() {
                   <p className="text-sm text-white/70">Nada aguardando a sua revisão.</p> :
                   toReview.map((item) => row(item, "review"))}
               </section>
+              {returned.length > 0 && (
+                <section aria-label="Devolvidos aguardando o autor" className="space-y-2">
+                  <h2 className="font-semibold">Devolvidos aguardando o autor</h2>
+                  <p className="text-sm text-white/70">
+                    Se o autor não for reenviar, abra o item e peça a exclusão.
+                  </p>
+                  {returned.map((item) => row(item, "returned"))}
+                </section>
+              )}
               <section aria-label="Pedidos de exclusão" className="space-y-2">
                 <h2 className="font-semibold">Pedidos de exclusão</h2>
                 {deleteRequests.length === 0 ?

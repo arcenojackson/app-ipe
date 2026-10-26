@@ -5,6 +5,9 @@ export interface ReviewQueue {
   mine: LibraryItem[];
   // Envios de outros aguardando revisão (só curador/admin).
   toReview: LibraryItem[];
+  // Devolvidos de outros autores, parados à espera de reenvio (só curador/admin):
+  // o curador pode pedir a exclusão de quem nunca reenvia.
+  returned: LibraryItem[];
   // Pedidos de exclusão em aberto (só curador/admin).
   deleteRequests: LibraryItem[];
 }
@@ -14,13 +17,21 @@ const newestFirst = (a: LibraryItem, b: LibraryItem) =>
 
 export function buildReviewQueue(
   viewer: Viewer,
-  input: {mine: LibraryItem[]; inReview: LibraryItem[]; deleteRequested: LibraryItem[]}
+  input: {
+    mine: LibraryItem[];
+    inReview: LibraryItem[];
+    returned: LibraryItem[];
+    deleteRequested: LibraryItem[];
+  }
 ): ReviewQueue {
   const privileged = viewer.isCurator || viewer.isAdmin;
   return {
     mine: [...input.mine].sort(newestFirst),
     toReview: privileged ?
       input.inReview.filter((i) => i.authorId !== viewer.uid).sort(newestFirst) :
+      [],
+    returned: privileged ?
+      input.returned.filter((i) => i.authorId !== viewer.uid).sort(newestFirst) :
       [],
     deleteRequests: privileged ? [...input.deleteRequested].sort(newestFirst) : [],
   };

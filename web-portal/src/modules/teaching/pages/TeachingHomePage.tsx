@@ -17,7 +17,7 @@ export default function TeachingHomePage() {
       <p className="text-white/70">Seu papel no grupo: {roleLabel}</p>
       <Card>
         <h2 className="font-semibold">Biblioteca de materiais</h2>
-        <p className="mb-2 text-sm text-white/70">Aulas, planos e bibliografia, organizados em pastas.</p>
+        <p className="mb-2 text-sm text-white/70">Aulas, planos e bibliografia, organizados por tags.</p>
         <Link href="/ensino/biblioteca" className="text-secondary underline">
           Abrir a biblioteca
         </Link>

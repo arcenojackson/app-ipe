@@ -263,6 +263,17 @@ describe("atualização de itens", () => {
     await assertFails(updateDoc(doc(teacher(), "teaching_items/pub"), request("t1", "t1")));
   });
 
+  it("curador pede exclusão de item devolvido (autor que nunca reenvia); professor não", async () => {
+    const request = (uid: string) => ({
+      deleteRequested: true,
+      deleteRequest: {id: "r8", requestedBy: uid, requestedAt: serverTimestamp(), reason: "Autor não reenviou"},
+      updatedBy: uid, updatedAt: serverTimestamp(),
+    });
+    await assertSucceeds(updateDoc(doc(curator1(), "teaching_items/ret"), request("c1")));
+    await assertFails(updateDoc(doc(teacher(), "teaching_items/ret"), request("t1")));
+    await assertFails(updateDoc(doc(curator1(), "teaching_items/rev"), request("c1")));
+  });
+
   it("quem pediu cancela o pedido; outro curador não cancela", async () => {
     const cancel = (uid: string) => ({deleteRequested: false, deleteRequest: null, updatedBy: uid, updatedAt: serverTimestamp()});
     await assertFails(updateDoc(doc(curator2(), "teaching_items/del"), cancel("c2")));

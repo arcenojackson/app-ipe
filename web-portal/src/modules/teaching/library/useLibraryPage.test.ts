@@ -49,6 +49,17 @@ describe("useLibraryPage", () => {
     expect(repo.loadLibraryPage).toHaveBeenCalledTimes(1);
   });
 
+  it("reload recarrega do começo com os mesmos filtros", async () => {
+    repo.loadLibraryPage
+      .mockResolvedValueOnce({items: [item("a")], cursor: "c1", done: false})
+      .mockResolvedValueOnce({items: [item("a2")], cursor: null, done: true});
+    const {result} = renderHook(() => useLibraryPage(EMPTY_FILTERS));
+    await waitFor(() => expect(result.current.items.map((i) => i.id)).toEqual(["a"]));
+    act(() => result.current.reload());
+    await waitFor(() => expect(result.current.items.map((i) => i.id)).toEqual(["a2"]));
+    expect(repo.loadLibraryPage).toHaveBeenLastCalledWith(EMPTY_FILTERS, null, expect.any(Number));
+  });
+
   it("erro vira mensagem em pt-BR", async () => {
     repo.loadLibraryPage.mockRejectedValue(new Error("boom"));
     const {result} = renderHook(() => useLibraryPage(EMPTY_FILTERS));

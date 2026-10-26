@@ -12,10 +12,11 @@ const tagList: Tag[] = [
   {id: "assunto-trindade", kind: "subject", name: "Trindade", order: 1, active: true},
   {id: "faixa-ump", kind: "age", name: "UMP", order: 1, active: true},
 ];
+const tagsState = vi.hoisted(() => ({error: null as string | null}));
 vi.mock("../useTags", () => ({
   useTags: () => ({
     tags: tagList,
-    error: null,
+    error: tagsState.error,
     byId: new Map(tagList.map((t) => [t.id, t])),
     active: (kind: string) => tagList.filter((t) => t.kind === kind && t.active),
   }),
@@ -28,10 +29,11 @@ const notifications = vi.hoisted(() => ({subscribeNotifications: vi.fn()}));
 vi.mock("../notifications", () => notifications);
 
 vi.mock("./ItemModal", () => ({
-  ItemModal: ({itemId, onClose}: {itemId: string; onClose: () => void}) => (
+  ItemModal: ({itemId, onClose, onChanged}: {itemId: string; onClose: () => void; onChanged?: () => void}) => (
     <div data-testid="item-modal">
       {itemId}
       <button type="button" onClick={onClose}>Fechar janela</button>
+      <button type="button" onClick={onChanged}>Alterar item</button>
     </div>
   ),
 }));
@@ -44,7 +46,7 @@ const item = (id: string, name: string, extra: Partial<LibraryItem> = {}): Libra
 const teacher: Viewer = {uid: "t1", isCurator: false, isAdmin: false};
 const curator: Viewer = {uid: "c1", isCurator: true, isAdmin: false};
 
-let state: {items: LibraryItem[]; loading: boolean; error: string | null; done: boolean; loadMore: ReturnType<typeof vi.fn>};
+let state: {items: LibraryItem[]; loading: boolean; error: string | null; done: boolean; loadMore: ReturnType<typeof vi.fn>; reload: ReturnType<typeof vi.fn>};
 const lastFilters = () => page.useLibraryPage.mock.calls.at(-1)?.[0];
 
 function renderPage(viewer: Viewer = teacher, itemId: string | null = null, navigate = vi.fn()) {
@@ -53,7 +55,8 @@ function renderPage(viewer: Viewer = teacher, itemId: string | null = null, navi
 }
 
 beforeEach(() => {
-  state = {items: [item("a", "Santidade"), item("b", "Aula 2")], loading: false, error: null, done: true, loadMore: vi.fn()};
+  state = {items: [item("a", "Santidade"), item("b", "Aula 2")], loading: false, error: null, done: true, loadMore: vi.fn(), reload: vi.fn()};
+  tagsState.error = null;
   page.useLibraryPage.mockReset().mockImplementation(() => state);
   repo.loadUserNames.mockReset().mockResolvedValue({u1: "Felipe"});
   notifications.subscribeNotifications.mockReset().mockReturnValue(() => undefined);
@@ -143,6 +146,18 @@ describe("LibraryContent", () => {
     const navigate = renderPage();
     fireEvent.click(screen.getByRole("button", {name: /Santidade/}));
     expect(navigate).toHaveBeenCalledWith("/ensino/biblioteca?item=a");
+  });
+
+  it("falha ao carregar as tags mostra aviso nos filtros", () => {
+    tagsState.error = "Não foi possível carregar as tags.";
+    renderPage();
+    expect(screen.getByText("Não foi possível carregar as tags. Recarregue a página.")).toBeInTheDocument();
+  });
+
+  it("uma ação feita na janela recarrega a lista", () => {
+    renderPage(curator, "a");
+    fireEvent.click(screen.getByRole("button", {name: "Alterar item"}));
+    expect(state.reload).toHaveBeenCalled();
   });
 
   it("?item=ID renderiza a janela do item e fechar volta à biblioteca", () => {

@@ -48,6 +48,9 @@ export function validateTags(tags: ItemTags): string | null {
 
 export const REMOVED_TAG_NAME = "Tag removida";
 
+// Mostrado quando a leitura de teaching_tags falha (menus ficariam vazios sem explicação).
+export const TAGS_LOAD_HINT = "Recarregue a página.";
+
 export function tagName(byId: Map<string, Tag>, id: string): string {
   return byId.get(id)?.name ?? REMOVED_TAG_NAME;
 }

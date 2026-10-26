@@ -86,7 +86,7 @@ export function LinkDialog({
   onClose: () => void;
 }) {
   const [tags, setTags] = useState<ItemTags>(EMPTY_TAGS);
-  const {tags: tagList} = useTags();
+  const {tags: tagList, error: tagsError} = useTags();
   const [name, setName] = useState(initial?.name ?? "");
   const [url, setUrl] = useState(initial?.url ?? "");
   const [description, setDescription] = useState(initial?.description ?? "");
@@ -104,7 +104,7 @@ export function LinkDialog({
         <TextField id="link-name" label="Nome" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         <TextField id="link-url" label="Endereço (URL)" value={url} onChange={(e) => setUrl(e.target.value)} />
         <TextField id="link-description" label="Descrição (opcional)" value={description} onChange={(e) => setDescription(e.target.value)} />
-        {withTags && <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} />}
+        {withTags && <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} loadError={tagsError} />}
         <ErrorLine error={error} />
         <Actions busy={busy} submitLabel={submitLabel} onClose={onClose} />
       </form>
@@ -121,7 +121,7 @@ export function TagEditDialog({
   onClose: () => void;
 }) {
   const [tags, setTags] = useState<ItemTags>(initial);
-  const {tags: tagList} = useTags();
+  const {tags: tagList, error: tagsError} = useTags();
   const {error, busy, run} = useSubmit(onClose);
   return (
     <Dialog title="Editar tags" onClose={onClose} wide>
@@ -129,7 +129,7 @@ export function TagEditDialog({
         e.preventDefault();
         void run(validateTags(tags), () => onSubmit(tags));
       }}>
-        <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} />
+        <TagPicker tags={tagList ?? []} value={tags} onChange={setTags} loadError={tagsError} />
         <ErrorLine error={error} />
         <Actions busy={busy} submitLabel="Salvar tags" onClose={onClose} />
       </form>

@@ -109,16 +109,18 @@ export function subscribeReviewQueue(
   onError: (error: Error) => void
 ): () => void {
   const privileged = viewer.isCurator || viewer.isAdmin;
-  const sources: Array<{key: "mine" | "inReview" | "deleteRequested"; q: Query<DocumentData>}> = [
+  type QueueKey = "mine" | "inReview" | "returned" | "deleteRequested";
+  const sources: Array<{key: QueueKey; q: Query<DocumentData>}> = [
     {key: "mine", q: query(items(), where("authorId", "==", viewer.uid), where("status", "in", ["in_review", "returned"]))},
   ];
   if (privileged) {
     sources.push(
       {key: "inReview", q: query(items(), where("status", "==", "in_review"))},
+      {key: "returned", q: query(items(), where("status", "==", "returned"))},
       {key: "deleteRequested", q: query(items(), where("deleteRequested", "==", true))}
     );
   }
-  const latest: Partial<Record<"mine" | "inReview" | "deleteRequested", LibraryItem[]>> = {};
+  const latest: Partial<Record<QueueKey, LibraryItem[]>> = {};
   let active = true;
   const stops = sources.map(({key, q}) =>
     onSnapshot(
@@ -131,6 +133,7 @@ export function subscribeReviewQueue(
             buildReviewQueue(viewer, {
               mine: latest.mine ?? [],
               inReview: latest.inReview ?? [],
+              returned: latest.returned ?? [],
               deleteRequested: latest.deleteRequested ?? [],
             })
           );

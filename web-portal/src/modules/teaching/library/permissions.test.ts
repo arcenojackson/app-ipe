@@ -11,6 +11,14 @@ const adminOnly: Viewer = {uid: "a1", isCurator: false, isAdmin: true};
 const base: LibraryItem = {id: "i1", type: "file", name: "Aula", parentId: null, authorId: "t1", status: "in_review", version: 1};
 const make = (extra: Partial<LibraryItem>): LibraryItem => ({...base, ...extra});
 
+describe("itemPermissions — pedir exclusão de item devolvido", () => {
+  it("curador pode pedir; professor autor não; item em revisão continua sem pedido", () => {
+    expect(itemPermissions(make({status: "returned"}), curator).canRequestDelete).toBe(true);
+    expect(itemPermissions(make({status: "returned"}), teacher).canRequestDelete).toBe(false);
+    expect(itemPermissions(make({status: "in_review"}), curator).canRequestDelete).toBe(false);
+  });
+});
+
 describe("itemPermissions — editar tags", () => {
   it("curador edita tags de item publicado e em revisão; professor, admin sem papel e item em exclusão não", () => {
     expect(itemPermissions(make({status: "published"}), curator).canEditTags).toBe(true);
@@ -48,11 +56,11 @@ describe("itemPermissions — organizar e excluir", () => {
     expect(itemPermissions(make({status: "published"}), adminOnly)).toMatchObject({canRename: false});
   });
 
-  it("curador pede exclusão de item publicado ou pasta ativa, uma vez só", () => {
+  it("curador pede exclusão de item publicado, devolvido ou pasta ativa, uma vez só", () => {
     expect(itemPermissions(make({status: "published"}), curator).canRequestDelete).toBe(true);
     expect(itemPermissions(make({type: "folder", status: "active"}), curator).canRequestDelete).toBe(true);
     expect(itemPermissions(make({status: "in_review"}), curator).canRequestDelete).toBe(false);
-    expect(itemPermissions(make({status: "returned"}), curator).canRequestDelete).toBe(false);
+    expect(itemPermissions(make({status: "returned"}), curator).canRequestDelete).toBe(true);
     expect(itemPermissions(make({status: "published", deleteRequest: {id: "r", requestedBy: "c1", requestedAt: 1}}), curator).canRequestDelete).toBe(false);
     expect(itemPermissions(make({status: "published"}), teacher).canRequestDelete).toBe(false);
   });

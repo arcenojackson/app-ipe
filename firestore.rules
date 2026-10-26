@@ -291,7 +291,7 @@ service cloud.firestore {
         changedKeys().hasOnly(['deleteRequest', 'deleteRequested',
           'updatedBy', 'updatedAt']) &&
         resource.data.get('deleteRequest', null) == null &&
-        resource.data.status in ['active', 'published'] &&
+        resource.data.status in ['active', 'published', 'returned'] &&
         request.resource.data.deleteRequested == true &&
         request.resource.data.deleteRequest.keys().hasOnly(
           ['id', 'requestedBy', 'requestedAt', 'reason']) &&
