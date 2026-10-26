@@ -10,6 +10,7 @@ import {
   validateTopicInput,
 } from "./payloads";
 import {commentPermissions, topicPermissions} from "./permissions";
+import {topicQuery} from "./queries";
 import {buildTree} from "./tree";
 import type {Comment, Topic} from "./types";
 
@@ -154,5 +155,18 @@ describe("linkify", () => {
     ]);
     expect(linkify("javascript:alert(1)")).toEqual([{type: "text", value: "javascript:alert(1)"}]);
     expect(linkify("")).toEqual([]);
+  });
+});
+
+describe("topicQuery", () => {
+  it("assunto e busca são exclusivos", () => {
+    expect(() => topicQuery({tagId: "assunto-fe", search: "graça"})).toThrow();
+    expect(topicQuery({tagId: "assunto-fe", search: "  "})).toEqual({tagId: "assunto-fe", token: null, words: []});
+  });
+
+  it("busca usa a palavra mais longa, sem acento, limitada a 20 letras", () => {
+    expect(topicQuery({search: "A Graça de Deus"})).toEqual({tagId: null, token: "graca", words: ["graca", "de", "deus"]});
+    expect(topicQuery({search: "x".repeat(30)}).token).toBe("x".repeat(20));
+    expect(topicQuery({})).toEqual({tagId: null, token: null, words: []});
   });
 });
