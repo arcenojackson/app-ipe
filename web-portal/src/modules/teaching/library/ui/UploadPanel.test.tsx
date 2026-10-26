@@ -1,3 +1,4 @@
+import {chooseTag} from "./chooseTag";
 import {fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import type {Tag} from "../tags";
@@ -19,7 +20,7 @@ vi.mock("../useTags", () => ({
 const TAGS = {typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]};
 const pdf = (name: string) => new File(["x"], name, {type: "application/pdf"});
 const chooseAllTags = () => {
-  for (const name of ["Artigos", "Trindade", "UMP"]) fireEvent.click(screen.getByRole("checkbox", {name}));
+  for (const name of ["Artigos", "Trindade", "UMP"]) chooseTag(name);
 };
 
 beforeEach(() => {
@@ -45,8 +46,8 @@ describe("UploadPanel", () => {
 
   it("sem tag de faixa mostra o erro e não envia nada", async () => {
     render(<UploadPanel uid="t1" onUploaded={vi.fn()} />);
-    fireEvent.click(screen.getByRole("checkbox", {name: "Artigos"}));
-    fireEvent.click(screen.getByRole("checkbox", {name: "Trindade"}));
+    chooseTag("Artigos");
+    chooseTag("Trindade");
     fireEvent.change(screen.getByLabelText("Escolher arquivos"), {target: {files: [pdf("a.pdf")]}});
     expect(await screen.findByRole("alert")).toHaveTextContent("Escolha pelo menos uma tag de faixa.");
     expect(mutations.uploadFile).not.toHaveBeenCalled();

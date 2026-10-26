@@ -102,7 +102,7 @@ export function LibraryContent({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Biblioteca</h1>
         <div className="flex items-center gap-2">
-          <Link href="/ensino/revisao" className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 text-sm font-semibold hover:brightness-110">
+          <Link href="/ensino/revisao?novo=1" className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 text-sm font-semibold hover:brightness-110">
             <Icon name="plus" className="h-4 w-4" />
             Enviar material
           </Link>

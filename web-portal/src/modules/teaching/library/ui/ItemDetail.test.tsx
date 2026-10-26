@@ -1,3 +1,4 @@
+import {chooseTag} from "./chooseTag";
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import type {LibraryItem, LibraryVote, Viewer} from "../types";
@@ -200,8 +201,8 @@ describe("ItemDetail — editar tags", () => {
   it("curador edita as tags e salva", async () => {
     const {onChanged} = setup(curator1, file({status: "in_review", typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"]}));
     fireEvent.click(await screen.findByRole("button", {name: "Editar tags"}));
-    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
-    fireEvent.click(screen.getByRole("checkbox", {name: "UMP"}));
+    chooseTag("UMP");
+    chooseTag("UMP");
     fireEvent.click(screen.getByRole("button", {name: "Salvar tags"}));
     await waitFor(() => expect(mutations.editTags).toHaveBeenCalledWith("c1", "i1", {
       typeTags: ["tipo-artigos"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-ump"],
