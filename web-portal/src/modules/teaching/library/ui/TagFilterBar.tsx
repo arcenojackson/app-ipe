@@ -1,6 +1,8 @@
 "use client";
 
 import {useState} from "react";
+import {Icon} from "@/core/ui/icons";
+import {TAG_KIND_STYLE} from "../tagKindStyle";
 import {TAGS_LOAD_HINT, TAG_FIELD, TAG_KINDS, TAG_KIND_LABEL, tagName, type ItemTags, type Tag, type TagKind} from "../tags";
 
 const SEARCHABLE_FROM = 8;
@@ -44,7 +46,7 @@ export function TagFilterBar({
     <div className="space-y-3">
       {loadError && <p role="alert" className="text-sm text-error">{`${loadError} ${TAGS_LOAD_HINT}`}</p>}
       <div className="flex items-center gap-3 rounded-full bg-surface-elevated px-5 py-3">
-        <span aria-hidden className="text-white/60">🔍</span>
+        <Icon name="search" className="h-5 w-5 text-white/60" />
         <input
           type="search"
           aria-label="Buscar na biblioteca"
@@ -65,8 +67,8 @@ export function TagFilterBar({
                 type="button"
                 aria-expanded={open === kind}
                 onClick={() => toggleMenu(kind)}
-                className={`rounded-full border px-4 py-1.5 text-sm hover:bg-white/10 ${
-                  count > 0 ? "border-secondary bg-secondary/20" : "border-white/20 text-white/80"
+                className={`flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm hover:brightness-125 ${
+                  count > 0 ? TAG_KIND_STYLE[kind].solid : `${TAG_KIND_STYLE[kind].chip} text-white/90`
                 }`}
               >
                 {TAG_KIND_LABEL[kind]}
@@ -103,17 +105,6 @@ export function TagFilterBar({
             </div>
           );
         })}
-        {selected.map(({kind, id}) => (
-          <button
-            key={`${kind}-${id}`}
-            type="button"
-            aria-label={`Remover ${tagName(byId, id)}`}
-            onClick={() => toggle(TAG_FIELD[kind], id)}
-            className="rounded-full border border-secondary bg-secondary/20 px-3 py-1.5 text-sm hover:bg-secondary/30"
-          >
-            {tagName(byId, id)} ✕
-          </button>
-        ))}
         {selected.length > 0 && (
           <button
             type="button"
@@ -124,6 +115,27 @@ export function TagFilterBar({
           </button>
         )}
       </div>
+      {selected.length > 0 && (
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          {TAG_KINDS.filter((kind) => value[TAG_FIELD[kind]].length > 0).map((kind) => (
+            <ul key={kind} aria-label={`${TAG_KIND_LABEL[kind]} selecionados`} className="flex flex-wrap items-center gap-2">
+              <li aria-hidden className={`h-2.5 w-2.5 rounded-full ${TAG_KIND_STYLE[kind].dot}`} />
+              {value[TAG_FIELD[kind]].map((id) => (
+                <li key={id}>
+                  <button
+                    type="button"
+                    aria-label={`Remover ${tagName(byId, id)}`}
+                    onClick={() => toggle(TAG_FIELD[kind], id)}
+                    className={`rounded-full border px-3 py-1 text-sm hover:brightness-125 ${TAG_KIND_STYLE[kind].chip}`}
+                  >
+                    {tagName(byId, id)} ✕
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

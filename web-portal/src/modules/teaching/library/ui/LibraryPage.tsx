@@ -5,6 +5,7 @@ import {useRouter, useSearchParams} from "next/navigation";
 import {useEffect, useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {Button} from "@/core/ui/Button";
+import {Icon} from "@/core/ui/icons";
 import {EMPTY_FILTERS, type LibraryFilters} from "../libraryQuery";
 import {loadUserNames} from "../repository";
 import {EMPTY_TAGS, type ItemTags} from "../tags";
@@ -101,8 +102,9 @@ export function LibraryContent({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Biblioteca</h1>
         <div className="flex items-center gap-2">
-          <Link href="/ensino/revisao" className="rounded-full bg-secondary px-5 py-2 text-sm font-semibold hover:brightness-110">
-            ＋ Enviar material
+          <Link href="/ensino/revisao" className="inline-flex items-center gap-2 rounded-full bg-secondary px-5 py-2.5 text-sm font-semibold hover:brightness-110">
+            <Icon name="plus" className="h-4 w-4" />
+            Enviar material
           </Link>
           <NotificationBell uid={viewer.uid} />
         </div>
@@ -115,9 +117,10 @@ export function LibraryContent({
             type="button"
             aria-pressed={view === v}
             onClick={() => chooseView(v)}
-            className={`rounded-full border px-4 py-1.5 text-sm ${view === v ? "border-secondary bg-secondary/20" : "border-white/20 text-white/70 hover:bg-white/10"}`}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm ${view === v ? "border-white/40 bg-white/15" : "border-white/15 text-white/70 hover:bg-white/10"}`}
           >
-            {v === "list" ? "☰ Lista" : "▦ Grade"}
+            <Icon name={v === "list" ? "list" : "grid"} className="h-4 w-4" />
+            {v === "list" ? "Lista" : "Grade"}
           </button>
         ))}
       </div>

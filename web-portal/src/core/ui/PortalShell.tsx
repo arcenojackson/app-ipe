@@ -12,6 +12,7 @@ import {
 import type {PortalModule} from "@/core/modules/types";
 import {AccessDenied} from "./AccessDenied";
 import {Button} from "./Button";
+import {Icon} from "./icons";
 
 export function PortalShell({
   children,
@@ -38,20 +39,25 @@ export function PortalShell({
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="border-b border-white/5 bg-surface p-4 md:min-h-screen md:w-64 md:border-b-0 md:border-r">
-        <p className="mb-4 text-lg font-semibold">Portal de Ensino</p>
+        <p className="mb-5 flex items-center gap-2.5 px-2 text-base font-bold">
+          <span aria-hidden className="h-7 w-7 rounded-[9px] bg-gradient-to-br from-primary to-secondary" />
+          Portal de Ensino
+        </p>
         <nav aria-label="Principal" className="space-y-4">
           {groups.map((group) => (
             <div key={group.moduleId}>
-              <p className="mb-1 text-xs uppercase tracking-wide text-white/50">{group.label}</p>
+              <p className="mb-1 px-3 text-xs uppercase tracking-wide text-white/50">{group.label}</p>
               <ul className="space-y-1">
                 {group.items.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
-                      className={`block rounded-button px-3 py-2 text-sm hover:bg-white/10 ${
-                        pathname === item.href ? "bg-primary/30 font-semibold" : ""
+                      aria-current={pathname === item.href ? "page" : undefined}
+                      className={`flex items-center gap-3 rounded-button px-3 py-2.5 text-sm hover:bg-white/10 ${
+                        pathname === item.href ? "bg-secondary/20 font-semibold text-white" : "text-white/70"
                       }`}
                     >
+                      {item.icon && <Icon name={item.icon} />}
                       {item.label}
                     </Link>
                   </li>
