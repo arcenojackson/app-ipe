@@ -5,7 +5,8 @@ import {
   setElectionStatus,
 } from "../src/elections/lifecycle";
 import {
-  ADMIN, DIRECTOR, DIRECTOR2, ELECTION, MEMBER, OTHER_DIRECTOR, OTHER_SOCIETY,
+  ADMIN, DIRECTOR, DIRECTOR2, ELECTION, MEMBER, MEMBER2, MEMBER3, OTHER_DIRECTOR,
+  OTHER_SOCIETY,
   SOCIETY, clearDb, db, expectCode, seedBase,
 } from "./helpers";
 
@@ -147,84 +148,103 @@ describe("setElectionStatus", () => {
   });
 });
 
-const closedRound = (id: string, position: string, winnerId: string | null, ms: number) =>
-  db.doc(`elections/${ELECTION}/rounds/${id}`).set({
-    position, status: "closed", candidates: [], type: "normal",
-    closedAt: new Date(ms), result: {winnerId},
+const seedCargo = (position: string, over: Record<string, unknown> = {}) =>
+  db.doc(`elections/${ELECTION}/cargos/${position}`).set({
+    stage: "idle", cycle: 1, candidates: [], tiedIds: [], winnerId: null, ...over,
   });
+const decided = (position: string, winnerId: string) =>
+  seedCargo(position, {stage: "decided", winnerId});
 
 const board = async () => (await db.doc(`societies/${SOCIETY}`).get()).get("board");
+const directorIds = async () =>
+  (await db.doc(`elections/${ELECTION}`).get()).get("directorIds") as string[];
+const apply = (uid = DIRECTOR) => applyBoard(db, uid, {electionId: ELECTION});
 
-// applyBoard só é reescrita na Task 5; estes testes seguem o comportamento atual.
-describe("applyBoard (comportamento atual)", () => {
+describe("applyBoard", () => {
   beforeEach(async () => {
     await clearDb();
     await seedBase("closed");
   });
 
-  it("só admin aplica", async () => {
-    await closedRound("r1", "presidente", "m2", 1);
-    await expectCode(applyBoard(db, MEMBER, {electionId: ELECTION}), "permission-denied");
+  it("só diretor da eleição aplica", async () => {
+    await decided("presidente", MEMBER2);
+    for (const uid of [MEMBER, OTHER_DIRECTOR, ADMIN]) {
+      await expectCode(apply(uid), "permission-denied");
+    }
+    expect(await board()).toEqual({presidente: [DIRECTOR], vice: [DIRECTOR2]});
   });
 
-  it("troca só os cargos eleitos e preserva os demais", async () => {
-    await closedRound("r1", "presidente", "m2", 1);
-    const res = await applyBoard(db, ADMIN, {electionId: ELECTION});
-    expect(res.winners).toEqual({presidente: "m2"});
-    expect(await board()).toEqual({presidente: ["m2"], vice: [DIRECTOR2]});
-    const election = await db.doc(`elections/${ELECTION}`).get();
-    expect(election.get("boardAppliedAt")).toBeDefined();
+  it("grava só os cargos decididos, preserva os demais e avisa o que falta de obrigatório", async () => {
+    await decided("presidente", MEMBER2);
+    const res = await apply();
+    expect(res.winners).toEqual({presidente: MEMBER2});
+    expect(res.missingRequired).toEqual(["vice"]);
+    expect(await board()).toEqual({presidente: [MEMBER2], vice: [DIRECTOR2]});
+    expect((await db.doc(`elections/${ELECTION}`).get()).get("boardAppliedAt")).toBeDefined();
   });
 
-  it("usa a chave com sufixo para secretário e tesoureiro", async () => {
-    await closedRound("r1", "secretario", "m3", 1);
-    await closedRound("r2", "tesoureiro", "m1", 1);
-    await applyBoard(db, ADMIN, {electionId: ELECTION});
+  it("presidente e vice decididos: nada obrigatório falta", async () => {
+    await decided("presidente", MEMBER);
+    await decided("vice", MEMBER2);
+    expect((await apply()).missingRequired).toEqual([]);
+  });
+
+  it("usa as chaves do app, inclusive a do 2º secretário", async () => {
+    await decided("secretario", MEMBER);
+    await decided("secretario2", MEMBER2);
+    await decided("tesoureiro", MEMBER3);
+    await apply();
     const b = await board();
-    expect(b["secretario(a)"]).toEqual(["m3"]);
-    expect(b["tesoureiro(a)"]).toEqual(["m1"]);
+    expect(b["secretario(a)"]).toEqual([MEMBER]);
+    expect(b["2º secretario(a)"]).toEqual([MEMBER2]);
+    expect(b["tesoureiro(a)"]).toEqual([MEMBER3]);
   });
 
-  it("cargo decidido em desempate vale a rodada mais recente", async () => {
-    await closedRound("r1", "presidente", null, 1);
-    await closedRound("r2", "presidente", "m3", 2);
-    await applyBoard(db, ADMIN, {electionId: ELECTION});
-    expect((await board()).presidente).toEqual(["m3"]);
+  it("cargo não decidido não entra", async () => {
+    await decided("presidente", MEMBER);
+    await seedCargo("vice", {stage: "awaiting3", winnerId: MEMBER2});
+    const res = await apply();
+    expect(res.winners).toEqual({presidente: MEMBER});
   });
 
-  it("board vazio em formato de lista (padrão de sociedade nova) vira mapa", async () => {
+  it("nenhum cargo decidido: erro claro e nada muda", async () => {
+    await expectCode(apply(), "failed-precondition");
+    expect(await board()).toEqual({presidente: [DIRECTOR], vice: [DIRECTOR2]});
+  });
+
+  it("diretoria vazia em formato de lista (sociedade nova) vira mapa", async () => {
     await db.doc(`societies/${SOCIETY}`).update({board: []});
-    await closedRound("r1", "vice", "m2", 1);
-    await applyBoard(db, ADMIN, {electionId: ELECTION});
-    expect(await board()).toEqual({vice: ["m2"]});
+    await decided("vice", MEMBER2);
+    await apply();
+    expect(await board()).toEqual({vice: [MEMBER2]});
   });
 
-  it("board antigo com pessoas (lista) é recusado, sem perder ninguém", async () => {
+  it("diretoria antiga com pessoas (lista) é recusada, sem perder ninguém", async () => {
     await db.doc(`societies/${SOCIETY}`).update({board: ["a", "b"]});
-    await closedRound("r1", "vice", "m2", 1);
-    await expectCode(applyBoard(db, ADMIN, {electionId: ELECTION}), "failed-precondition");
+    await decided("vice", MEMBER2);
+    await expectCode(apply(), "failed-precondition");
     expect(await board()).toEqual(["a", "b"]);
   });
 
   it("não duplica cargo gravado como 'Presidente'", async () => {
     await db.doc(`societies/${SOCIETY}`).update({board: {Presidente: ["old"]}});
-    await closedRound("r1", "presidente", "m2", 1);
-    await applyBoard(db, ADMIN, {electionId: ELECTION});
-    expect(await board()).toEqual({presidente: ["m2"]});
+    await decided("presidente", MEMBER2);
+    await apply();
+    expect(await board()).toEqual({presidente: [MEMBER2]});
   });
 
-  it("sem cargo decidido, erro claro e nada muda", async () => {
-    await db.doc(`elections/${ELECTION}/rounds/r1`).set({
-      position: "presidente", status: "open", candidates: [], type: "normal",
-    });
-    await expectCode(applyBoard(db, ADMIN, {electionId: ELECTION}), "failed-precondition");
-    expect(await board()).toEqual({presidente: [DIRECTOR], vice: [DIRECTOR2]});
+  it("os novos diretores passam a ter acesso e os antigos continuam", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    expect((await directorIds()).sort()).toEqual([DIRECTOR, DIRECTOR2, MEMBER2].sort());
+    // Quem acabou de ser eleito já consegue conduzir/ver a eleição.
+    await apply(MEMBER2);
   });
 
-  it("registra evento e pode ser reaplicado", async () => {
-    await closedRound("r1", "presidente", "m2", 1);
-    await applyBoard(db, ADMIN, {electionId: ELECTION});
-    await applyBoard(db, ADMIN, {electionId: ELECTION});
+  it("registra evento e pode ser reaplicada", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    await apply();
     const events = await db.collection(`elections/${ELECTION}/events`).get();
     expect(events.docs.filter((d) => d.get("type") === "board_applied")).toHaveLength(2);
   });

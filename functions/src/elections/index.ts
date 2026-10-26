@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
+import {pickOldest, removeCandidate, restartCargo} from "./cargoActions";
 import {assertNotAnonymous} from "./common";
 import {applyBoard, createElection, setElectionStatus} from "./lifecycle";
 import {
@@ -59,7 +60,18 @@ export const electionCastVote = functions.https.onCall((data, context) =>
 export const electionCloseScrutiny = functions.https.onCall((data, context) =>
   closeScrutiny(admin.firestore(), needDirectorAuth(context).uid, data));
 
-export const electionApplyBoard = functions.https.onCall((data, context) =>
+export const electionRemoveCandidate = functions.https.onCall(
+  (data, context) =>
+    removeCandidate(admin.firestore(), needDirectorAuth(context).uid, data)
+);
+
+export const electionRestartCargo = functions.https.onCall((data, context) =>
+  restartCargo(admin.firestore(), needDirectorAuth(context).uid, data));
+
+export const electionPickOldest = functions.https.onCall((data, context) =>
+  pickOldest(admin.firestore(), needDirectorAuth(context).uid, data));
+
+export const electionApplyBoard =functions.https.onCall((data, context) =>
   applyBoard(admin.firestore(), needDirectorAuth(context).uid, data));
 
 // Contador ao vivo "X de Y votaram": roda fora da transação do voto.

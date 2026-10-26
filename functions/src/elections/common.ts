@@ -1,11 +1,6 @@
 import * as functions from "firebase-functions/v1";
-import {
-  FieldValue,
-  type Firestore,
-  type QueryDocumentSnapshot,
-} from "firebase-admin/firestore";
+import {FieldValue, type Firestore} from "firebase-admin/firestore";
 import type {ElectionStatus} from "./types";
-import type {RoundSummary} from "./winners";
 
 type ErrorCode = ConstructorParameters<typeof functions.https.HttpsError>[0];
 
@@ -27,17 +22,6 @@ export const assertNotAnonymous = (isAnonymous: boolean): void => {
     throw fail(
       "permission-denied", "Entre com uma conta do app para fazer isso."
     );
-  }
-};
-
-// Só `users/{uid}.is_admin === true` vale (mesma fonte de isAdmin()).
-export const assertAdmin = async (
-  db: Firestore,
-  uid: string
-): Promise<void> => {
-  const snap = await db.doc(`users/${uid}`).get();
-  if (!snap.exists || snap.get("is_admin") !== true) {
-    throw fail("permission-denied", "Apenas administradores podem fazer isso.");
   }
 };
 
@@ -68,14 +52,4 @@ export const logEvent = async (
     ...event,
     at: FieldValue.serverTimestamp(),
   });
-};
-
-export const summarizeRound = (doc: QueryDocumentSnapshot): RoundSummary => {
-  const closedAt = doc.get("closedAt");
-  return {
-    position: String(doc.get("position")),
-    status: String(doc.get("status")),
-    closedAtMs: closedAt ? closedAt.toMillis() : 0,
-    winnerId: doc.get("result")?.winnerId ?? null,
-  };
 };

@@ -1,11 +1,8 @@
 import {FieldValue, Timestamp, type Firestore} from "firebase-admin/firestore";
 import {applyWinners} from "./board";
-import {
-  assertAdmin, fail, getElection, logEvent, requireString, summarizeRound,
-} from "./common";
+import {fail, logEvent, requireString} from "./common";
 import {assertElectionDirector, directorIdsOf} from "./directors";
-import {normalizePositions} from "./positions";
-import {pickWinners} from "./winners";
+import {normalizePositions, REQUIRED_POSITIONS} from "./positions";
 
 // Cria a eleição em rascunho. Só quem está na diretoria *atual* da sociedade
 // cria; a lista de diretores vira o snapshot `directorIds` da eleição.
@@ -68,22 +65,29 @@ export const createElection = async (
   return {electionId: electionRef.id};
 };
 
+// Grava os eleitos (cargos `decided`) em `societies/{id}.board`, só nesses
+// cargos, e dá aos novos diretores acesso à eleição (união, sem tirar ninguém).
 export const applyBoard = async (
   db: Firestore,
   uid: string,
   data: unknown
-): Promise<{winners: Record<string, string>}> => {
-  await assertAdmin(db, uid);
+): Promise<{winners: Record<string, string>; missingRequired: string[]}> => {
   const electionId = requireString(data, "electionId");
-  const election = await getElection(db, electionId);
+  const election = await assertElectionDirector(db, uid, electionId);
 
-  const rounds = await db.collection(`elections/${electionId}/rounds`).get();
-  const winners = pickWinners(rounds.docs.map(summarizeRound));
+  const cargos = await db.collection(`elections/${electionId}/cargos`).get();
+  const winners: Record<string, string> = {};
+  for (const cargo of cargos.docs) {
+    if (cargo.get("stage") === "decided" && cargo.get("winnerId")) {
+      winners[cargo.id] = String(cargo.get("winnerId"));
+    }
+  }
   if (Object.keys(winners).length === 0) {
     throw fail("failed-precondition", "Nenhum cargo foi decidido ainda.");
   }
 
   const societyRef = db.doc(`societies/${election.societyId}`);
+  const electionRef = db.doc(`elections/${electionId}`);
   await db.runTransaction(async (tx) => {
     const society = await tx.get(societyRef);
     if (!society.exists) throw fail("not-found", "Sociedade não encontrada.");
@@ -95,17 +99,22 @@ export const applyBoard = async (
           "Defina os cargos em Sociedades antes de aplicar a eleição."
       );
     }
-    tx.update(societyRef, {
-      board: applyWinners(society.get("board"), winners),
-    });
-    tx.update(db.doc(`elections/${electionId}`), {
+    const board = applyWinners(current, winners);
+    tx.update(societyRef, {board});
+    tx.update(electionRef, {
       boardAppliedAt: FieldValue.serverTimestamp(),
+      directorIds: [
+        ...new Set([...(election.directorIds ?? []), ...directorIdsOf(board)]),
+      ],
     });
   });
   await logEvent(db, electionId, {
     type: "board_applied", actorId: uid, winners,
   });
-  return {winners};
+  return {
+    winners,
+    missingRequired: REQUIRED_POSITIONS.filter((p) => !(p in winners)),
+  };
 };
 
 export const setElectionStatus = async (
