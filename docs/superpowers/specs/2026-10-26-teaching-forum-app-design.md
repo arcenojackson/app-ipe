@@ -68,6 +68,17 @@ Unitários: permissões, árvore, tokens de busca (casos cruzados com o portal),
 
 Layout fino dos cartões, texto vazio/erro, ordem dos assuntos no seletor, debounce da busca, otimismo de UI no voto (recalcular placar localmente até a Function atualizar). Marcado como decisão do builder, não do usuário.
 
+## 9b. Decisões do builder (após checagem, minhas, o usuário pode rever)
+
+- **Meu voto:** como no portal, uma leitura `get` de `.../votes/<uid>` por comentário carregado (no máx. 500), em paralelo ao abrir o tópico; o destaque do voto e trocar/remover dependem disso. Sem regra nova.
+- **Fixados com filtro/busca:** igual ao portal (`loadPinnedTopics`): consulta `deleted==false, pinned==true` + o filtro (assunto ou token), sem `orderBy`; ordena e filtra palavras no cliente. Não precisa de índice novo.
+- **Busca:** o token consultado é a palavra mais longa da pesquisa (até 20 letras, sem acento); as demais palavras filtram no cliente. Mesmo `topicQuery` do portal.
+- **Moderador no app:** `isCurator = teachingRole == curator`; `isAdmin = user.isAdminUser`. Botões de moderação aparecem para curador e para admin (o servidor aceita admin). Se doc e claim divergirem, o servidor nega e o app mostra "Sem permissão"; ao abrir o Fórum faz-se `getIdToken(true)` uma vez para atualizar claims.
+- **Fallback do push:** o decisor puro decide por papel e dados. "Tópico inexistente/invisível" é tratado em `ForumTopicPage`: se não achar, chama `launchUrl` do portal (URL do payload validada) e fecha a tela. O push não traz `commentId`: abre no topo do tópico, sem rolagem.
+- **Tópico removido** só é visto por quem abre direto (push/link), já que a lista filtra `deleted==false`.
+- **Seções:** admin que também é professor vê "Integrações" e "Plataforma pedagógica"; ambas null-safe enquanto `user` carrega.
+- `NotificationType.teachingForum` entra na lista de preferências só para quem tem papel de ensino (filtro novo na tela).
+
 ## 10. Perguntas abertas (nenhuma bloqueia o plano)
 
 - Universal/app links do portal no celular: fazer depois, junto com a publicação nas lojas e decisão de domínio próprio?
