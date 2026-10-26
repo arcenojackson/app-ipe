@@ -6,11 +6,10 @@ export const teachingModule: PortalModule = {
   basePath: "/ensino",
   access: "teacher",
   navItems: [
-    {label: "Início", href: "/ensino", access: "teacher"},
-    {label: "Biblioteca", href: "/ensino/biblioteca", access: "teacher"},
-    {label: "Plano pedagógico", href: "/ensino/plano", access: "teacher"},
-    {label: "Fila de revisão", href: "/ensino/revisao", access: "teacher"},
-    {label: "Notificações", href: "/ensino/notificacoes", access: "teacher"},
-    {label: "Grupo de professores", href: "/ensino/admin", access: "admin"},
+    {label: "Biblioteca", href: "/ensino", access: "teacher", icon: "library"},
+    {label: "Plano pedagógico", href: "/ensino/plano", access: "teacher", icon: "plan"},
+    {label: "Fila de revisão", href: "/ensino/revisao", access: "teacher", icon: "review"},
+    {label: "Notificações", href: "/ensino/notificacoes", access: "teacher", icon: "bell"},
+    {label: "Grupo de professores", href: "/ensino/admin", access: "admin", icon: "admin"},
   ],
 };

@@ -1,9 +1,12 @@
 import type {AccessRequirement} from "@/core/auth/access";
+import type {IconName} from "@/core/ui/icons";
 
 export interface NavItem {
   label: string;
   href: string;
   access: AccessRequirement;
+  // Ícone opcional do menu (ver core/ui/icons.tsx).
+  icon?: IconName;
 }
 
 /**

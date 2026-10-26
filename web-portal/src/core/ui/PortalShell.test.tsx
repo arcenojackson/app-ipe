@@ -79,7 +79,7 @@ describe("PortalShell", () => {
 
   it("o menu do professor não mostra itens de admin", () => {
     renderAt("/ensino", signedIn(teacher));
-    expect(screen.getByRole("link", {name: "Início"})).toBeInTheDocument();
+    expect(screen.getByRole("link", {name: "Biblioteca"})).toBeInTheDocument();
     expect(screen.queryByRole("link", {name: "Grupo de professores"})).not.toBeInTheDocument();
   });
 });

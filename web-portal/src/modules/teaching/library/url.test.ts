@@ -3,13 +3,13 @@ import {libraryUrl, readParams} from "./url";
 
 describe("libraryUrl", () => {
   it("sem item é a raiz da biblioteca; com item leva ?item=", () => {
-    expect(libraryUrl({})).toBe("/ensino/biblioteca");
-    expect(libraryUrl({item: null})).toBe("/ensino/biblioteca");
-    expect(libraryUrl({item: "i1"})).toBe("/ensino/biblioteca?item=i1");
+    expect(libraryUrl({})).toBe("/ensino");
+    expect(libraryUrl({item: null})).toBe("/ensino");
+    expect(libraryUrl({item: "i1"})).toBe("/ensino?item=i1");
   });
 
   it("codifica ids com caracteres especiais", () => {
-    expect(libraryUrl({item: "a b&c"})).toBe("/ensino/biblioteca?item=a%20b%26c");
+    expect(libraryUrl({item: "a b&c"})).toBe("/ensino?item=a%20b%26c");
   });
 });
 

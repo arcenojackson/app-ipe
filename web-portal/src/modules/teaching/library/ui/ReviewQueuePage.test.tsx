@@ -97,7 +97,7 @@ describe("ReviewQueuePage — curador", () => {
     await screen.findByText("Parado no autor");
     expect(section("Devolvidos aguardando o autor").getByText(/Sem resposta do autor/)).toBeInTheDocument();
     fireEvent.click(section("Devolvidos aguardando o autor").getByRole("button", {name: "Abrir Parado no autor"}));
-    expect(nav.push).toHaveBeenCalledWith("/ensino/biblioteca?item=r1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino?item=r1");
   });
 
   it("mostra as tags de cada item", async () => {
@@ -125,7 +125,7 @@ describe("ReviewQueuePage — curador", () => {
   it("clicar numa linha abre ?item=ID", async () => {
     renderAs("c1");
     fireEvent.click(await screen.findByRole("button", {name: "Abrir Aula 1"}));
-    expect(nav.push).toHaveBeenCalledWith("/ensino/biblioteca?item=i1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino?item=i1");
   });
 
   it("nada para revisar mostra a mensagem da seção", async () => {

@@ -1,10 +1,8 @@
-import {Suspense} from "react";
-import LibraryPage from "@/modules/teaching/library/ui/LibraryPage";
+import {redirect} from "next/navigation";
+import {libraryUrl} from "@/modules/teaching/library/url";
 
-export default function Page() {
-  return (
-    <Suspense fallback={<p className="text-white/70">Carregando…</p>}>
-      <LibraryPage />
-    </Suspense>
-  );
+// Endereço antigo da biblioteca (links de push e notificações): a Início é a biblioteca.
+export default async function Page({searchParams}: {searchParams: Promise<{item?: string | string[]}>}) {
+  const {item} = await searchParams;
+  redirect(libraryUrl({item: Array.isArray(item) ? item[0] : item}));
 }
