@@ -69,7 +69,7 @@ O app ganha o cargo `2º Secretario(a)` em `BoardPosition` e na tela de diretori
 
 Toda gravação e toda mudança de fase passa por Cloud Function; o cliente só lê. Os dados ficam em coleções novas com regras próprias e aditivas; `users` e `societies` não são alteradas nas regras.
 
-- **App Flutter**: menu "Eleições" para quem é diretor de alguma sociedade. Cria a eleição (por Function), lista as eleições das sociedades em que a pessoa é diretora, abre a condução na web e mostra a ata.
+- **App Flutter**: item "Eleições" em Configurações, visível para admins (todo diretor é admin); o que filtra de verdade é o servidor e a lista/formulário, que mostram só as sociedades em que a pessoa é diretora. Cria a eleição (por Function), lista as eleições das sociedades em que a pessoa é diretora, abre a condução na web e mostra a ata.
 - **Portal Next.js, condução**: rota `/eleicoes/[id]`, só para os diretores da eleição. Módulo `src/modules/elections/` registrado no portal com acesso "qualquer pessoa logada" (a checagem de diretor é da Function e das regras).
 - **Portal Next.js, voto**: rota pública `/votar/[id]`, fora do grupo `(portal)`.
 - **Cloud Functions** (`functions/src/elections/`):

@@ -1,3 +1,5 @@
+> **SUBSTITUÍDO** em 2026-10-26 por `docs/superpowers/plans/2026-10-26-society-elections-scrutinies.md` (rito por escrutínios, condução na web, acesso por diretoria). Mantido só como histórico.
+
 # Eleição de diretoria das sociedades — Plano de implementação
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
