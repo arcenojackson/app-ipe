@@ -72,6 +72,16 @@ A biblioteca é uma lista de arquivos e links **sem pastas**, organizada por tag
   purge-library:dry` conta o que seria apagado; `purge-library` apaga itens, votos,
   notificações e arquivos (mantém `teaching_log`, `teaching_tags` e usuários).
 
+## Plano pedagógico
+
+- Rota `/ensino/plano`: a planilha "Planejamento_Pedagógico_UPA" como tabela (aula,
+  tema, orientador, objetos de conhecimento, habilidades, aprendizagens essenciais,
+  observações e referências). Professores leem; curadores editam cada célula (salva ao
+  sair do campo), adicionam e apagam aulas.
+- Dados em `teaching_plan/{id}` (regras: leitura de professores, escrita de curadores).
+  As 52 aulas iniciais: `npm --prefix functions run seed-plan:dry` e `seed-plan`
+  (só cria as que não existem).
+
 ## Acesso
 
 - `none` não entra; `teacher` lê a biblioteca e usa o fórum; `curator` também aprova;

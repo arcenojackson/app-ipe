@@ -7,6 +7,12 @@ describe("teachingModule", () => {
     expect(item?.access).toBe("teacher");
   });
 
+  it("o Plano pedagógico é aberto a professores", () => {
+    const item = teachingModule.navItems.find((i) => i.href === "/ensino/plano");
+    expect(item?.label).toBe("Plano pedagógico");
+    expect(item?.access).toBe("teacher");
+  });
+
   it("Biblioteca e Notificações são de professores; o grupo é do admin", () => {
     const access = (href: string) => teachingModule.navItems.find((i) => i.href === href)?.access;
     expect(access("/ensino/biblioteca")).toBe("teacher");

@@ -23,6 +23,13 @@ export default function TeachingHomePage() {
         </Link>
       </Card>
       <Card>
+        <h2 className="font-semibold">Plano pedagógico</h2>
+        <p className="mb-2 text-sm text-white/70">Temas, objetivos e referências de cada aula do ano.</p>
+        <Link href="/ensino/plano" className="text-secondary underline">
+          Abrir o plano
+        </Link>
+      </Card>
+      <Card>
         <h2 className="font-semibold">Notificações</h2>
         <p className="mb-2 text-sm text-white/70">Avisos sobre os seus envios e a curadoria.</p>
         <Link href="/ensino/notificacoes" className="text-secondary underline">

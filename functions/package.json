@@ -10,6 +10,8 @@
     "backfill-claims:dry": "tsx scripts/backfill-teaching-claims.ts --dry-run",
     "seed-tags": "tsx scripts/seed-teaching-tags.ts",
     "seed-tags:dry": "tsx scripts/seed-teaching-tags.ts --dry-run",
+    "seed-plan": "tsx scripts/seed-teaching-plan.ts",
+    "seed-plan:dry": "tsx scripts/seed-teaching-plan.ts --dry-run",
     "purge-library": "tsx scripts/purge-teaching-library.ts --execute",
     "purge-library:dry": "tsx scripts/purge-teaching-library.ts",
     "serve": "npm run build && firebase emulators:start --only functions",
