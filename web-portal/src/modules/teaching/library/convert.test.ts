@@ -69,5 +69,12 @@ describe("toNotification", () => {
     });
     expect(toNotification("n2", {toUid: "t1", type: "x", itemId: "i", title: "T", body: "B", createdAt: ts(1), readAt: ts(5)})?.readAt).toBe(5);
     expect(toNotification("n3", {type: "x"})).toBeNull();
+    expect(toNotification("n4", {toUid: "t1", type: "x", itemId: "", title: "T", body: "B"})).toBeNull();
+  });
+
+  it("aceita resposta do Fórum (topicId, sem itemId)", () => {
+    expect(toNotification("f1", {toUid: "t1", type: "forum_reply", itemId: "", topicId: "top1", commentId: "c1", title: "Nova resposta no Fórum", body: "Ana: oi", createdAt: ts(7), readAt: null})).toEqual({
+      id: "f1", toUid: "t1", type: "forum_reply", itemId: "", topicId: "top1", title: "Nova resposta no Fórum", body: "Ana: oi", createdAt: 7, readAt: null,
+    });
   });
 });

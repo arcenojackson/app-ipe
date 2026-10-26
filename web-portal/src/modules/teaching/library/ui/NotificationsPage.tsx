@@ -39,7 +39,7 @@ export default function NotificationsPage() {
         // abrir o item continua funcionando mesmo se marcar falhar
       }
     }
-    router.push(libraryUrl({item: n.itemId}));
+    router.push(n.topicId ? `/ensino/forum/${n.topicId}` : libraryUrl({item: n.itemId}));
   }
 
   const unreadIds = (list ?? []).filter((n) => n.readAt === null).map((n) => n.id);

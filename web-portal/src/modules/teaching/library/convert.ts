@@ -91,13 +91,16 @@ export function toVote(id: string, data: Data): LibraryVote | null {
 
 export function toNotification(id: string, data: Data): LibraryNotification | null {
   const toUid = str(data.toUid);
-  const itemId = str(data.itemId);
-  if (!toUid || !itemId) return null;
+  const itemId = str(data.itemId) ?? "";
+  const topicId = str(data.topicId);
+  // Biblioteca traz itemId; resposta do Fórum (forum_reply) traz topicId.
+  if (!toUid || (!itemId && !topicId)) return null;
   return {
     id,
     toUid,
     type: str(data.type) ?? "",
     itemId,
+    ...(topicId ? {topicId} : {}),
     title: str(data.title) ?? "",
     body: str(data.body) ?? "",
     createdAt: millis(data.createdAt),
