@@ -16,6 +16,8 @@ vi.mock("@/core/auth/AuthContext", () => ({
 
 const api = vi.hoisted(() => ({
   election: undefined as unknown,
+  electionError: null as string | null,
+  cargosPending: false,
   cargos: [] as unknown[],
   rounds: [] as unknown[],
   voters: [] as unknown[],
@@ -31,8 +33,15 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock("../data/conductClient", () => ({
-  watchElection: (_id: string, cb: (v: unknown) => void) => { cb(api.election); return () => {}; },
-  watchCargos: (_id: string, cb: (v: unknown) => void) => { cb(api.cargos); return () => {}; },
+  watchElection: (_id: string, cb: (v: unknown) => void, onError?: (m: string) => void) => {
+    if (api.electionError) onError?.(api.electionError);
+    else cb(api.election);
+    return () => {};
+  },
+  watchCargos: (_id: string, cb: (v: unknown) => void) => {
+    if (!api.cargosPending) cb(api.cargos);
+    return () => {};
+  },
   watchRounds: (_id: string, cb: (v: unknown) => void) => { cb(api.rounds); return () => {}; },
   watchVoters: (_id: string, cb: (v: unknown) => void) => { cb(api.voters); return () => {}; },
   watchVoted: (_id: string, _r: string, cb: (v: unknown) => void) => { cb(api.voted); return () => {}; },
@@ -65,6 +74,8 @@ const round = (over: Partial<ConductRound> = {}): ConductRound => ({
 beforeEach(() => {
   auth.uid = "dir1";
   api.election = election();
+  api.electionError = null;
+  api.cargosPending = false;
   api.cargos = [cargo("presidente"), cargo("vice")];
   api.rounds = [];
   api.voters = [];
@@ -83,6 +94,19 @@ describe("ConductPage", () => {
     expect(screen.getByText(/Acesso restrito aos diretores/)).toBeInTheDocument();
     expect(screen.queryByRole("button", {name: "Iniciar 1º escrutínio"})).not.toBeInTheDocument();
     expect(screen.queryByText(/\/votar\/e1/)).not.toBeInTheDocument();
+  });
+
+  it("falha ao carregar a eleição mostra o erro, não fica só em Carregando", () => {
+    api.electionError = "Missing or insufficient permissions.";
+    render(<ConductPage electionId="e1" />);
+    expect(screen.getByRole("alert")).toHaveTextContent("Missing or insufficient permissions.");
+  });
+
+  it("antes do primeiro snapshot dos cargos não mostra controles de escrutínio", () => {
+    api.cargosPending = true;
+    render(<ConductPage electionId="e1" />);
+    expect(screen.getByText("Carregando cargos…")).toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: "Iniciar 1º escrutínio"})).not.toBeInTheDocument();
   });
 
   it("diretor vê o título, o QR e o link da votação", () => {

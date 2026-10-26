@@ -47,9 +47,10 @@ export function ConductPage({electionId}: {electionId: string}) {
   const uid = state.status === "signedIn" ? state.user.uid : null;
 
   const [election, setElection] = useState<ConductElection | null | undefined>(undefined);
-  const [cargos, setCargos] = useState<Cargo[]>([]);
-  const [rounds, setRounds] = useState<ConductRound[]>([]);
-  const [voters, setVoters] = useState<ConductVoter[]>([]);
+  // `null` = ainda não chegou o primeiro snapshot (diferente de lista vazia).
+  const [cargos, setCargos] = useState<Cargo[] | null>(null);
+  const [rounds, setRounds] = useState<ConductRound[] | null>(null);
+  const [voters, setVoters] = useState<ConductVoter[] | null>(null);
   const [votedIds, setVotedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +69,7 @@ export function ConductPage({electionId}: {electionId: string}) {
     return () => stops.forEach((stop) => stop());
   }, [electionId, isDirector]);
 
-  const openRound = rounds.find((r) => r.status === "open") ?? null;
+  const openRound = (rounds ?? []).find((r) => r.status === "open") ?? null;
   const openRoundId = openRound?.id;
   useEffect(() => {
     if (!isDirector || !openRoundId) return;
@@ -88,7 +89,11 @@ export function ConductPage({electionId}: {electionId: string}) {
     }
   }
 
-  if (election === undefined) return <p className="p-6 text-white/70">Carregando…</p>;
+  if (election === undefined) {
+    return error ?
+      <p role="alert" className="p-6 text-error">{error}</p> :
+      <p className="p-6 text-white/70">Carregando…</p>;
+  }
   if (election === null) return <p className="p-6">Eleição não encontrada.</p>;
   if (!isDirector) {
     return (
@@ -96,8 +101,9 @@ export function ConductPage({electionId}: {electionId: string}) {
     );
   }
 
-  const approved = voters.filter((v) => v.status === "approved");
-  const anyDecided = cargos.some((c) => c.stage === "decided");
+  const loaded = cargos !== null && rounds !== null && voters !== null;
+  const approved = (voters ?? []).filter((v) => v.status === "approved");
+  const anyDecided = (cargos ?? []).some((c) => c.stage === "decided");
 
   function onAction(position: string, kind: ConductActionKind, targetId?: string) {
     void run(async () => {
@@ -137,14 +143,15 @@ export function ConductPage({electionId}: {electionId: string}) {
 
       <GlassCard>
         <PresentesPanel
-          voters={voters}
+          voters={voters ?? []}
           busy={busy}
           onReview={(voterId, decision) => void run(() => reviewVoter(electionId, voterId, decision))}
         />
       </GlassCard>
 
       <section className="space-y-3">
-        {election.positions.map((position) => {
+        {!loaded && <p className="text-sm text-white/70">Carregando cargos…</p>}
+        {loaded && election.positions.map((position) => {
           const cargo = cargos.find((c) => c.position === position) ?? idleCargo(position);
           return (
             <CargoCard
