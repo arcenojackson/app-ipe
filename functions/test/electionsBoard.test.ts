@@ -6,11 +6,19 @@ describe("boardKey", () => {
     expect(boardKey("presidente")).toBe("presidente");
     expect(boardKey("vice")).toBe("vice");
     expect(boardKey("secretario")).toBe("secretario(a)");
+    expect(boardKey("secretario2")).toBe("2º secretario(a)");
     expect(boardKey("tesoureiro")).toBe("tesoureiro(a)");
   });
 
   it("recusa cargo desconhecido", () => {
     expect(() => boardKey("pastor")).toThrow();
+  });
+});
+
+describe("applyWinners com 2º secretário", () => {
+  it("grava a chave nova sem apagar o 1º secretário", () => {
+    const next = applyWinners({"secretario(a)": ["s1"]}, {secretario2: "ana"});
+    expect(next).toEqual({"secretario(a)": ["s1"], "2º secretario(a)": ["ana"]});
   });
 });
 

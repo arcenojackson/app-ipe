@@ -2,6 +2,7 @@ const KEYS: Record<string, string> = {
   presidente: "presidente",
   vice: "vice",
   secretario: "secretario(a)",
+  secretario2: "2º secretario(a)",
   tesoureiro: "tesoureiro(a)",
 };
 
