@@ -2,6 +2,8 @@
 
 import {useState} from "react";
 import {Button} from "@/core/ui/Button";
+import {TextField} from "@/core/ui/TextField";
+import {filterOptions} from "../filterOptions";
 import {positionLabel, type Round} from "../types";
 
 interface Props {
@@ -13,28 +15,29 @@ interface Props {
 
 export function BallotStep({round, busy, error, onSubmit}: Props) {
   const [choice, setChoice] = useState<string | null>(null);
-  const cargo = positionLabel(round.position);
-  const single = round.type === "single";
-
-  const options = single ?
-    [
-      {value: "yes", label: "Sim"},
-      {value: "no", label: "Não"},
-      {value: "blank", label: "Branco"},
-    ] :
-    [
-      ...round.candidates.map((c) => ({value: c.id, label: c.name})),
-      {value: "blank", label: "Branco"},
-    ];
+  const [search, setSearch] = useState("");
+  const visible = round.number === 1 ?
+    filterOptions(round.options, search) :
+    round.options;
+  const options = [
+    ...visible.map((o) => ({value: o.id, label: o.name})),
+    {value: "blank", label: "Branco"},
+  ];
 
   return (
     <div className="space-y-4">
       <h2 className="text-lg font-semibold">
-        {single ?
-          `${round.candidates[0]?.name} deve ser ${cargo}?` :
-          `Votação para ${cargo}`}
+        {`Votação para ${positionLabel(round.position)} — ${round.number}º escrutínio`}
       </h2>
-      <div role="radiogroup" className="space-y-2">
+      {round.number === 1 && (
+        <TextField
+          id="ballot-search"
+          label="Buscar por nome"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      )}
+      <div role="radiogroup" className="max-h-80 space-y-2 overflow-y-auto">
         {options.map((option) => (
           <label
             key={option.value}

@@ -40,8 +40,8 @@ const election = (status: Election["status"] = "open"): Election => ({
   id: "e1", title: "Eleição 2026", societyName: "UMP", status,
 });
 const round: Round = {
-  id: "r1", position: "presidente", type: "normal",
-  candidates: [{id: "a", name: "Ana"}, {id: "b", name: "Bia"}],
+  id: "r1", position: "presidente", number: 1,
+  options: [{id: "a", name: "Ana"}, {id: "b", name: "Bia"}],
 };
 const voter = (status: Voter["status"]): Voter => ({status, kind: "guest", name: "Maria"});
 const signedIn = (isAnonymous = false) => ({
@@ -169,14 +169,16 @@ describe("VotePage", () => {
     expect(screen.getByText(/Seu voto foi registrado/)).toBeInTheDocument();
   });
 
-  it("candidato único: Sim, Não ou Branco", () => {
+  it("2º escrutínio mostra só os candidatos, sem busca, e o título traz o número", () => {
     auth.state = signedIn();
     api.voter = voter("approved");
-    api.round = {...round, type: "single", candidates: [round.candidates[0]]};
+    api.round = {...round, number: 2, options: [round.options[0]]};
     api.hasVoted = false;
     render(<VotePage electionId="e1" />);
-    expect(screen.getByLabelText("Sim")).toBeInTheDocument();
-    expect(screen.getByLabelText("Não")).toBeInTheDocument();
+    expect(screen.getByText("Votação para Presidente — 2º escrutínio")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Buscar por nome")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Ana")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Bia")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Branco")).toBeInTheDocument();
   });
 

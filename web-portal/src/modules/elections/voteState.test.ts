@@ -6,8 +6,8 @@ const election = (status: Election["status"]): Election => ({
   id: "e1", title: "Eleição 2026", societyName: "UMP", status,
 });
 const round: Round = {
-  id: "r1", position: "presidente", type: "normal",
-  candidates: [{id: "a", name: "Ana"}],
+  id: "r1", position: "presidente", number: 1,
+  options: [{id: "a", name: "Ana"}],
 };
 const voter = (status: Voter["status"]): Voter => ({status, kind: "guest", name: "Maria"});
 

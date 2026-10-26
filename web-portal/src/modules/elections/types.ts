@@ -12,13 +12,12 @@ export interface Candidate {
   name: string;
 }
 
-export type RoundType = "normal" | "single" | "runoff";
-
+/** Escrutínio aberto: as opções já vêm montadas pelo servidor. */
 export interface Round {
   id: string;
   position: string;
-  candidates: Candidate[];
-  type: RoundType;
+  number: 1 | 2 | 3;
+  options: Candidate[];
 }
 
 export type VoterStatus = "pending" | "approved" | "rejected";
@@ -29,10 +28,39 @@ export interface Voter {
   name: string;
 }
 
+export type CargoStage =
+  | "idle"
+  | "scrutiny1"
+  | "confirming"
+  | "scrutiny2"
+  | "awaiting3"
+  | "scrutiny3"
+  | "tiebreak"
+  | "decided";
+
+export interface CandidateVotes {
+  id: string;
+  name: string;
+  votes: number;
+}
+
+/** `result` gravado pelo servidor ao encerrar o escrutínio. */
+export interface RoundResult {
+  counts: Record<string, number>;
+  blank: number;
+  total: number;
+  presentCount: number;
+  threshold: number;
+  winnerId: string | null;
+  tie: string[];
+  divergence: boolean;
+}
+
 const POSITION_LABELS: Record<string, string> = {
   presidente: "Presidente",
   vice: "Vice",
-  secretario: "Secretário(a)",
+  secretario: "1º Secretário(a)",
+  secretario2: "2º Secretário(a)",
   tesoureiro: "Tesoureiro(a)",
 };
 
