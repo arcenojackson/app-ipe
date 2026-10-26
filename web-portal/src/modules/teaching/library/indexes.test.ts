@@ -17,7 +17,7 @@ describe("firestore.indexes.json", () => {
 
   it("preserva os índices que já existiam em produção (o deploy não pode removê-los)", () => {
     const others = all.filter((i) => i.collectionGroup !== "teaching_items").map((i) => i.collectionGroup).sort();
-    expect(others).toEqual(["messages", "music_evaluation_forms", "music_evaluation_forms", "responses", "responses"]);
+    expect(others).toEqual(["forum_topics", "forum_topics", "forum_topics", "messages","music_evaluation_forms", "music_evaluation_forms", "responses", "responses"]);
   });
 
   it("tem o índice base e um por filtro de servidor, sempre com status e publishedAt desc", () => {

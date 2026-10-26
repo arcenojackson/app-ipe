@@ -1841,3 +1841,9 @@ export {
   onTeachingItemUpdated,
   onTeachingVoteCreated,
 } from "./teaching/library/triggers";
+
+export {
+  onForumCommentCreated,
+  onForumCommentUpdated,
+  onForumVoteWritten,
+} from "./teaching/forum/triggers";
