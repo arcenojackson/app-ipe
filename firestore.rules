@@ -410,6 +410,33 @@ service cloud.firestore {
       }
     }
 
+    // Plano pedagógico: uma linha por aula/tema. Professores leem; curadores
+    // editam como numa planilha (criar, alterar e apagar linhas).
+    function planText(d, field, max) {
+      return !(field in d) || (d[field] is string && d[field].size() <= max);
+    }
+
+    function validPlanRow(d) {
+      return d.keys().hasOnly(['lesson', 'theme', 'leader', 'knowledge',
+          'skills', 'essentials', 'notes', 'references', 'updatedBy',
+          'updatedAt']) &&
+        d.keys().hasAll(['lesson', 'theme', 'updatedBy', 'updatedAt']) &&
+        d.lesson is int && d.lesson >= 1 && d.lesson <= 999 &&
+        d.theme is string && d.theme.size() >= 1 && d.theme.size() <= 200 &&
+        planText(d, 'leader', 120) && planText(d, 'knowledge', 2000) &&
+        planText(d, 'skills', 2000) && planText(d, 'essentials', 2000) &&
+        planText(d, 'notes', 2000) && planText(d, 'references', 2000);
+    }
+
+    match /teaching_plan/{rowId} {
+      allow read: if canUseTeaching();
+      allow create, update: if isCurator() &&
+        request.resource.data.updatedBy == request.auth.uid &&
+        request.resource.data.updatedAt == request.time &&
+        validPlanRow(request.resource.data);
+      allow delete: if isCurator();
+    }
+
     match /teaching_tags/{tagId} {
       allow read: if canUseTeaching();
       // Sem escrita pelo cliente: tags são mantidas direto no banco.
