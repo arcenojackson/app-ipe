@@ -79,7 +79,7 @@ export function LibraryContent({
 
   // Nomes dos autores: só busca os que ainda não são conhecidos.
   useEffect(() => {
-    const missing = [...new Set(library.items.map((i) => i.authorId))].filter(
+    const missing = [...new Set(library.items.flatMap((i) => [i.authorId, ...(i.approvedBy ?? [])]))].filter(
       (uid) => uid && !(uid in authorNames)
     );
     if (missing.length === 0) return;

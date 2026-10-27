@@ -66,6 +66,7 @@ export function toItem(id: string, data: Data): LibraryItem | null {
     ageTags: strings(data.ageTags),
     searchTokens: Array.isArray(data.searchTokens) ? strings(data.searchTokens) : undefined,
     publishedAt: data.publishedAt ? millis(data.publishedAt) : undefined,
+    approvedBy: Array.isArray(data.approvedBy) ? strings(data.approvedBy) : undefined,
     returnComment: str(data.returnComment) ?? null,
     returnedBy: str(data.returnedBy) ?? null,
     deleteRequest: request,

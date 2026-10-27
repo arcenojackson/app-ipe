@@ -1,6 +1,6 @@
 "use client";
 
-import {formatDate} from "../labels";
+import {approverLabel, formatDate} from "../labels";
 import type {Tag} from "../tags";
 import type {LibraryItem} from "../types";
 import {FileTypeIcon} from "./FileTypeIcon";
@@ -38,6 +38,11 @@ export function LibraryGrid({
               <span className="block text-xs text-white/60">
                 {authorNames[item.authorId] ?? "—"} · {formatDate(item.publishedAt)}
               </span>
+              {item.approvedBy && item.approvedBy.length > 0 && (
+                <span className="block truncate text-xs text-white/60" title={approverLabel(item.approvedBy, authorNames).title}>
+                  Aprovado por {approverLabel(item.approvedBy, authorNames).text}
+                </span>
+              )}
             </span>
           </>
         );

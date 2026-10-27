@@ -1,5 +1,5 @@
 import {describe, expect, it} from "vitest";
-import {formatBytes, formatDate, formatDateTime, voteLabel} from "./labels";
+import {approverLabel, formatBytes, formatDate, formatDateTime, voteLabel} from "./labels";
 
 describe("voteLabel", () => {
   it("rótulos em pt-BR para cada ação", () => {
@@ -33,5 +33,16 @@ describe("formatBytes", () => {
     expect(formatBytes(6 * 1024)).toBe("6 KB");
     expect(formatBytes(1.5 * 1024 * 1024)).toBe("1,5 MB");
     expect(formatBytes(100 * 1024 * 1024)).toBe("100 MB");
+  });
+});
+
+describe("approverLabel", () => {
+  const names = {a: "Ana Curadora", b: "Bia Souza", c: "Caio Lima"};
+  it("sem aprovadores mostra traço; até 2 mostra primeiros nomes; mais vira +N", () => {
+    expect(approverLabel(undefined, names)).toEqual({text: "—", title: ""});
+    expect(approverLabel([], names).text).toBe("—");
+    expect(approverLabel(["a", "b"], names).text).toBe("Ana, Bia");
+    expect(approverLabel(["a", "b", "c"], names)).toEqual({text: "Ana, Bia +1", title: "Ana Curadora, Bia Souza, Caio Lima"});
+    expect(approverLabel(["x"], names).text).toBe("Curador");
   });
 });

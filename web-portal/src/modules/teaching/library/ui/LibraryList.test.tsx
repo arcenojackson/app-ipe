@@ -34,7 +34,18 @@ describe("LibraryList", () => {
 
   it("autor desconhecido aparece como traço", () => {
     render(<LibraryList items={[file({authorId: "x"})]} {...props} />);
-    expect(within(screen.getByRole("row", {name: /Santidade/})).getByText("—", {selector: "td"})).toBeInTheDocument();
+    // Autor desconhecido e item ainda sem approvedBy (antes do backfill): um traço em cada coluna.
+    expect(within(screen.getByRole("row", {name: /Santidade/})).getAllByText("—", {selector: "td"})).toHaveLength(2);
+  });
+
+  it("coluna Aprovado por: primeiros nomes, +N e title com todos; sem campo mostra traço", () => {
+    const names = {u1: "Felipe", c1: "Ana Curadora", c2: "Bia Souza", c3: "Caio Lima"};
+    render(<LibraryList items={[file({approvedBy: ["c1", "c2", "c3"]})]} {...props} authorNames={names} />);
+    const titled = within(screen.getByRole("row", {name: /Santidade/})).getAllByTitle("Ana Curadora, Bia Souza, Caio Lima");
+    // Coluna (lg+) e linha secundária sob o nome (abaixo de lg).
+    expect(titled.map((el) => el.tagName)).toEqual(["SPAN", "TD"]);
+    expect(titled[1]).toHaveTextContent("Ana, Bia +1");
+    expect(titled[0]).toHaveTextContent("Aprovado por Ana, Bia +1");
   });
 
   it("clicar num arquivo chama onSelect com o id", () => {
