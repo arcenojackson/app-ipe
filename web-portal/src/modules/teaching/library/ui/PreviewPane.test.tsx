@@ -87,6 +87,23 @@ describe("PreviewPane", () => {
     expect(screen.getByText("Não foi possível exibir o arquivo. Baixe para abri-lo.")).toBeInTheDocument();
   });
 
+  it("permissão negada na leitura mostra mensagem específica", () => {
+    bytesHook.useFileBytes.mockReturnValue({bytes: null, loading: false, error: "Sem permissão para este arquivo."});
+    render(<PreviewPane item={file()} />);
+    expect(screen.getByText("Sem permissão para este arquivo.")).toBeInTheDocument();
+  });
+
+  it("Baixar com permissão negada ou arquivo inexistente mostra o motivo", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    storage.downloadUrl.mockRejectedValue({code: "storage/unauthorized"});
+    render(<PreviewPane item={file({contentType: "application/zip", fileName: "a.zip"})} />);
+    fireEvent.click(screen.getByRole("button", {name: "Baixar"}));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sem permissão para este arquivo.");
+    storage.downloadUrl.mockRejectedValue({code: "storage/object-not-found"});
+    fireEvent.click(screen.getByRole("button", {name: "Baixar"}));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Arquivo não encontrado."));
+  });
+
   it("link não renderiza pré-visualização", () => {
     const {container} = render(<PreviewPane item={file({type: "link", url: "https://x.org"})} />);
     expect(container).toBeEmptyDOMElement();

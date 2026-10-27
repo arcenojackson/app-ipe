@@ -2,6 +2,7 @@
 
 import {useEffect, useState} from "react";
 import {fileBytes} from "./storageAccess";
+import {fileErrorMessage} from "./storageErrors";
 
 // Lê os bytes do arquivo só quando `enabled`. O resultado fica ligado ao caminho
 // pedido, então trocar de arquivo nunca mostra os bytes do anterior.
@@ -17,7 +18,11 @@ export function useFileBytes(storagePath: string | undefined, enabled: boolean) 
     let active = true;
     fileBytes(storagePath)
       .then((bytes) => active && setResult({path: storagePath, bytes, error: null}))
-      .catch(() => active && setResult({path: storagePath, bytes: null, error: "Não foi possível ler o arquivo."}));
+      .catch(
+        (e) =>
+          active &&
+          setResult({path: storagePath, bytes: null, error: fileErrorMessage(e, "Não foi possível ler o arquivo.")})
+      );
     return () => {
       active = false;
     };
