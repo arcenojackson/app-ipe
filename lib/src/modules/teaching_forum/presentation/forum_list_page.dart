@@ -11,6 +11,7 @@ import 'forum_editor_page.dart';
 import 'forum_list_controller.dart';
 import 'forum_topic_page.dart';
 import 'widgets/forum_scaffold.dart';
+import 'widgets/subject_filter.dart';
 import 'widgets/topic_card.dart';
 
 class ForumListPage extends StatefulWidget {
@@ -56,6 +57,19 @@ class _ForumListPageState extends State<ForumListPage> {
       builder: (_) => ForumTopicPage(topicId: topicId, viewer: viewer),
     ));
     if (mounted) _controller.load();
+  }
+
+  Future<void> _pickSubject() async {
+    final picked = await showSubjectFilterSheet(
+      context,
+      tags: _controller.tags,
+      selected: _controller.tagId,
+    );
+    if (picked == null || !mounted) return;
+    final next = picked.isEmpty ? null : picked;
+    if (next == _controller.tagId) return;
+    _searchController.clear();
+    _controller.setTagId(next);
   }
 
   Future<void> _create() async {
@@ -109,23 +123,21 @@ class _ForumListPageState extends State<ForumListPage> {
             ),
           ),
           if (c.tags.isNotEmpty)
-            SizedBox(
-              height: 52,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  for (final tag in c.tags)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(tag.name),
-                        selected: c.tagId == tag.id,
-                        onSelected: (on) {
-                          _searchController.clear();
-                          c.setTagId(on ? tag.id : null);
-                        },
-                      ),
+                  SubjectFilterButton(
+                    activeCount: c.tagId == null ? 0 : 1,
+                    onPressed: _pickSubject,
+                  ),
+                  if (c.tagId != null)
+                    SubjectChip(
+                      label: names[c.tagId] ?? c.tagId!,
+                      onRemove: () => c.setTagId(null),
                     ),
                 ],
               ),

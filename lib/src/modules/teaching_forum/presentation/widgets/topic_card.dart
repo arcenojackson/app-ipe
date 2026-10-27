@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../shared/widgets/glass_container.dart';
 import '../../models/forum_models.dart';
 import 'forum_scaffold.dart';
+import 'subject_filter.dart';
 
 class TopicCard extends StatelessWidget {
   const TopicCard({
@@ -66,11 +67,12 @@ class TopicCard extends StatelessWidget {
                       style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      subjects.join(' · '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.white54),
+                    child: Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final s in subjects) SubjectChip(label: s, small: true),
+                      ],
                     ),
                   ),
                 ],
