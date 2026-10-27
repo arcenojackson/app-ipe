@@ -1,7 +1,8 @@
 import type {LibraryItem, LibraryVote, Viewer} from "./types";
 
 export interface ReviewQueue {
-  // Envios do próprio usuário (em revisão ou devolvidos).
+  // Histórico de envios do próprio usuário (qualquer status): devolvidos no
+  // topo (pedem ação do autor), depois do mais novo ao mais antigo.
   mine: LibraryItem[];
   // Envios de outros aguardando revisão (só curador/admin).
   toReview: LibraryItem[];
@@ -26,7 +27,9 @@ export function buildReviewQueue(
 ): ReviewQueue {
   const privileged = viewer.isCurator || viewer.isAdmin;
   return {
-    mine: [...input.mine].sort(newestFirst),
+    mine: [...input.mine].sort(
+      (a, b) => Number(b.status === "returned") - Number(a.status === "returned") || newestFirst(a, b)
+    ),
     toReview: privileged ?
       input.inReview.filter((i) => i.authorId !== viewer.uid).sort(newestFirst) :
       [],

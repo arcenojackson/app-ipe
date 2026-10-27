@@ -7,7 +7,7 @@ import type {Tag} from "../tags";
 import type {LibraryItem, LibraryVote} from "../types";
 import ReviewQueuePage from "./ReviewQueuePage";
 
-const repo = vi.hoisted(() => ({subscribeReviewQueue: vi.fn(), loadVotes: vi.fn(), countCurators: vi.fn()}));
+const repo = vi.hoisted(() => ({subscribeReviewQueue: vi.fn(), loadVotes: vi.fn(), countCurators: vi.fn(), loadUserNames: vi.fn()}));
 vi.mock("../repository", () => repo);
 const nav = vi.hoisted(() => ({push: vi.fn(), replace: vi.fn(), back: vi.fn(), search: ""}));
 vi.mock("next/navigation", () => ({
@@ -53,6 +53,8 @@ beforeEach(() => {
   nav.replace.mockReset();
   nav.search = "";
   repo.countCurators.mockReset().mockResolvedValue(3);
+  repo.loadUserNames.mockReset().mockImplementation(async (ids: string[]) =>
+    Object.fromEntries(ids.map((id) => [id, id === "c2" ? "Ana Curadora" : "Bia Curadora"])));
   repo.loadVotes.mockReset().mockImplementation(async (id: string): Promise<LibraryVote[]> =>
     id === "i1" ? [{id: "v1", voterId: "c3", action: "approve", version: 1, createdAt: 1}] : []);
   queue = {
@@ -82,6 +84,28 @@ describe("ReviewQueuePage — professor", () => {
     expect(screen.getByTestId("drop-zone")).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", {name: "Para revisar"})).not.toBeInTheDocument();
+  });
+
+  it("histórico: envio aprovado continua em Meus envios com data e quem aprovou", async () => {
+    queue = {
+      mine: [
+        item("p1", "Aula publicada", {authorId: "t1", status: "published", version: 2, createdAt: 1_700_000_000_000, publishedAt: 1_700_100_000_000}),
+        item("m3", "Em andamento", {authorId: "t1", createdAt: 1_700_200_000_000}),
+      ],
+      toReview: [], returned: [], deleteRequests: [],
+    };
+    repo.loadVotes.mockImplementation(async (id: string): Promise<LibraryVote[]> => id === "p1" ? [
+      {id: "v1", voterId: "c2", action: "approve", version: 2, createdAt: 1},
+      {id: "v2", voterId: "c3", action: "approve", version: 2, createdAt: 2},
+      {id: "v0", voterId: "c4", action: "approve", version: 1, createdAt: 0},
+    ] : []);
+    asTeacher();
+    expect(await screen.findByText("Aula publicada")).toBeInTheDocument();
+    expect(screen.queryByText("Você ainda não enviou nada.")).not.toBeInTheDocument();
+    expect(await screen.findByText("Aprovado por Ana Curadora, Bia Curadora")).toBeInTheDocument();
+    expect(screen.getByText(/Enviado em .* · Publicado em /)).toBeInTheDocument();
+    expect(screen.getByText("Publicado")).toBeInTheDocument();
+    expect(screen.getByText(/Enviado em [^·]*· 0\/2 aprovações/)).toBeInTheDocument();
   });
 
   it("sem envios mostra a mensagem da seção", async () => {

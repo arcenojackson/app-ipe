@@ -1,12 +1,14 @@
 "use client";
 
 import {useRouter, useSearchParams} from "next/navigation";
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {Icon} from "@/core/ui/icons";
 import {REQUIRED_APPROVALS} from "../files";
+import {formatDate} from "../labels";
+import {loadUserNames} from "../repository";
 import {iVoted} from "../reviewQueue";
-import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
+import {approverIds, countApprovals, countDeleteApprovals, statusBadge} from "../status";
 import type {LibraryItem, LibraryVote} from "../types";
 import {viewerFrom} from "../types";
 import {useItemOverlay} from "../useItemOverlay";
@@ -33,6 +35,24 @@ export default function ReviewQueuePage() {
   const [drawerOpen, setDrawerOpen] = useState(params.get("novo") === "1");
   const [tab, setTab] = useState<TabId | null>(null);
   const overlay = useItemOverlay("/ensino/revisao");
+  const [approverNames, setApproverNames] = useState<Record<string, string>>({});
+
+  // Nomes de quem aprovou os envios já publicados do próprio usuário.
+  useEffect(() => {
+    if (!queue || !viewer) return;
+    const ids = queue.mine
+      .filter((i) => i.status === "published")
+      .flatMap((i) => approverIds(i, votes[i.id] ?? []));
+    const missing = [...new Set(ids)].filter((id) => !(id in approverNames));
+    if (missing.length === 0) return;
+    let active = true;
+    loadUserNames(missing)
+      .then((names) => active && setApproverNames((known) => ({...known, ...names})))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [queue, votes, viewer, approverNames]);
 
   if (!viewer) return null;
   const privileged = viewer.isCurator || viewer.isAdmin;
@@ -54,14 +74,24 @@ export default function ReviewQueuePage() {
         `Devolvido: ${item.returnComment}` :
         deletion ? `Pedido de exclusão${reason ? `: ${reason}` : ""}` : undefined;
     const showProgress = deletion || item.status === "in_review";
+    const approvedBy = kind === "mine" && item.status === "published" ?
+      approverIds(item, itemVotes).map((id) => approverNames[id] ?? "Curador") :
+      [];
+    const history = kind === "mine" ?
+      [
+        `Enviado em ${formatDate(item.createdAt)}`,
+        item.status === "published" ? `Publicado em ${formatDate(item.publishedAt)}` : null,
+        showProgress ? `${approvals}/${REQUIRED_APPROVALS} aprovações` : null,
+      ].filter(Boolean).join(" · ") :
+      undefined;
     return (
       <QueueRow
         key={`${kind}-${item.id}`}
         item={item}
         badge={statusBadge(item, countApprovals(item, itemVotes))}
         byTagId={tagById}
-        note={note}
-        progress={showProgress ? `${approvals}/${REQUIRED_APPROVALS} aprovações` : undefined}
+        note={approvedBy.length > 0 ? `Aprovado por ${approvedBy.join(", ")}` : note}
+        progress={history ?? (showProgress ? `${approvals}/${REQUIRED_APPROVALS} aprovações` : undefined)}
         onOpen={() => open(item)}
       />
     );
@@ -75,11 +105,11 @@ export default function ReviewQueuePage() {
   const tabs: Array<{id: TabId; label: string; count: number}> = privileged ?
     [
       {id: "review", label: "Para revisar", count: toReview.length},
-      {id: "mine", label: "Meus envios", count: mine.length},
+      {id: "mine", label: "Meus envios", count: mine.filter((i) => i.status !== "published").length},
       ...(returned.length > 0 ? [{id: "returned" as const, label: "Devolvidos", count: returned.length}] : []),
       {id: "delete", label: "Pedidos de exclusão", count: deleteRequests.length},
     ] :
-    [{id: "mine", label: "Meus envios", count: mine.length}];
+    [{id: "mine", label: "Meus envios", count: mine.filter((i) => i.status !== "published").length}];
   const current = tabs.find((t) => t.id === tab)?.id ?? tabs[0].id;
 
   return (
