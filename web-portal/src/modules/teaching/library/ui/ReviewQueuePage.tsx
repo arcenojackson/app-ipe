@@ -9,10 +9,11 @@ import {iVoted} from "../reviewQueue";
 import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
 import type {LibraryItem, LibraryVote} from "../types";
 import {viewerFrom} from "../types";
-import {libraryUrl} from "../url";
+import {useItemOverlay} from "../useItemOverlay";
 import {useReviewQueue} from "../useReviewQueue";
 import {useTags} from "../useTags";
 import {CuratorWarning} from "./CuratorWarning";
+import {ItemModal} from "./ItemModal";
 import {QueueRow} from "./QueueRow";
 import {UploadDrawer} from "./UploadDrawer";
 
@@ -31,10 +32,11 @@ export default function ReviewQueuePage() {
   const [showVoted, setShowVoted] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(params.get("novo") === "1");
   const [tab, setTab] = useState<TabId | null>(null);
+  const overlay = useItemOverlay("/ensino/revisao");
 
   if (!viewer) return null;
   const privileged = viewer.isCurator || viewer.isAdmin;
-  const open = (item: LibraryItem) => router.push(libraryUrl({item: item.id}));
+  const open = (item: LibraryItem) => overlay.open(item.id);
   const votesOf = (item: LibraryItem): LibraryVote[] => votes[item.id] ?? [];
   const pending = (item: LibraryItem) => showVoted || !iVoted(item, votesOf(item), viewer.uid);
   const closeDrawer = () => {
@@ -95,6 +97,7 @@ export default function ReviewQueuePage() {
       </div>
       {privileged && <CuratorWarning />}
 
+      {overlay.itemId && <ItemModal itemId={overlay.itemId} viewer={viewer} onClose={overlay.close} />}
       {drawerOpen && <UploadDrawer uid={viewer.uid} onClose={closeDrawer} />}
 
       {error && <p role="alert" className="text-sm text-error">{error}</p>}

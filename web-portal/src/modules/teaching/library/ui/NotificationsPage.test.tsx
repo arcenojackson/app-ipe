@@ -7,8 +7,17 @@ import NotificationsPage from "./NotificationsPage";
 
 const notifications = vi.hoisted(() => ({subscribeNotifications: vi.fn(), markRead: vi.fn(), markAllRead: vi.fn()}));
 vi.mock("../notifications", () => notifications);
-const nav = vi.hoisted(() => ({push: vi.fn()}));
-vi.mock("next/navigation", () => ({useRouter: () => ({push: nav.push})}));
+const nav = vi.hoisted(() => ({push: vi.fn(), replace: vi.fn(), back: vi.fn(), search: ""}));
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({push: nav.push, replace: nav.replace, back: nav.back}),
+  useSearchParams: () => new URLSearchParams(nav.search),
+}));
+vi.mock("./ItemModal", () => ({
+  ItemModal: ({itemId, onClose}: {itemId: string; onClose: () => void}) => (
+    <div role="dialog" aria-label="Janela do item">{itemId}<button type="button" onClick={onClose}>Fechar janela</button></div>
+  ),
+}));
+
 
 const list: LibraryNotification[] = [
   {id: "n1", toUid: "t1", type: "published", itemId: "i1", title: "Material publicado", body: "\"Aula\" foi aprovado.", createdAt: 5, readAt: null},
@@ -26,6 +35,9 @@ function renderPage() {
 
 beforeEach(() => {
   nav.push.mockReset();
+  nav.replace.mockReset();
+  nav.back.mockReset();
+  nav.search = "";
   notifications.markRead.mockReset().mockResolvedValue(undefined);
   notifications.markAllRead.mockReset().mockResolvedValue(undefined);
   notifications.subscribeNotifications.mockReset().mockImplementation((_uid, onData) => {
@@ -46,7 +58,24 @@ describe("NotificationsPage", () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", {name: /Material publicado/}));
     await waitFor(() => expect(notifications.markRead).toHaveBeenCalledWith("n1"));
-    expect(nav.push).toHaveBeenCalledWith("/ensino?item=i1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino/notificacoes?item=i1", {scroll: false});
+  });
+
+  it("com ?item= a janela abre sobre as notificações; fechar volta uma entrada", async () => {
+    nav.search = "item=i1";
+    renderPage();
+    expect(await screen.findByRole("dialog", {name: "Janela do item"})).toHaveTextContent("i1");
+    expect(screen.getByText("Material publicado")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", {name: /Material devolvido/}));
+    fireEvent.click(screen.getByRole("button", {name: "Fechar janela"}));
+    expect(nav.back).toHaveBeenCalled();
+  });
+
+  it("link direto: fechar troca a URL para a própria página", async () => {
+    nav.search = "item=i1";
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", {name: "Fechar janela"}));
+    expect(nav.replace).toHaveBeenCalledWith("/ensino/notificacoes", {scroll: false});
   });
 
   it("resposta do Fórum abre o tópico", async () => {
@@ -64,7 +93,7 @@ describe("NotificationsPage", () => {
     renderPage();
     fireEvent.click(await screen.findByRole("button", {name: /Material devolvido/}));
     expect(notifications.markRead).not.toHaveBeenCalled();
-    expect(nav.push).toHaveBeenCalledWith("/ensino?item=i2");
+    expect(nav.push).toHaveBeenCalledWith("/ensino/notificacoes?item=i2", {scroll: false});
   });
 
   it("marcar todas como lidas só envia as não lidas", async () => {

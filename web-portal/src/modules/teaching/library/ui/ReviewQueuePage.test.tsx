@@ -9,13 +9,18 @@ import ReviewQueuePage from "./ReviewQueuePage";
 
 const repo = vi.hoisted(() => ({subscribeReviewQueue: vi.fn(), loadVotes: vi.fn(), countCurators: vi.fn()}));
 vi.mock("../repository", () => repo);
-const nav = vi.hoisted(() => ({push: vi.fn(), replace: vi.fn(), search: ""}));
+const nav = vi.hoisted(() => ({push: vi.fn(), replace: vi.fn(), back: vi.fn(), search: ""}));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({push: nav.push, replace: nav.replace}),
+  useRouter: () => ({push: nav.push, replace: nav.replace, back: nav.back}),
   useSearchParams: () => new URLSearchParams(nav.search),
 }));
 const mutations = vi.hoisted(() => ({createLink: vi.fn()}));
 vi.mock("../mutations", () => mutations);
+vi.mock("./ItemModal", () => ({
+  ItemModal: ({itemId, onClose}: {itemId: string; onClose: () => void}) => (
+    <div role="dialog" aria-label="Janela do item">{itemId}<button type="button" onClick={onClose}>Fechar janela</button></div>
+  ),
+}));
 vi.mock("../notifications", () => ({subscribeNotifications: vi.fn(() => () => undefined)}));
 
 const tagList: Tag[] = [
@@ -106,7 +111,7 @@ describe("ReviewQueuePage — curador", () => {
     await screen.findByText("Parado no autor");
     expect(section("Devolvidos aguardando o autor").getByText(/Sem resposta do autor/)).toBeInTheDocument();
     fireEvent.click(section("Devolvidos aguardando o autor").getByRole("button", {name: "Abrir Parado no autor"}));
-    expect(nav.push).toHaveBeenCalledWith("/ensino?item=r1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino/revisao?item=r1", {scroll: false});
   });
 
   it("mostra as tags de cada item", async () => {
@@ -132,10 +137,19 @@ describe("ReviewQueuePage — curador", () => {
     expect(await screen.findByText("Já votei")).toBeInTheDocument();
   });
 
-  it("clicar numa linha abre ?item=ID", async () => {
+  it("clicar numa linha abre ?item=ID sobre a própria Fila, sem trocar de rota", async () => {
     renderAs("c1");
     fireEvent.click(await screen.findByRole("button", {name: "Abrir Aula 1"}));
-    expect(nav.push).toHaveBeenCalledWith("/ensino?item=i1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino/revisao?item=i1", {scroll: false});
+  });
+
+  it("com ?item= a janela aparece sobre a Fila; fechar volta uma entrada (ou troca a URL em link direto)", async () => {
+    nav.search = "item=i1";
+    renderAs("c1");
+    expect(await screen.findByRole("dialog", {name: "Janela do item"})).toHaveTextContent("i1");
+    expect(screen.getByRole("heading", {name: "Fila de revisão"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Fechar janela"}));
+    expect(nav.replace).toHaveBeenCalledWith("/ensino/revisao", {scroll: false});
   });
 
   it("nada para revisar mostra a mensagem da seção", async () => {

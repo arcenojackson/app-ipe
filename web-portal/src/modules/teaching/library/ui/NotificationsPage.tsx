@@ -7,11 +7,15 @@ import {Button} from "@/core/ui/Button";
 import {formatDateTime} from "../labels";
 import {markAllRead, markRead, subscribeNotifications} from "../notifications";
 import type {LibraryNotification} from "../types";
-import {libraryUrl} from "../url";
+import {viewerFrom} from "../types";
+import {useItemOverlay} from "../useItemOverlay";
+import {ItemModal} from "./ItemModal";
 
 export default function NotificationsPage() {
   const {state} = useAuth();
   const router = useRouter();
+  const overlay = useItemOverlay("/ensino/notificacoes");
+  const viewer = state.status === "signedIn" ? viewerFrom(state.user.uid, state.claims) : null;
   const uid = state.status === "signedIn" ? state.user.uid : null;
   const [list, setList] = useState<LibraryNotification[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +43,8 @@ export default function NotificationsPage() {
         // abrir o item continua funcionando mesmo se marcar falhar
       }
     }
-    router.push(n.topicId ? `/ensino/forum/${n.topicId}` : libraryUrl({item: n.itemId}));
+    if (n.topicId) router.push(`/ensino/forum/${n.topicId}`);
+    else overlay.open(n.itemId);
   }
 
   const unreadIds = (list ?? []).filter((n) => n.readAt === null).map((n) => n.id);
@@ -82,6 +87,7 @@ export default function NotificationsPage() {
           </li>
         ))}
       </ul>
+      {overlay.itemId && viewer && <ItemModal itemId={overlay.itemId} viewer={viewer} onClose={overlay.close} />}
     </div>
   );
 }
