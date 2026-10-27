@@ -5,7 +5,15 @@ export interface AccessClaims {
   teachingRole: TeachingRole | null;
 }
 
-export type AccessRequirement = "authenticated" | "teacher" | "curator" | "admin";
+// "teachingManager": quem gerencia papéis de ensino. Exige ser Curador E admin
+// (o servidor só deixa admin gravar `teaching_role`); admin sem papel de curador
+// e curador sem admin não gerenciam.
+export type AccessRequirement =
+  | "authenticated"
+  | "teacher"
+  | "curator"
+  | "admin"
+  | "teachingManager";
 
 export function parseClaims(
   raw: Record<string, unknown> | null | undefined
@@ -37,5 +45,7 @@ export function hasAccess(
       return claims.teachingRole === "curator";
     case "admin":
       return claims.admin;
+    case "teachingManager":
+      return claims.admin && claims.teachingRole === "curator";
   }
 }

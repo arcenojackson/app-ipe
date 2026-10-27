@@ -2,8 +2,8 @@ import {describe, expect, it} from "vitest";
 import {teachingModule} from "./module";
 
 describe("teachingModule", () => {
-  it("o módulo não é liberado por ser admin: cada item define seu acesso", () => {
-    expect(teachingModule.access).toBe("authenticated");
+  it("o módulo exige papel de ensino; só o Grupo exige gerenciar papéis", () => {
+    expect(teachingModule.access).toBe("teacher");
     for (const item of teachingModule.navItems.filter((i) => i.href !== "/ensino/admin")) {
       expect(item.access).toBe("teacher");
     }
@@ -25,10 +25,10 @@ describe("teachingModule", () => {
     expect(item).toMatchObject({label: "Fórum", access: "teacher", icon: "forum"});
   });
 
-  it("Biblioteca (a Início) e Notificações são de professores; o grupo é do admin", () => {
+  it("Biblioteca (a Início) e Notificações são de professores; o grupo é de quem gerencia papéis", () => {
     const access = (href: string) => teachingModule.navItems.find((i) => i.href === href)?.access;
     expect(access("/ensino")).toBe("teacher");
     expect(access("/ensino/notificacoes")).toBe("teacher");
-    expect(access("/ensino/admin")).toBe("admin");
+    expect(access("/ensino/admin")).toBe("teachingManager");
   });
 });

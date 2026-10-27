@@ -29,6 +29,17 @@ void main() {
     expect(canUseTeachingForum(null), false);
   });
 
+  test('papéis de ensino: só Curador gerencia (admin sozinho e professor não)', () {
+    expect(canManageTeachingRoles(user(role: TeachingRole.curator)), true);
+    expect(canManageTeachingRoles(user(role: TeachingRole.curator, admin: true)), true);
+    expect(canManageTeachingRoles(user(admin: true)), false);
+    expect(canManageTeachingRoles(user(role: TeachingRole.teacher, admin: true)), false);
+    expect(canManageTeachingRoles(user(role: TeachingRole.teacher)), false);
+    expect(canManageTeachingRoles(user()), false);
+    expect(canManageTeachingRoles(user(role: TeachingRole.curator, pending: true)), false);
+    expect(canManageTeachingRoles(null), false);
+  });
+
   test('moderação: curador ou admin ativo', () {
     expect(forumViewerFor(user(role: TeachingRole.curator))!.isModerator, true);
     expect(forumViewerFor(user(role: TeachingRole.teacher, admin: true))!.isModerator, true);

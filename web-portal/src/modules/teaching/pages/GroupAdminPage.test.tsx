@@ -1,7 +1,24 @@
 import {act, fireEvent, render, screen, waitFor} from "@testing-library/react";
+import type {User} from "firebase/auth";
 import {beforeEach, describe, expect, it, vi} from "vitest";
+import type {AccessClaims} from "@/core/auth/access";
+import {AuthContext, type AuthState} from "@/core/auth/AuthContext";
 import type {MemberRow} from "../data/memberRows";
-import GroupAdminPage from "./GroupAdminPage";
+import GroupAdminPageBase from "./GroupAdminPage";
+
+const user = {uid: "me", displayName: "Eu", email: "eu@ipe.org"} as User;
+
+function pageAs(claims: AccessClaims) {
+  const state: AuthState = {status: "signedIn", user, claims};
+  return (
+    <AuthContext.Provider value={{state, refreshAccess: vi.fn(), signOut: vi.fn()}}>
+      <GroupAdminPageBase />
+    </AuthContext.Provider>
+  );
+}
+
+// Padrão: admin que também é curador (quem gerencia papéis).
+const GroupAdminPage = () => pageAs({admin: true, teachingRole: "curator"});
 
 const repo = vi.hoisted(() => ({
   listMembers: vi.fn(),
@@ -18,6 +35,22 @@ const rows: MemberRow[] = [
 beforeEach(() => {
   repo.listMembers.mockReset().mockResolvedValue(rows);
   repo.setTeachingRole.mockReset().mockResolvedValue(undefined);
+});
+
+describe("GroupAdminPage: quem pode gerenciar", () => {
+  it.each([
+    ["admin sem papel de ensino", {admin: true, teachingRole: null}],
+    ["admin professor", {admin: true, teachingRole: "teacher"}],
+    ["curador sem admin", {admin: false, teachingRole: "curator"}],
+    ["professor", {admin: false, teachingRole: "teacher"}],
+    ["sem papel", {admin: false, teachingRole: null}],
+  ] as Array<[string, AccessClaims]>)("%s: sem acesso e sem listar nem gravar", (_name, claims) => {
+    render(pageAs(claims));
+    expect(screen.getByText(/acesso restrito/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Buscar por nome ou e-mail")).not.toBeInTheDocument();
+    expect(repo.listMembers).not.toHaveBeenCalled();
+    expect(repo.setTeachingRole).not.toHaveBeenCalled();
+  });
 });
 
 describe("GroupAdminPage", () => {

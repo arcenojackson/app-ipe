@@ -7,6 +7,7 @@ import '../../../shared/utils/app_toast.dart';
 import '../../../shared/utils/sort_utils.dart';
 import '../../../shared/state/app_state.dart';
 import '../data/people_repository.dart';
+import '../../teaching_forum/models/teaching_access.dart';
 import '../models/teaching_role_menu_option.dart';
 import 'widgets/invite_person_sheet.dart';
 
@@ -286,8 +287,10 @@ class _PeopleSectionState extends State<PeopleSection> {
                                   );
                                 }
 
-                                // Papel de ensino (apenas para usuários aprovados)
-                                if (!person.isPending) {
+                                // Papel de ensino: só Curador gerencia (admin sem
+                                // papel de curador não vê estas opções).
+                                if (!person.isPending &&
+                                    canManageTeachingRoles(widget.currentUser)) {
                                   for (final option in teachingRoleMenuOptions(
                                     person.teachingRole,
                                   )) {
@@ -443,6 +446,7 @@ class _PeopleSectionState extends State<PeopleSection> {
   }
 
   Future<void> _setTeachingRole(UserModel user, TeachingRole role) async {
+    if (!canManageTeachingRoles(widget.currentUser)) return;
     try {
       await context.read<PeopleRepository>().setTeachingRole(
         userId: user.id,

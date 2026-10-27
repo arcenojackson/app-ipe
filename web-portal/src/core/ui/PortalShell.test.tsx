@@ -79,10 +79,24 @@ describe("PortalShell", () => {
     expect(screen.getByText(/acesso restrito/i)).toBeInTheDocument();
   });
 
-  it("admin vê o conteúdo em /ensino/admin e o menu completo", () => {
+  it("admin sem papel de ensino não vê nada do ensino, nem o Grupo", () => {
     renderAt("/ensino/admin", signedIn(admin));
+    expect(screen.queryByText("conteúdo da página")).not.toBeInTheDocument();
+    expect(screen.getByText(/acesso restrito/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", {name: "Grupo de professores"})).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", {name: "Biblioteca"})).not.toBeInTheDocument();
+  });
+
+  it("admin que também é curador vê o conteúdo em /ensino/admin e o menu completo", () => {
+    renderAt("/ensino/admin", signedIn({admin: true, teachingRole: "curator"}));
     expect(screen.getByText("conteúdo da página")).toBeInTheDocument();
     expect(screen.getByRole("link", {name: "Grupo de professores"})).toBeInTheDocument();
+  });
+
+  it("curador sem admin não vê o Grupo", () => {
+    renderAt("/ensino", signedIn({admin: false, teachingRole: "curator"}));
+    expect(screen.getByRole("link", {name: "Biblioteca"})).toBeInTheDocument();
+    expect(screen.queryByRole("link", {name: "Grupo de professores"})).not.toBeInTheDocument();
   });
 
   it("o menu do professor não mostra itens de admin", () => {
