@@ -3,20 +3,26 @@ import 'package:flutter/foundation.dart';
 import '../data/forum_repository.dart';
 import '../models/forum_logic.dart';
 import '../models/forum_models.dart';
-
 class ForumEditorController extends ChangeNotifier {
   ForumEditorController({
     required this.repository,
     required this.author,
     this.editing,
-  }) : selectedTags = {...?editing?.tagIds};
+  })  : selectedTags = {...?editing?.tagIds},
+        refs = [...?editing?.refs];
 
   final ForumRepository repository;
   final ForumAuthor author;
   final ForumTopic? editing;
 
   final Set<String> selectedTags;
+  List<ForumRef> refs;
   List<SubjectTag> tags = [];
+
+  void setRefs(List<ForumRef> next) {
+    refs = next.take(forumMaxRefs).toList();
+    notifyListeners();
+  }
   bool saving = false;
   String? error;
 
@@ -54,7 +60,7 @@ class ForumEditorController extends ChangeNotifier {
       title: title,
       body: body,
       tagIds: selectedTags.toList(),
-      refs: editing?.refs ?? const [],
+      refs: refs,
     );
     final invalid = validateTopicInput(input);
     if (invalid != null) {

@@ -218,7 +218,7 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
             perms: c.commentPerms,
             myVotes: c.myVotes,
             onVote: (cm, v) => c.vote(cm, v),
-            onReply: (cm, text) => c.submitComment(text, cm),
+            onReply: (cm, text, refs) => c.submitComment(text, cm, refs: refs),
             onEdit: (cm, text) => c.editComment(cm, text),
             onDelete: (cm) async {
               if (await _confirm('Apagar este comentário?')) await c.deleteComment(cm);
@@ -226,7 +226,10 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
           ),
         const SizedBox(height: 16),
         if (perms.canComment)
-          CommentComposer(onSubmit: (text) => c.submitComment(text, null))
+          CommentComposer(
+            allowRefs: true,
+            onSubmit: (text, refs) => c.submitComment(text, null, refs: refs),
+          )
         else
           const Text('Este tópico não aceita novos comentários.',
               style: TextStyle(color: Colors.white54)),

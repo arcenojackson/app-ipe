@@ -7,6 +7,7 @@ import '../models/forum_logic.dart';
 import '../models/forum_models.dart';
 import 'forum_editor_controller.dart';
 import 'widgets/forum_scaffold.dart';
+import 'widgets/ref_picker.dart';
 import 'widgets/subject_filter.dart';
 import 'widgets/subject_multi_sheet.dart';
 
@@ -118,13 +119,8 @@ class _ForumEditorPageState extends State<ForumEditorPage> {
               ],
             ),
           ],
-          if (widget.editing != null && widget.editing!.refs.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text('Citações (somente leitura no app)',
-                style: TextStyle(color: Colors.white70)),
-            for (final r in widget.editing!.refs)
-              Text('• ${r.label}', style: const TextStyle(color: Colors.white54)),
-          ],
+          const SizedBox(height: 12),
+          RefPickerField(value: c.refs, onChanged: c.setRefs),
           if (c.error != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),

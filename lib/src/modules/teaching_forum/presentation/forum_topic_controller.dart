@@ -103,9 +103,10 @@ class ForumTopicController extends ChangeNotifier {
   }
 
   /// Devolve `true` se enviou; em erro o chamador mantém o texto digitado.
-  Future<bool> submitComment(String body, ForumComment? parent) async {
+  Future<bool> submitComment(String body, ForumComment? parent,
+      {List<ForumRef> refs = const []}) async {
     if (sending || topic == null || !permissions!.canComment) return false;
-    final input = ForumCommentInput(body: body);
+    final input = ForumCommentInput(body: body, refs: refs);
     final invalid = validateCommentInput(input);
     if (invalid != null) {
       actionError = invalid;

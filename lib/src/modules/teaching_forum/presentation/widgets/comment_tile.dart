@@ -23,7 +23,7 @@ class CommentTile extends StatefulWidget {
   final CommentPermissions Function(ForumComment) perms;
   final Map<String, int> myVotes;
   final void Function(ForumComment, int) onVote;
-  final Future<bool> Function(ForumComment, String) onReply;
+  final Future<bool> Function(ForumComment, String, List<ForumRef>) onReply;
   final Future<bool> Function(ForumComment, String) onEdit;
   final Future<void> Function(ForumComment) onDelete;
 
@@ -67,7 +67,7 @@ class _CommentTileState extends State<CommentTile> {
                 initialText: c.body,
                 submitLabel: 'Salvar',
                 onCancel: () => setState(() => _editing = false),
-                onSubmit: (text) async {
+                onSubmit: (text, _) async {
                   final ok = await widget.onEdit(c, text);
                   if (ok && mounted) setState(() => _editing = false);
                   return ok;
@@ -116,9 +116,10 @@ class _CommentTileState extends State<CommentTile> {
             if (_replying)
               CommentComposer(
                 hint: 'Escreva uma resposta',
+                allowRefs: true,
                 onCancel: () => setState(() => _replying = false),
-                onSubmit: (text) async {
-                  final ok = await widget.onReply(c, text);
+                onSubmit: (text, refs) async {
+                  final ok = await widget.onReply(c, text, refs);
                   if (ok && mounted) setState(() => _replying = false);
                   return ok;
                 },
