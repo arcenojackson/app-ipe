@@ -486,6 +486,50 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                     const SizedBox(height: 24),
 
+                    // Plataforma pedagógica - apenas professor e curador
+                    if (canUseTeachingForum(user)) ...[
+                      Text(
+                        'Plataforma pedagógica',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      GlassContainer(
+                        padding: EdgeInsets.zero,
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.school_outlined,
+                            color: Colors.white70,
+                          ),
+                          title: const Text(
+                            'Plataforma pedagógica',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          subtitle: Text(
+                            'Fórum de professores',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: Colors.white60,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.chevron_right,
+                            color: Colors.white54,
+                          ),
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const TeachingHomePage(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
+
                     // Seção de Equipe de Louvor
                     Builder(
                       builder: (context) {
@@ -678,50 +722,6 @@ class _SettingsPageState extends State<SettingsPage> {
                               ),
                             );
                           },
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-
-                    // Plataforma pedagógica - apenas professor e curador
-                    if (canUseTeachingForum(user)) ...[
-                      Text(
-                        'Plataforma pedagógica',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      GlassContainer(
-                        padding: EdgeInsets.zero,
-                        child: ListTile(
-                          leading: const Icon(
-                            Icons.school_outlined,
-                            color: Colors.white70,
-                          ),
-                          title: const Text(
-                            'Plataforma pedagógica',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          subtitle: Text(
-                            'Fórum de professores',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.white60,
-                            ),
-                          ),
-                          trailing: const Icon(
-                            Icons.chevron_right,
-                            color: Colors.white54,
-                          ),
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const TeachingHomePage(),
-                            ),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
