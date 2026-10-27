@@ -3,6 +3,7 @@ import type {User} from "firebase/auth";
 import {beforeEach, describe, expect, it, vi} from "vitest";
 import type {AccessClaims} from "@/core/auth/access";
 import {AuthContext, type AuthState} from "@/core/auth/AuthContext";
+import {electionsModule} from "@/modules/elections/module";
 import {teachingModule} from "@/modules/teaching/module";
 import {PortalShell} from "./PortalShell";
 
@@ -17,11 +18,15 @@ const refreshAccess = vi.fn().mockResolvedValue(undefined);
 const signOut = vi.fn().mockResolvedValue(undefined);
 const user = {displayName: "Ana", email: "ana@ipe.org"} as User;
 
-function renderAt(path: string, state: AuthState) {
+function renderAt(
+  path: string,
+  state: AuthState,
+  modules = [teachingModule]
+) {
   nav.path = path;
   return render(
     <AuthContext.Provider value={{state, refreshAccess, signOut}}>
-      <PortalShell modules={[teachingModule]}>
+      <PortalShell modules={modules}>
         <p>conteúdo da página</p>
       </PortalShell>
     </AuthContext.Provider>
@@ -88,3 +93,25 @@ function cleanupAndRender(path: string, state: AuthState) {
   document.body.innerHTML = "";
   renderAt(path, state);
 }
+
+describe("PortalShell: menu só no módulo de ensino", () => {
+  const both = [teachingModule, electionsModule];
+
+  it("em /eleicoes não mostra o menu nem a marca do Portal de Ensino", () => {
+    renderAt("/eleicoes/abc", signedIn(noRole), both);
+    expect(screen.getByText("conteúdo da página")).toBeInTheDocument();
+    expect(screen.queryByText("Portal de Ensino")).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", {name: "Principal"})).not.toBeInTheDocument();
+  });
+
+  it("em /eleicoes, deslogado continua indo para /login", () => {
+    renderAt("/eleicoes/abc", {status: "signedOut"}, both);
+    expect(nav.replace).toHaveBeenCalledWith("/login");
+  });
+
+  it("em /ensino o menu do Portal de Ensino continua aparecendo", () => {
+    renderAt("/ensino", signedIn(teacher), both);
+    expect(screen.getByText("Portal de Ensino")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", {name: "Principal"})).toBeInTheDocument();
+  });
+});

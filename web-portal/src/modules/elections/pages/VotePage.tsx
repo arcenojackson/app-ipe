@@ -3,6 +3,7 @@
 import {useEffect, useRef, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {GlassCard} from "@/core/ui/GlassCard";
+import {LoadingText} from "@/core/ui/Spinner";
 import {BallotStep} from "../components/BallotStep";
 import {JoinStep} from "../components/JoinStep";
 import {
@@ -108,7 +109,7 @@ export function VotePage({electionId}: {electionId: string}) {
             <p className="text-sm text-white/70">{election.societyName}</p>
           </header>
         )}
-        {view.kind === "loading" && <p className="text-sm text-white/70">Carregando...</p>}
+        {view.kind === "loading" && <LoadingText>Carregando...</LoadingText>}
         {view.kind === "notFound" && <p>Eleição não encontrada.</p>}
         {view.kind === "notOpen" && <p>Esta eleição ainda não foi aberta. Aguarde o início.</p>}
         {view.kind === "closed" && <p>Esta eleição foi encerrada.</p>}
@@ -120,13 +121,13 @@ export function VotePage({electionId}: {electionId: string}) {
           />
         )}
         {view.kind === "pending" && (
-          <p>Aguardando aprovação do administrador. Esta tela atualiza sozinha.</p>
+          <LoadingText>Aguardando aprovação do administrador. Esta tela atualiza sozinha.</LoadingText>
         )}
         {view.kind === "rejected" && (
           <p>Sua participação não foi liberada. Procure o administrador da eleição.</p>
         )}
         {view.kind === "waitingRound" && (
-          <p>Aguardando a próxima votação. Esta tela atualiza sozinha.</p>
+          <LoadingText>Aguardando a próxima votação. Esta tela atualiza sozinha.</LoadingText>
         )}
         {view.kind === "ballot" && (
           <BallotStep

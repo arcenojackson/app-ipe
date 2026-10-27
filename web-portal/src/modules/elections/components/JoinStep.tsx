@@ -3,6 +3,7 @@
 import {useState, type FormEvent} from "react";
 import {authErrorMessage} from "@/core/auth/errors";
 import {Button} from "@/core/ui/Button";
+import {LoadingText} from "@/core/ui/Spinner";
 import {TextField} from "@/core/ui/TextField";
 import {
   checkIn,
@@ -48,7 +49,7 @@ export function JoinStep({electionId, needsName, verifying}: Props) {
     authErrorMessage((e as {code?: string}).code ?? "");
 
   if (verifying) {
-    return <p className="text-sm text-white/70">Verificando sua presença...</p>;
+    return <LoadingText>Verificando sua presença...</LoadingText>;
   }
 
   if (needsName) {
@@ -65,7 +66,7 @@ export function JoinStep({electionId, needsName, verifying}: Props) {
         </p>
         <TextField id="voter-name" label="Seu nome" required value={name} onChange={(e) => setName(e.target.value)} />
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
-        <Button type="submit" disabled={busy} className="w-full">Continuar</Button>
+        <Button type="submit" loading={busy} className="w-full">Continuar</Button>
       </form>
     );
   }
@@ -83,7 +84,7 @@ export function JoinStep({electionId, needsName, verifying}: Props) {
           <TextField id="email" label="E-mail" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
           <TextField id="password" label="Senha" type="password" autoComplete="current-password" required value={password} onChange={(e) => setPassword(e.target.value)} />
           {error && <p role="alert" className="text-sm text-error">{error}</p>}
-          <Button type="submit" disabled={busy} className="w-full">Entrar</Button>
+          <Button type="submit" loading={busy} className="w-full">Entrar</Button>
         </form>
         <Button type="button" variant="text" className="w-full" onClick={() => { setError(null); setMode("choose"); }}>
           Voltar
@@ -98,7 +99,7 @@ export function JoinStep({electionId, needsName, verifying}: Props) {
         Para votar, entre com a sua conta. Quem ainda não tem cadastro é
         cadastrado automaticamente.
       </p>
-      <Button type="button" className="w-full" disabled={busy} onClick={() => run(() => signInWithGoogle(), authMessage)}>
+      <Button type="button" className="w-full" loading={busy} onClick={() => run(() => signInWithGoogle(), authMessage)}>
         Entrar com Google
       </Button>
       <Button type="button" variant="text" className="w-full" onClick={() => setMode("login")}>

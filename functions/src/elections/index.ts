@@ -6,6 +6,7 @@ import {applyBoard, createElection, setElectionStatus} from "./lifecycle";
 import {
   bumpVotedCount, castVote, closeScrutiny, startScrutiny,
 } from "./scrutinies";
+import {applyDueBoards} from "./transitions";
 import {checkIn, reviewVoter} from "./voters";
 
 const needAuth = (context: functions.https.CallableContext) => {
@@ -73,6 +74,20 @@ export const electionPickOldest = functions.https.onCall((data, context) =>
 
 export const electionApplyBoard =functions.https.onCall((data, context) =>
   applyBoard(admin.firestore(), needDirectorAuth(context).uid, data));
+
+// Mandatos vão de 01/01 a 31/12: a diretoria eleita fica em espera
+// (`boardTransitions`) e assume por esta rotina, todo 01/01 ao meio-dia.
+export const electionApplyDueBoards = functions
+  .region("us-central1")
+  .pubsub.schedule("0 12 1 1 *")
+  .timeZone("America/Sao_Paulo")
+  .onRun(async () => {
+    const res = await applyDueBoards(admin.firestore());
+    console.log(
+      `Diretorias aplicadas: ${res.applied.length}; ` +
+        `com falha: ${res.failed.length}`
+    );
+  });
 
 // Contador ao vivo "X de Y votaram": roda fora da transação do voto.
 export const electionVoteRecorded = functions.firestore

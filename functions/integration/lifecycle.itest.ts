@@ -4,6 +4,7 @@ import {
   createElection,
   setElectionStatus,
 } from "../src/elections/lifecycle";
+import {applyDueBoards} from "../src/elections/transitions";
 import {
   ADMIN, DIRECTOR, DIRECTOR2, ELECTION, MEMBER, MEMBER2, MEMBER3, OTHER_DIRECTOR,
   OTHER_SOCIETY,
@@ -156,30 +157,38 @@ const decided = (position: string, winnerId: string) =>
   seedCargo(position, {stage: "decided", winnerId});
 
 const board = async () => (await db.doc(`societies/${SOCIETY}`).get()).get("board");
-const directorIds = async () =>
-  (await db.doc(`elections/${ELECTION}`).get()).get("directorIds") as string[];
+const transition = async () =>
+  (await db.doc(`boardTransitions/${ELECTION}`).get()).data();
 const apply = (uid = DIRECTOR) => applyBoard(db, uid, {electionId: ELECTION});
+const ORIGINAL_BOARD = {presidente: [DIRECTOR], vice: [DIRECTOR2]};
+// 01/01/2027 ao meio-dia em São Paulo.
+const JAN_1_NOON = new Date("2027-01-01T15:00:00Z");
 
-describe("applyBoard", () => {
+describe("applyBoard (registra a diretoria em espera)", () => {
   beforeEach(async () => {
     await clearDb();
     await seedBase("closed");
   });
 
-  it("só diretor da eleição aplica", async () => {
+  it("só diretor da eleição registra", async () => {
     await decided("presidente", MEMBER2);
     for (const uid of [MEMBER, OTHER_DIRECTOR, ADMIN]) {
       await expectCode(apply(uid), "permission-denied");
     }
-    expect(await board()).toEqual({presidente: [DIRECTOR], vice: [DIRECTOR2]});
+    expect(await transition()).toBeUndefined();
   });
 
-  it("grava só os cargos decididos, preserva os demais e avisa o que falta de obrigatório", async () => {
+  it("não altera a diretoria atual: grava só os decididos como pendentes", async () => {
     await decided("presidente", MEMBER2);
     const res = await apply();
     expect(res.winners).toEqual({presidente: MEMBER2});
     expect(res.missingRequired).toEqual(["vice"]);
-    expect(await board()).toEqual({presidente: [MEMBER2], vice: [DIRECTOR2]});
+    expect(await board()).toEqual(ORIGINAL_BOARD);
+    const t = (await transition())!;
+    expect(t.status).toBe("pending");
+    expect(t.societyId).toBe(SOCIETY);
+    expect(t.winners).toEqual({presidente: MEMBER2});
+    expect(t.effectiveAt.toMillis()).toBe(res.effectiveAtMs);
     expect((await db.doc(`elections/${ELECTION}`).get()).get("boardAppliedAt")).toBeDefined();
   });
 
@@ -189,63 +198,117 @@ describe("applyBoard", () => {
     expect((await apply()).missingRequired).toEqual([]);
   });
 
-  it("usa as chaves do app, inclusive a do 2º secretário", async () => {
-    await decided("secretario", MEMBER);
-    await decided("secretario2", MEMBER2);
-    await decided("tesoureiro", MEMBER3);
-    await apply();
-    const b = await board();
-    expect(b["secretario(a)"]).toEqual([MEMBER]);
-    expect(b["2º secretario(a)"]).toEqual([MEMBER2]);
-    expect(b["tesoureiro(a)"]).toEqual([MEMBER3]);
-  });
-
   it("cargo não decidido não entra", async () => {
     await decided("presidente", MEMBER);
     await seedCargo("vice", {stage: "awaiting3", winnerId: MEMBER2});
-    const res = await apply();
-    expect(res.winners).toEqual({presidente: MEMBER});
+    expect((await apply()).winners).toEqual({presidente: MEMBER});
   });
 
-  it("nenhum cargo decidido: erro claro e nada muda", async () => {
+  it("nenhum cargo decidido: erro claro e nada é registrado", async () => {
     await expectCode(apply(), "failed-precondition");
-    expect(await board()).toEqual({presidente: [DIRECTOR], vice: [DIRECTOR2]});
+    expect(await transition()).toBeUndefined();
   });
 
-  it("diretoria vazia em formato de lista (sociedade nova) vira mapa", async () => {
-    await db.doc(`societies/${SOCIETY}`).update({board: []});
-    await decided("vice", MEMBER2);
-    await apply();
-    expect(await board()).toEqual({vice: [MEMBER2]});
-  });
-
-  it("diretoria antiga com pessoas (lista) é recusada, sem perder ninguém", async () => {
+  it("diretoria antiga com pessoas (lista) é recusada, sem registrar nada", async () => {
     await db.doc(`societies/${SOCIETY}`).update({board: ["a", "b"]});
     await decided("vice", MEMBER2);
     await expectCode(apply(), "failed-precondition");
+    expect(await transition()).toBeUndefined();
     expect(await board()).toEqual(["a", "b"]);
   });
 
-  it("não duplica cargo gravado como 'Presidente'", async () => {
-    await db.doc(`societies/${SOCIETY}`).update({board: {Presidente: ["old"]}});
+  it("repetir substitui o registro pendente (uma só vez, com o mesmo createdAt)", async () => {
     await decided("presidente", MEMBER2);
     await apply();
-    expect(await board()).toEqual({presidente: [MEMBER2]});
-  });
-
-  it("os novos diretores passam a ter acesso e os antigos continuam", async () => {
-    await decided("presidente", MEMBER2);
+    const first = (await transition())!;
+    await decided("presidente", MEMBER3);
     await apply();
-    expect((await directorIds()).sort()).toEqual([DIRECTOR, DIRECTOR2, MEMBER2].sort());
-    // Quem acabou de ser eleito já consegue conduzir/ver a eleição.
-    await apply(MEMBER2);
-  });
-
-  it("registra evento e pode ser reaplicada", async () => {
-    await decided("presidente", MEMBER2);
-    await apply();
-    await apply();
+    const second = (await transition())!;
+    expect(second.winners).toEqual({presidente: MEMBER3});
+    expect(second.createdAt.toMillis()).toBe(first.createdAt.toMillis());
+    const all = await db.collection("boardTransitions").get();
+    expect(all.size).toBe(1);
     const events = await db.collection(`elections/${ELECTION}/events`).get();
-    expect(events.docs.filter((d) => d.get("type") === "board_applied")).toHaveLength(2);
+    expect(events.docs.filter((d) => d.get("type") === "board_scheduled")).toHaveLength(2);
+  });
+
+  it("depois que a diretoria assumiu, não registra de novo", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    await applyDueBoards(db, JAN_1_NOON);
+    await expectCode(apply(), "failed-precondition");
+  });
+});
+
+describe("applyDueBoards (rotina de 01/01)", () => {
+  beforeEach(async () => {
+    await clearDb();
+    await seedBase("closed");
+  });
+
+  it("antes da vigência não muda nada", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    const res = await applyDueBoards(db, new Date("2026-12-31T20:00:00Z"));
+    expect(res.applied).toEqual([]);
+    expect(await board()).toEqual(ORIGINAL_BOARD);
+    expect((await transition())!.status).toBe("pending");
+  });
+
+  it("na vigência troca só os cargos eleitos e marca como aplicada", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    const res = await applyDueBoards(db, JAN_1_NOON);
+    expect(res.applied).toEqual([ELECTION]);
+    expect(await board()).toEqual({presidente: [MEMBER2], vice: [DIRECTOR2]});
+    const t = (await transition())!;
+    expect(t.status).toBe("applied");
+    expect(t.appliedAt).toBeDefined();
+    const events = await db.collection(`elections/${ELECTION}/events`).get();
+    expect(events.docs.filter((d) => d.get("type") === "board_applied")).toHaveLength(1);
+  });
+
+  it("usa as chaves do app, inclusive a do 2º secretário, sem duplicar cargo", async () => {
+    await db.doc(`societies/${SOCIETY}`).update({board: {Presidente: ["old"]}});
+    await decided("presidente", MEMBER);
+    await decided("secretario2", MEMBER2);
+    await decided("tesoureiro", MEMBER3);
+    await apply();
+    await applyDueBoards(db, JAN_1_NOON);
+    expect(await board()).toEqual({
+      presidente: [MEMBER],
+      "2º secretario(a)": [MEMBER2],
+      "tesoureiro(a)": [MEMBER3],
+    });
+  });
+
+  it("rodar de novo não reaplica", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    await applyDueBoards(db, JAN_1_NOON);
+    await db.doc(`societies/${SOCIETY}`).update({board: {presidente: ["x"]}});
+    const res = await applyDueBoards(db, JAN_1_NOON);
+    expect(res.applied).toEqual([]);
+    expect(await board()).toEqual({presidente: ["x"]});
+  });
+
+  it("sociedade com diretoria em formato antigo vira failed e não trava as outras", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    await db.doc(`societies/${SOCIETY}`).update({board: ["a"]});
+    await db.doc("boardTransitions/e2").set({
+      electionId: "e2",
+      societyId: OTHER_SOCIETY,
+      winners: {presidente: MEMBER},
+      effectiveAt: new Date("2027-01-01T03:00:00Z"),
+      status: "pending",
+      createdAt: new Date("2026-12-20T12:00:00Z"),
+    });
+    const res = await applyDueBoards(db, JAN_1_NOON);
+    expect(res.applied).toEqual(["e2"]);
+    expect(res.failed.map((f) => f.electionId)).toEqual([ELECTION]);
+    expect((await transition())!.status).toBe("failed");
+    expect((await db.doc(`societies/${OTHER_SOCIETY}`).get()).get("board"))
+      .toEqual({presidente: [MEMBER]});
   });
 });

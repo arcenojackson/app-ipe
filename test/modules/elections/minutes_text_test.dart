@@ -172,4 +172,54 @@ void main() {
     expect(t, contains('1º Secretário(a)'));
     expect(t, contains('2º Secretário(a)'));
   });
+
+  test('no 1º escrutínio a ata omite quem teve 0 voto; no 2º mantém todos', () {
+    final t = buildMinutesText(
+      election: election,
+      cargos: const [],
+      voters: const [],
+      rounds: [
+        round(
+          'a',
+          'presidente',
+          1,
+          [ana, bia, caio],
+          result(counts: {'ana': 2, 'bia': 1}, total: 3, threshold: 2),
+        ),
+        round(
+          'b',
+          'vice',
+          2,
+          [ana, bia, caio],
+          result(counts: {'ana': 2, 'bia': 1}, total: 3, threshold: 2),
+        ),
+      ],
+      events: const [],
+    );
+    final lines = t.split('\n').where((l) => l.contains('escrutínio —'));
+    final first = lines.firstWhere((l) => l.contains('1º escrutínio'));
+    final second = lines.firstWhere((l) => l.contains('2º escrutínio'));
+    expect(first, contains('Ana: 2'));
+    expect(first, contains('Bia: 1'));
+    expect(first, isNot(contains('Caio')));
+    expect(second, contains('Caio: 0'));
+  });
+
+  test('linha do tempo: diretoria registrada com a data em que assume', () {
+    final t = buildMinutesText(
+      election: election,
+      cargos: const [],
+      voters: const [],
+      rounds: const [],
+      events: [
+        ElectionEvent(
+          id: 'b',
+          type: 'board_scheduled',
+          at: DateTime(2026, 12, 10, 21, 0),
+          data: {'effectiveAtMs': DateTime.utc(2027, 1, 1, 3).millisecondsSinceEpoch},
+        ),
+      ],
+    );
+    expect(t, contains('Diretoria registrada para assumir em 01/01/2027'));
+  });
 }

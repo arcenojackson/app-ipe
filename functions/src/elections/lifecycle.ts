@@ -1,7 +1,7 @@
 import {FieldValue, Timestamp, type Firestore} from "firebase-admin/firestore";
-import {applyWinners} from "./board";
 import {fail, logEvent, requireString} from "./common";
 import {assertElectionDirector, directorIdsOf} from "./directors";
+import {nextTermStart} from "./transitions";
 import {normalizePositions, REQUIRED_POSITIONS} from "./positions";
 
 // Cria a eleição em rascunho. Só quem está na diretoria *atual* da sociedade
@@ -65,13 +65,19 @@ export const createElection = async (
   return {electionId: electionRef.id};
 };
 
-// Grava os eleitos (cargos `decided`) em `societies/{id}.board`, só nesses
-// cargos, e dá aos novos diretores acesso à eleição (união, sem tirar ninguém).
+// Registra os eleitos (cargos `decided`) como diretoria em espera em
+// `boardTransitions/{electionId}`. Quem assume é a rotina de 01/01
+// (`applyDueBoards`); aqui a diretoria atual não muda. Pode ser repetido até
+// a diretoria assumir: o registro é substituído.
 export const applyBoard = async (
   db: Firestore,
   uid: string,
   data: unknown
-): Promise<{winners: Record<string, string>; missingRequired: string[]}> => {
+): Promise<{
+  winners: Record<string, string>;
+  missingRequired: string[];
+  effectiveAtMs: number;
+}> => {
   const electionId = requireString(data, "electionId");
   const election = await assertElectionDirector(db, uid, electionId);
 
@@ -87,7 +93,9 @@ export const applyBoard = async (
   }
 
   const societyRef = db.doc(`societies/${election.societyId}`);
+  const transitionRef = db.doc(`boardTransitions/${electionId}`);
   const electionRef = db.doc(`elections/${electionId}`);
+  const effectiveAt = nextTermStart(new Date());
   await db.runTransaction(async (tx) => {
     const society = await tx.get(societyRef);
     if (!society.exists) throw fail("not-found", "Sociedade não encontrada.");
@@ -96,24 +104,40 @@ export const applyBoard = async (
       throw fail(
         "failed-precondition",
         "A diretoria desta sociedade está no formato antigo (sem cargos). " +
-          "Defina os cargos em Sociedades antes de aplicar a eleição."
+          "Defina os cargos em Sociedades antes de registrar a eleição."
       );
     }
-    const board = applyWinners(current, winners);
-    tx.update(societyRef, {board});
-    tx.update(electionRef, {
-      boardAppliedAt: FieldValue.serverTimestamp(),
-      directorIds: [
-        ...new Set([...(election.directorIds ?? []), ...directorIdsOf(board)]),
-      ],
+    const existing = await tx.get(transitionRef);
+    if (existing.exists && existing.get("status") === "applied") {
+      throw fail(
+        "failed-precondition", "Esta diretoria já assumiu na sociedade."
+      );
+    }
+    tx.set(transitionRef, {
+      electionId,
+      societyId: election.societyId,
+      societyName: String(society.get("name") ?? ""),
+      winners,
+      effectiveAt: Timestamp.fromDate(effectiveAt),
+      status: "pending",
+      createdBy: uid,
+      createdAt: existing.exists ?
+        existing.get("createdAt") :
+        FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
+    tx.update(electionRef, {boardAppliedAt: FieldValue.serverTimestamp()});
   });
   await logEvent(db, electionId, {
-    type: "board_applied", actorId: uid, winners,
+    type: "board_scheduled",
+    actorId: uid,
+    winners,
+    effectiveAtMs: effectiveAt.getTime(),
   });
   return {
     winners,
     missingRequired: REQUIRED_POSITIONS.filter((p) => !(p in winners)),
+    effectiveAtMs: effectiveAt.getTime(),
   };
 };
 

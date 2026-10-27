@@ -1822,6 +1822,7 @@ export const sendEloAvailabilityReminder = functions
 export {syncTeachingClaimsOnUserWrite} from "./teaching/syncClaims";
 export {
   electionApplyBoard,
+  electionApplyDueBoards,
   electionCastVote,
   electionCheckIn,
   electionCloseScrutiny,

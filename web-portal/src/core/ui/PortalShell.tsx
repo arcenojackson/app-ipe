@@ -6,6 +6,7 @@ import {useEffect, type ReactNode} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {
   isPathAllowed,
+  moduleForPath,
   portalModules,
   visibleNavGroups,
 } from "@/core/modules/registry";
@@ -35,6 +36,13 @@ export function PortalShell({
 
   const groups = visibleNavGroups(modules, state.claims);
   const allowed = isPathAllowed(modules, pathname, state.claims);
+
+  // O menu e a marca "Portal de Ensino" são do módulo de ensino. Rotas de
+  // módulos sem itens de menu (ex.: /eleicoes) abrem sem a barra lateral.
+  const showMenu = (moduleForPath(modules, pathname)?.navItems.length ?? 0) > 0;
+  if (!showMenu) {
+    return <main className="min-h-screen p-6">{allowed ? children : <AccessDenied />}</main>;
+  }
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
