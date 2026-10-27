@@ -4,7 +4,7 @@ export const teachingModule: PortalModule = {
   id: "teaching",
   label: "Ensino",
   basePath: "/ensino",
-  access: "teacher",
+  access: "authenticated",
   navItems: [
     {label: "Biblioteca", href: "/ensino", access: "teacher", icon: "library"},
     {label: "Fórum", href: "/ensino/forum", access: "teacher", icon: "forum"},

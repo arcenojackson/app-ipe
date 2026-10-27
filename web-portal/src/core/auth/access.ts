@@ -17,13 +17,17 @@ export function parseClaims(
   };
 }
 
-/** `claims === null` significa deslogado. Admin é superconjunto de tudo. */
+/**
+ * `claims === null` significa deslogado. Admin NÃO dá acesso ao ensino: só
+ * "authenticated" e "admin". Teacher/curator exigem o papel de ensino (também
+ * para admin). Restrição só do portal; as regras do Firestore continuam
+ * liberando admin.
+ */
 export function hasAccess(
   claims: AccessClaims | null,
   requirement: AccessRequirement
 ): boolean {
   if (claims === null) return false;
-  if (claims.admin) return true;
   switch (requirement) {
     case "authenticated":
       return true;
@@ -32,6 +36,6 @@ export function hasAccess(
     case "curator":
       return claims.teachingRole === "curator";
     case "admin":
-      return false;
+      return claims.admin;
   }
 }

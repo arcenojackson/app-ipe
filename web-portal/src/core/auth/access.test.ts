@@ -51,9 +51,19 @@ describe("hasAccess", () => {
     expect(hasAccess(curator, "admin")).toBe(false);
   });
 
-  it("admin é superconjunto: passa em tudo", () => {
-    for (const req of ["authenticated", "teacher", "curator", "admin"] as const) {
-      expect(hasAccess(admin, req)).toBe(true);
-    }
+  it("admin sem papel de ensino passa em authenticated e admin, mas não em teacher/curator", () => {
+    expect(hasAccess(admin, "authenticated")).toBe(true);
+    expect(hasAccess(admin, "admin")).toBe(true);
+    expect(hasAccess(admin, "teacher")).toBe(false);
+    expect(hasAccess(admin, "curator")).toBe(false);
+  });
+
+  it("admin com papel de ensino acessa o que o papel permite", () => {
+    const adminTeacher: AccessClaims = {admin: true, teachingRole: "teacher"};
+    const adminCurator: AccessClaims = {admin: true, teachingRole: "curator"};
+    expect(hasAccess(adminTeacher, "teacher")).toBe(true);
+    expect(hasAccess(adminTeacher, "curator")).toBe(false);
+    expect(hasAccess(adminTeacher, "admin")).toBe(true);
+    expect(hasAccess(adminCurator, "curator")).toBe(true);
   });
 });
