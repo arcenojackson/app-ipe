@@ -12,7 +12,9 @@ import {UploadError} from "../uploadFlow";
 import {useItemDetail} from "../useItemDetail";
 import {useTags} from "../useTags";
 import {LinkDialog, ReasonDialog, TagEditDialog, TextPromptDialog} from "./Dialogs";
+import {FileInfo} from "./FileInfo";
 import {PreviewPane} from "./PreviewPane";
+import {ResubmitCard} from "./ResubmitCard";
 import {StatusBadge} from "./StatusBadge";
 import {TagChips} from "./TagChips";
 
@@ -76,6 +78,12 @@ export function ItemDetail({
       setBusy(false);
     }
   }
+  // Tipo, tamanho ou nome inválidos não se resolvem tentando de novo: mostra o motivo.
+  const reason = (cause: unknown) =>
+    cause instanceof UploadError ? cause.message : "Não foi possível reenviar o arquivo. Tente novamente.";
+  const resubmitCard = permissions.canResubmit && item.type === "file";
+  // O autor não vê o arquivo de um item ainda em revisão/devolvido (não publicado).
+  const hideFile = item.authorId === viewer.uid && !viewer.isCurator && !viewer.isAdmin && item.status !== "published";
   const quiet = (promise: Promise<void>) => void promise.catch(() => undefined);
 
   const vote = (action: VoteAction, comment?: string) =>
@@ -105,7 +113,7 @@ export function ItemDetail({
           Pedido de exclusão aberto{request.reason ? `: ${request.reason}` : ""}.{votesLoaded && ` Aprovações: ${deleteApprovals}/${REQUIRED_APPROVALS}`}
         </p>
       )}
-      {item.status === "returned" && item.returnComment && (
+      {item.status === "returned" && item.returnComment && !resubmitCard && (
         <p className="rounded-card bg-white/10 p-3 text-sm">Devolvido pelos curadores: {item.returnComment}</p>
       )}
       {item.status === "in_review" && !request && votesLoaded && (
@@ -114,7 +122,7 @@ export function ItemDetail({
       {myVote && <p className="text-sm text-white/70">Seu voto: {voteLabel(myVote.action)}</p>}
       {votesError && <p className="text-sm text-error">Não foi possível carregar o histórico de revisão.</p>}
 
-      {item.type === "file" && <PreviewPane item={item} />}
+      {item.type === "file" && (hideFile ? <FileInfo item={item} download={false} /> : <PreviewPane item={item} />)}
       {item.type === "link" && item.url && (
         <section aria-label="Link" className="space-y-1">
           {isWebUrl(item.url) ? (
@@ -128,7 +136,23 @@ export function ItemDetail({
 
       {notice && <p role="status" className="text-sm text-secondary">{notice}</p>}
       {failure && <p role="alert" className="text-sm text-error">{failure}</p>}
-      {progress !== null && <progress className="w-full" value={progress} max={1} />}
+      {progress !== null && !resubmitCard && <progress className="w-full" value={progress} max={1} />}
+
+      {resubmitCard && (
+        <ResubmitCard
+          returnComment={item.returnComment ?? undefined}
+          busy={busy}
+          progress={progress}
+          onResubmit={(file) =>
+            act("Arquivo reenviado para revisão.", reason, async () => {
+              try {
+                await resubmitFile(viewer.uid, item, file, setProgress);
+              } finally {
+                setProgress(null);
+              }
+            })}
+        />
+      )}
 
       <div className="flex flex-wrap gap-2">
         {permissions.canVote && (
@@ -157,33 +181,6 @@ export function ItemDetail({
           <Button type="button" disabled={busy} onClick={() => setModal("resubmit-link")}>Reenviar link</Button>
         )}
       </div>
-
-      {permissions.canResubmit && item.type === "file" && (
-        <label className="block text-sm text-white/70">
-          Reenviar arquivo corrigido
-          <input
-            type="file"
-            aria-label="Escolher novo arquivo"
-            disabled={busy}
-            className="mt-1 block"
-            onChange={(event) => {
-              const chosen = event.target.files?.[0];
-              event.target.value = "";
-              if (!chosen) return;
-              // Tipo, tamanho ou nome inválidos não se resolvem tentando de novo: mostra o motivo.
-              const reason = (cause: unknown) =>
-                cause instanceof UploadError ? cause.message : "Não foi possível reenviar o arquivo. Tente novamente.";
-              quiet(act("Arquivo reenviado para revisão.", reason, async () => {
-                try {
-                  await resubmitFile(viewer.uid, item, chosen, setProgress);
-                } finally {
-                  setProgress(null);
-                }
-              }));
-            }}
-          />
-        </label>
-      )}
 
       {votes.length > 0 && (
         <section aria-label="Histórico de revisão" className="space-y-1">
