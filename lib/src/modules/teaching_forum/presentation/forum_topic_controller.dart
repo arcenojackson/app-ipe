@@ -33,6 +33,55 @@ class ForumTopicController extends ChangeNotifier {
   CommentPermissions commentPerms(ForumComment c) =>
       commentPermissions(c, topic!, viewer);
 
+  /// Puxar para atualizar: relê tópico, comentários e votos. Em erro mantém o
+  /// que está na tela e avisa por [actionError].
+  Future<bool> refresh() async {
+    try {
+      final t = await repository.loadTopic(topicId);
+      if (t == null) {
+        notFound = true;
+        notifyListeners();
+        return false;
+      }
+      final fresh = await _fetchComments(t);
+      final votes = await _fetchVotes(fresh);
+      topic = t;
+      comments = fresh;
+      myVotes
+        ..clear()
+        ..addAll(votes);
+      error = false;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      actionError = 'Não foi possível atualizar. Tente de novo.';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<List<ForumComment>> _fetchComments(ForumTopic t) =>
+      t.deleted && !topicPermissions(t, viewer).visibleBody
+          ? Future.value(<ForumComment>[])
+          : repository.loadComments(topicId);
+
+  Future<Map<String, int>> _fetchVotes(List<ForumComment> list) async {
+    final votes = await Future.wait(
+      list
+          .where((c) => c.authorUid != viewer.uid && !c.deleted)
+          .map((c) async => MapEntry(
+                c.id,
+                await repository
+                    .loadMyVote(topicId, c.id, viewer.uid)
+                    .catchError((_) => null),
+              )),
+    );
+    return {
+      for (final v in votes)
+        if (v.value != null) v.key: v.value!,
+    };
+  }
+
   Future<void> load() async {
     loading = true;
     error = false;
@@ -46,24 +95,10 @@ class ForumTopicController extends ChangeNotifier {
         return;
       }
       topic = t;
-      final loaded = t.deleted && !topicPermissions(t, viewer).visibleBody
-          ? <ForumComment>[]
-          : await repository.loadComments(topicId);
-      comments = loaded;
-      myVotes.clear();
-      final votes = await Future.wait(
-        loaded
-            .where((c) => c.authorUid != viewer.uid && !c.deleted)
-            .map((c) async => MapEntry(
-                  c.id,
-                  await repository
-                      .loadMyVote(topicId, c.id, viewer.uid)
-                      .catchError((_) => null),
-                )),
-      );
-      for (final v in votes) {
-        if (v.value != null) myVotes[v.key] = v.value!;
-      }
+      comments = await _fetchComments(t);
+      myVotes
+        ..clear()
+        ..addAll(await _fetchVotes(comments));
     } catch (_) {
       error = true;
     }

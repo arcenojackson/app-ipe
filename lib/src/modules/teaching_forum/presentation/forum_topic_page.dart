@@ -192,6 +192,7 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
     final theme = Theme.of(context);
     final tree = buildCommentTree(c.comments);
     final list = ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         Text(t.title,
@@ -231,7 +232,14 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
     final reply = _replyTo;
     return Column(
       children: [
-        Expanded(child: list),
+        Expanded(
+          child: RefreshIndicator(
+            color: Theme.of(context).colorScheme.secondary,
+            backgroundColor: const Color(0xFF111828),
+            onRefresh: c.refresh,
+            child: list,
+          ),
+        ),
         if (perms.canComment)
           Material(
             color: const Color(0xFF111828),

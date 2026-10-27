@@ -46,9 +46,17 @@ class ForumListController extends ChangeNotifier {
   }
 
   Future<void> load() async {
+    await _reload(keepOnError: false);
+  }
+
+  /// Puxar para atualizar: recarrega a primeira página com o filtro e a busca
+  /// atuais. Em erro mantém o que já está na tela e devolve `false`.
+  Future<bool> refresh() => _reload(keepOnError: true);
+
+  Future<bool> _reload({required bool keepOnError}) async {
     final generation = ++_generation;
     loading = true;
-    error = false;
+    if (!keepOnError) error = false;
     notifyListeners();
     try {
       final spec = _spec;
@@ -56,18 +64,24 @@ class ForumListController extends ChangeNotifier {
         repository.loadPinned(spec),
         repository.loadPage(spec),
       ]);
-      if (generation != _generation) return;
+      if (generation != _generation) return false;
+      error = false;
+      loadingMore = false;
       pinned = results[0] as List<ForumTopic>;
       final page = results[1] as TopicPage;
       topics = page.topics;
       _cursor = page.cursor;
       done = page.done;
     } catch (_) {
-      if (generation != _generation) return;
-      error = true;
+      if (generation != _generation) return false;
+      loading = false;
+      if (!keepOnError) error = true;
+      notifyListeners();
+      return false;
     }
     loading = false;
     notifyListeners();
+    return true;
   }
 
   Future<void> loadMore() async {
