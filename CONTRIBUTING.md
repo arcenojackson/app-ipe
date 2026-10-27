@@ -48,9 +48,9 @@ docs: adicionar guia de configuração do Firebase
 
 ## Como abrir um Pull Request
 
-1. Crie sua branch a partir de `master`:
+1. Crie sua branch a partir de `main`:
    ```bash
-   git checkout master && git pull
+   git checkout main && git pull
    git checkout -b feat/minha-feature
    ```
 
@@ -63,9 +63,9 @@ docs: adicionar guia de configuração do Firebase
    flutter test
    ```
 
-4. Abra um Pull Request para `master`. O template em `.github/pull_request_template.md` será carregado automaticamente — preencha todas as seções.
+4. Abra um Pull Request para `main`. O template em `.github/pull_request_template.md` será carregado automaticamente — preencha todas as seções.
 
-5. Aguarde review. Após aprovação, o merge é feito em `master`.
+5. Aguarde review. Após aprovação, o merge é feito em `main`.
 
 ## Reportar bugs
 

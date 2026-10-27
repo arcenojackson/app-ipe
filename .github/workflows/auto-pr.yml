@@ -66,5 +66,5 @@ jobs:
 
           ---
           *PR gerado automaticamente pelo workflow ArcLabz* 🤖" \
-            --base master \
+            --base main \
             --draft
