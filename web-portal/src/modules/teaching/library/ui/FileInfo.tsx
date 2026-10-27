@@ -4,21 +4,22 @@ import {useState} from "react";
 import {Button} from "@/core/ui/Button";
 import {formatBytes} from "../labels";
 import {downloadUrl} from "../storageAccess";
+import {fileErrorMessage} from "../storageErrors";
 import type {LibraryItem} from "../types";
 
 // Baixa pelo SDK autenticado: a URL é obtida na hora do clique e abre em nova aba.
 export function DownloadButton({item}: {item: LibraryItem}) {
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const path = item.storagePath;
   if (!path) return null;
 
   async function download(storagePath: string) {
-    setFailed(false);
+    setFailed(null);
     try {
       const url = await downloadUrl(storagePath);
       window.open(url, "_blank", "noopener,noreferrer");
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(fileErrorMessage(e, "Não foi possível baixar o arquivo."));
     }
   }
 
@@ -29,7 +30,7 @@ export function DownloadButton({item}: {item: LibraryItem}) {
       </Button>
       {failed && (
         <p role="alert" className="text-sm text-error">
-          Não foi possível baixar o arquivo.
+          {failed}
         </p>
       )}
     </div>

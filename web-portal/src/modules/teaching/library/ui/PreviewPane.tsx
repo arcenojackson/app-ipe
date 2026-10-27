@@ -5,6 +5,7 @@ import {renderDocx} from "../docxRender";
 import {renderPdf} from "../pdfRender";
 import {MAX_INLINE_PREVIEW_BYTES, previewKind} from "../preview";
 import type {LibraryItem} from "../types";
+import {SPECIFIC_FILE_ERRORS} from "../storageErrors";
 import {useFileBytes} from "../useFileBytes";
 import {DownloadButton, FileInfo} from "./FileInfo";
 
@@ -67,7 +68,7 @@ export function PreviewPane({item}: {item: LibraryItem}) {
   if (error || (bytes && failedBytes === bytes)) {
     return (
       <div className="space-y-2">
-        <p role="status" className="text-sm text-white/70">{UNAVAILABLE}</p>
+        <p role="status" className="text-sm text-white/70">{error && SPECIFIC_FILE_ERRORS.includes(error) ? error : UNAVAILABLE}</p>
         <FileInfo item={item} />
       </div>
     );
