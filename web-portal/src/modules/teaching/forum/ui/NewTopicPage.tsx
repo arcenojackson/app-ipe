@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {useRouter, useSearchParams} from "next/navigation";
 import {useEffect, useState, type FormEvent} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
@@ -10,6 +11,7 @@ import {validateTopicInput} from "../payloads";
 import {createTopic, editTopic, loadSubjectTags, loadTopic} from "../repository";
 import {topicPermissions} from "../permissions";
 import {LIMITS, type Ref} from "../types";
+import {SubjectMenu} from "./parts";
 import RefPicker from "./RefPicker";
 
 const SAVE_ERROR = "Não foi possível publicar. Tente novamente.";
@@ -63,13 +65,6 @@ export default function NewTopicPage() {
   if (state.status !== "signedIn") return null;
   const user = state.user;
 
-  function toggleTag(id: string) {
-    setTagIds((current) => {
-      if (current.includes(id)) return current.filter((t) => t !== id);
-      return current.length >= LIMITS.tags ? current : [...current, id];
-    });
-  }
-
   async function submit(event: FormEvent) {
     event.preventDefault();
     const input = {title, body, tagIds, refs};
@@ -91,35 +86,46 @@ export default function NewTopicPage() {
   if (blocked) return <p role="alert" className="text-error">{blocked}</p>;
 
   return (
-    <form onSubmit={submit} className="max-w-2xl space-y-4">
+    <form onSubmit={submit} className="mx-auto max-w-[820px]">
+      <Link href={editId ? `/ensino/forum/${editId}` : "/ensino/forum"} className="mb-2 inline-block text-sm text-white/60 hover:underline">← Fórum</Link>
       <h1 className="text-2xl font-semibold">{editId ? "Editar tópico" : "Novo tópico"}</h1>
-      <TextField id="topic-title" label="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
-      <label htmlFor="topic-body" className="block text-sm text-white/70">
-        Mensagem
-        <textarea
-          id="topic-body"
-          rows={8}
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          className="mt-1 block w-full rounded-input border border-white/5 bg-surface-elevated/80 px-4 py-3 text-base text-on-surface focus:border-primary focus:outline-none"
-        />
-      </label>
-      {tags.length > 0 && (
-        <fieldset className="space-y-2">
-          <legend className="text-sm text-white/70">Assuntos (opcional, até {LIMITS.tags})</legend>
-          <div className="flex flex-wrap gap-2">
-            {tags.map((t) => (
-              <label key={t.id} className="flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-sm">
-                <input type="checkbox" checked={tagIds.includes(t.id)} onChange={() => toggleTag(t.id)} />
-                {t.name}
-              </label>
-            ))}
+      <p className="mb-4 text-white/60">Escreva com clareza; os colegas verão o título na lista.</p>
+      <div className="mb-3 space-y-4 rounded-card bg-surface p-5">
+        <TextField id="topic-title" label="Título" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <label htmlFor="topic-body" className="block text-sm text-white/70">
+          Mensagem
+          <textarea
+            id="topic-body"
+            rows={7}
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            className="mt-1 block w-full rounded-input border border-white/5 bg-surface-elevated/80 px-4 py-3 text-base text-on-surface focus:border-primary focus:outline-none"
+          />
+        </label>
+      </div>
+      <div className="mb-3 space-y-5 rounded-card bg-surface p-5">
+        {tags.length > 0 && (
+          <div className="space-y-2">
+            <p className="flex justify-between text-sm text-white/70">
+              <span>Assuntos (opcional)</span>
+              <span>{tagIds.length} de {LIMITS.tags}</span>
+            </p>
+            <SubjectMenu subjects={tags} value={tagIds} onChange={setTagIds} max={LIMITS.tags} label="Escolher assuntos" />
           </div>
-        </fieldset>
-      )}
-      <RefPicker value={refs} onChange={setRefs} />
-      {problem && <p role="alert" className="text-sm text-error">{problem}</p>}
-      <Button type="submit" disabled={busy}>{editId ? "Salvar" : "Publicar"}</Button>
+        )}
+        <div className="space-y-2">
+          <p className="text-sm text-white/70">Citações (opcional)</p>
+          <RefPicker value={refs} onChange={setRefs} />
+        </div>
+      </div>
+      {problem && <p role="alert" className="mb-2 text-sm text-error">{problem}</p>}
+      <div className="sticky bottom-0 -mx-1 flex items-center justify-between gap-3 bg-gradient-to-t from-background from-70% to-transparent px-1 py-3">
+        <span className="text-xs text-white/60">Você poderá editar depois.</span>
+        <div className="flex gap-2">
+          <Link href={editId ? `/ensino/forum/${editId}` : "/ensino/forum"} className="rounded-full border border-white/10 px-5 py-3 text-sm hover:bg-white/10">Cancelar</Link>
+          <Button type="submit" disabled={busy} className="!rounded-full !px-6 !py-3">{editId ? "Salvar" : "Publicar"}</Button>
+        </div>
+      </div>
     </form>
   );
 }

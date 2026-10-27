@@ -26,11 +26,11 @@ describe("TopicListPage", () => {
   it("mostra fixados antes, selos, autor, comentários e assuntos", async () => {
     render(<TopicListPage />);
     const links = await screen.findAllByRole("link", {name: /Tópico/});
-    expect(links.map((l) => l.textContent)).toEqual(["Tópico fix", "Tópico a"]);
-    expect(links[0]).toHaveAttribute("href", "/ensino/forum/fix");
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/ensino/forum/fix", "/ensino/forum/a"]);
+    expect(screen.getByText("Fixados")).toBeInTheDocument();
     expect(screen.getByText("Fixado")).toBeInTheDocument();
     expect(screen.getByText("Trancado")).toBeInTheDocument();
-    expect(screen.getAllByText("2 comentários").length).toBe(2);
+    expect(screen.getAllByText("comentários").length).toBe(2);
     await waitFor(() => expect(screen.getByText("Fé", {selector: "span"})).toBeInTheDocument());
   });
 
@@ -57,19 +57,19 @@ describe("TopicListPage", () => {
       .mockResolvedValueOnce({topics: [topic("b")], cursor: null, done: true});
     render(<TopicListPage />);
     fireEvent.click(await screen.findByRole("button", {name: "Carregar mais"}));
-    expect(await screen.findByRole("link", {name: "Tópico b"})).toBeInTheDocument();
+    expect(await screen.findByRole("link", {name: /Tópico b/})).toBeInTheDocument();
     expect(repo.loadTopicsPage).toHaveBeenLastCalledWith({tagId: "", search: ""}, cursor);
     expect(screen.queryByRole("button", {name: "Carregar mais"})).toBeNull();
   });
 
   it("escolher assunto limpa a busca e vice-versa", async () => {
     render(<TopicListPage />);
-    await screen.findByRole("link", {name: "Tópico a"});
+    await screen.findByRole("link", {name: /Tópico a/});
     fireEvent.change(screen.getByLabelText("Buscar no título"), {target: {value: "graça"}});
     fireEvent.click(screen.getByRole("button", {name: "Buscar"}));
     await waitFor(() => expect(repo.loadTopicsPage).toHaveBeenLastCalledWith({tagId: "", search: "graça"}, null));
-    await waitFor(() => expect(screen.getByRole("option", {name: "Fé"})).toBeInTheDocument());
-    fireEvent.change(screen.getByLabelText("Assunto"), {target: {value: "assunto-fe"}});
+    fireEvent.click(screen.getByRole("button", {name: /Assunto/}));
+    fireEvent.click(await screen.findByRole("button", {name: "Fé"}));
     await waitFor(() => expect(repo.loadTopicsPage).toHaveBeenLastCalledWith({tagId: "assunto-fe", search: ""}, null));
     expect(screen.getByLabelText("Buscar no título")).toHaveValue("");
   });

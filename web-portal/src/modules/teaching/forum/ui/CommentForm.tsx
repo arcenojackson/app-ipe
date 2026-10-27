@@ -51,7 +51,7 @@ export default function CommentForm({
       <label className="block text-sm text-white/70">
         {label}
         <textarea
-          rows={4}
+          rows={3}
           value={body}
           onChange={(e) => setBody(e.target.value)}
           className="mt-1 block w-full rounded-input border border-white/5 bg-surface-elevated/80 px-4 py-3 text-base text-on-surface focus:border-primary focus:outline-none"
@@ -59,9 +59,9 @@ export default function CommentForm({
       </label>
       <RefPicker value={refs} onChange={setRefs} />
       {problem && <p role="alert" className="text-sm text-error">{problem}</p>}
-      <div className="flex gap-2">
-        <Button type="submit" disabled={busy}>{submitLabel}</Button>
+      <div className="flex justify-end gap-2">
         {onCancel && <Button type="button" variant="text" onClick={onCancel}>Cancelar</Button>}
+        <Button type="submit" disabled={busy} className="!rounded-full !px-6 !py-2.5">{submitLabel}</Button>
       </div>
     </form>
   );

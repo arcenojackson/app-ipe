@@ -20,8 +20,9 @@ describe("RefPicker", () => {
     fireEvent.click(screen.getByRole("button", {name: "Citar documento ou aula"}));
     fireEvent.click(await screen.findByRole("button", {name: "Doc 1"}));
     expect(onChange).toHaveBeenCalledWith([doc("1")]);
+    // o diálogo fecha ao escolher
+    expect(screen.queryByRole("dialog")).toBeNull();
     rerender(<RefPicker value={[doc("1")]} onChange={onChange} />);
-    expect(screen.getByRole("button", {name: "Doc 1", hidden: true})).toBeDisabled();
     fireEvent.click(screen.getByRole("button", {name: "Remover citação Doc 1"}));
     expect(onChange).toHaveBeenLastCalledWith([]);
   });
@@ -33,7 +34,7 @@ describe("RefPicker", () => {
     fireEvent.change(screen.getByLabelText("Buscar documento publicado"), {target: {value: "cate"}});
     fireEvent.click(screen.getByRole("button", {name: "Buscar"}));
     expect(repo.loadPublishedDocs).toHaveBeenLastCalledWith("cate");
-    fireEvent.click(screen.getByRole("button", {name: "Aula do Plano"}));
+    fireEvent.click(screen.getByRole("button", {name: "Plano pedagógico"}));
     expect(await screen.findByRole("button", {name: "Aula 1 — Fé"})).toBeInTheDocument();
   });
 

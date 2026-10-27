@@ -9,6 +9,7 @@ const repo = vi.hoisted(() => ({
   loadTopic: vi.fn(),
   loadComments: vi.fn(),
   loadMyVotes: vi.fn(),
+  loadSubjectTags: vi.fn(),
   createComment: vi.fn(),
   editComment: vi.fn(),
   removeComment: vi.fn(),
@@ -57,6 +58,7 @@ beforeEach(() => {
   repo.loadTopic.mockReset().mockImplementation(async () => current);
   repo.loadComments.mockReset().mockImplementation(async () => comments);
   repo.loadMyVotes.mockReset().mockResolvedValue({});
+  repo.loadSubjectTags.mockReset().mockResolvedValue([]);
   repo.createComment.mockReset().mockResolvedValue(undefined);
   repo.editComment.mockReset().mockResolvedValue(undefined);
   repo.removeComment.mockReset().mockResolvedValue(undefined);
@@ -147,7 +149,8 @@ describe("TopicPage — comentar e editar", () => {
   it("autor edita e apaga; curador só apaga os alheios", async () => {
     const {unmount} = renderAs("u2");
     await screen.findByText("Corpo c1");
-    fireEvent.click(screen.getAllByRole("button", {name: "Editar"})[0]);
+    fireEvent.click(screen.getAllByRole("button", {name: "Mais ações do comentário"})[0]);
+    fireEvent.click(screen.getByRole("menuitem", {name: "Editar"}));
     fireEvent.change(screen.getByLabelText("Editar comentário"), {target: {value: "Novo texto"}});
     fireEvent.click(screen.getByRole("button", {name: "Salvar"}));
     await waitFor(() => expect(repo.editComment).toHaveBeenCalledWith("t", "c1", {body: "Novo texto", refs: []}));
@@ -155,9 +158,9 @@ describe("TopicPage — comentar e editar", () => {
 
     renderAs("u9", "curator");
     await screen.findByText("Corpo c1");
-    expect(screen.queryAllByRole("button", {name: "Editar"})).toHaveLength(0);
-    const row = screen.getByText("Corpo c1").closest("div")!;
-    fireEvent.click(within(row).getByRole("button", {name: "Apagar"}));
+    fireEvent.click(screen.getAllByRole("button", {name: "Mais ações do comentário"})[0]);
+    expect(screen.queryByRole("menuitem", {name: "Editar"})).toBeNull();
+    fireEvent.click(screen.getByRole("menuitem", {name: "Apagar"}));
     await waitFor(() => expect(repo.removeComment).toHaveBeenCalledWith("t", "c1"));
   });
 
@@ -175,20 +178,23 @@ describe("TopicPage — comentar e editar", () => {
 describe("TopicPage — moderação e tópico trancado", () => {
   it("curador fixa, tranca e apaga o tópico", async () => {
     renderAs("u9", "curator");
-    fireEvent.click(await screen.findByRole("button", {name: "Fixar"}));
+    const openMenu = async () => fireEvent.click(await screen.findByRole("button", {name: "Ações do tópico"}));
+    await openMenu();
+    fireEvent.click(screen.getByRole("menuitem", {name: "Fixar"}));
     await waitFor(() => expect(repo.setTopicFlags).toHaveBeenLastCalledWith("t", {pinned: true}));
-    fireEvent.click(screen.getByRole("button", {name: "Trancar"}));
+    await openMenu();
+    fireEvent.click(screen.getByRole("menuitem", {name: "Trancar"}));
     await waitFor(() => expect(repo.setTopicFlags).toHaveBeenLastCalledWith("t", {locked: true}));
-    const header = screen.getByRole("heading", {name: "Dúvida"}).parentElement!;
-    fireEvent.click(within(header).getByRole("button", {name: "Apagar"}));
+    await openMenu();
+    fireEvent.click(screen.getByRole("menuitem", {name: "Apagar"}));
     await waitFor(() => expect(repo.setTopicFlags).toHaveBeenLastCalledWith("t", {deleted: true}));
   });
 
   it("professor comum não vê Fixar/Trancar", async () => {
     renderAs("u9");
     await screen.findByText("Corpo c1");
-    expect(screen.queryByRole("button", {name: "Fixar"})).toBeNull();
-    expect(screen.queryByRole("button", {name: "Trancar"})).toBeNull();
+    expect(screen.queryByRole("button", {name: "Ações do tópico"})).toBeNull();
+    expect(screen.queryByRole("menuitem", {name: "Fixar"})).toBeNull();
   });
 
   it("tópico trancado avisa e esconde formulário, Responder e votos", async () => {

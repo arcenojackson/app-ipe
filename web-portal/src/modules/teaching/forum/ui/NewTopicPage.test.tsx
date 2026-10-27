@@ -65,9 +65,11 @@ describe("NewTopicPage", () => {
   it("publica com autor, assuntos e citação e navega para o tópico", async () => {
     renderPage();
     fill("Dúvida", "Como explicar?");
-    fireEvent.click(await screen.findByLabelText("Fé"));
+    fireEvent.click(await screen.findByRole("button", {name: /Escolher assuntos/}));
+    fireEvent.click(screen.getByLabelText("Fé"));
     fireEvent.click(screen.getByRole("button", {name: "Citar documento ou aula"}));
     fireEvent.click(await screen.findByRole("button", {name: "Catecismo.pdf"}));
+    expect(screen.getByRole("button", {name: "Remover citação Catecismo.pdf"})).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: "Publicar"}));
     await waitFor(() => expect(nav.push).toHaveBeenCalledWith("/ensino/forum/novo-id"));
     expect(repo.createTopic).toHaveBeenCalledWith(
@@ -78,10 +80,10 @@ describe("NewTopicPage", () => {
 
   it("recusa o 4º assunto", async () => {
     renderPage();
-    for (const name of ["Fé", "Graça", "Oração", "Missões"]) {
-      fireEvent.click(await screen.findByLabelText(name));
-    }
-    expect(screen.getByLabelText("Missões")).not.toBeChecked();
+    fireEvent.click(await screen.findByRole("button", {name: /Escolher assuntos/}));
+    for (const name of ["Fé", "Graça", "Oração"]) fireEvent.click(screen.getByLabelText(name));
+    expect(screen.getByText("3 de 3")).toBeInTheDocument();
+    expect(screen.getByLabelText("Missões")).toBeDisabled();
     expect(screen.getByLabelText("Oração")).toBeChecked();
   });
 

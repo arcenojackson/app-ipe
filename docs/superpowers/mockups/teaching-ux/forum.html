@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Fórum — proposta de UX</title>
+<style>
+:root{--bg:#0b0f19;--surface:#111828;--elev:#1b2435;--primary:#2f4f2f;--sec:#6b8e23;--err:#ff5470;--on:#fff;
+--muted:rgba(255,255,255,.62);--line:rgba(255,255,255,.08);--r:18px;
+--subj:hsl(38 60% 50%);--age:hsl(205 60% 55%)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--on);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+.switch{position:sticky;top:0;z-index:50;display:flex;gap:8px;padding:10px 16px;background:#06090f;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.switch button{border:1px solid var(--line);background:none;padding:8px 14px;border-radius:99px}
+.switch button.on{background:var(--sec);border-color:var(--sec);font-weight:600}
+.dir{display:none}.dir.on{display:block}
+.app{display:grid;grid-template-columns:232px 1fr;min-height:calc(100vh - 53px)}
+.side{background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;display:flex;flex-direction:column;gap:4px}
+.brand{font-weight:700;font-size:16px;padding:4px 10px 14px;display:flex;align-items:center;gap:8px}
+.logo{width:28px;height:28px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--sec))}
+.nav{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:14px;color:var(--muted)}
+.nav.on{background:rgba(107,142,35,.18);color:#fff;font-weight:600}
+.main{padding:20px 28px;min-width:0}
+.wrap{max-width:820px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}.sub{color:var(--muted);margin:0 0 16px}
+.back{color:var(--muted);font-size:13px;display:inline-block;margin-bottom:10px}
+.btn{background:var(--sec);border:0;color:#fff;border-radius:99px;padding:9px 18px;font-weight:600}
+.ghost{background:none;border:1px solid var(--line);border-radius:99px;padding:8px 14px;color:var(--on)}
+.ghost.dash{border-style:dashed}
+.icon{background:none;border:0;color:var(--muted);padding:4px 8px;border-radius:99px}.icon:hover{background:rgba(255,255,255,.08);color:#fff}
+.top{display:flex;gap:12px;align-items:center;margin-bottom:14px}
+.search{flex:1;display:flex;align-items:center;gap:10px;background:var(--elev);border-radius:99px;padding:11px 18px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{border:1px solid var(--line);background:none;border-radius:99px;padding:5px 14px;font-size:13px;color:rgba(255,255,255,.9)}
+.chip.subj{border-color:var(--subj);background:hsl(38 60% 50%/.18)}
+.chip.subj.solid{background:hsl(38 60% 50%/.4)}
+.t{font-size:11px;padding:2px 9px;border-radius:99px;border:1px solid var(--subj);background:hsl(38 60% 50%/.18);white-space:nowrap}
+.pin{font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(107,142,35,.28);color:#d6ecaa;white-space:nowrap}
+.lock{font-size:11px;padding:2px 9px;border-radius:99px;background:rgba(255,255,255,.1);white-space:nowrap}
+.list{background:var(--surface);border-radius:var(--r);overflow:hidden;margin-top:14px}
+.sect{padding:10px 18px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:rgba(255,255,255,.03)}
+.row{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:14px;align-items:center;padding:13px 18px;border-top:1px solid var(--line)}
+.row:hover{background:rgba(255,255,255,.04)}
+.row.pinned{box-shadow:inset 3px 0 var(--sec);background:rgba(107,142,35,.07)}
+.av{width:36px;height:36px;border-radius:50%;background:var(--elev);display:grid;place-items:center;font-weight:700;font-size:13px}
+.nm{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta{color:var(--muted);font-size:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:3px}
+.count{display:flex;flex-direction:column;align-items:center;min-width:54px;padding:6px 10px;border-radius:12px;background:var(--elev);font-size:11px;color:var(--muted)}
+.count b{font-size:16px;color:#fff}
+.more{display:block;margin:14px auto}
+.state{background:var(--surface);border-radius:var(--r);padding:26px;text-align:center;color:var(--muted);margin-top:10px}
+.skel{height:56px;border-top:1px solid var(--line);background:linear-gradient(90deg,transparent,rgba(255,255,255,.05),transparent)}
+.card{background:var(--surface);border-radius:var(--r);padding:20px;margin-bottom:14px}
+.field{margin-bottom:16px}.field:last-child{margin-bottom:0}
+.lab{display:flex;justify-content:space-between;font-size:13px;color:var(--muted);margin-bottom:6px}
+.inp{width:100%;background:var(--elev);border:1px solid var(--line);border-radius:14px;padding:11px 14px;color:#fff;font:inherit}
+textarea.inp{min-height:130px;resize:vertical}
+.menu{position:relative;display:inline-block}
+.pop{position:absolute;z-index:5;top:42px;left:0;width:270px;background:var(--elev);border-radius:var(--r);padding:12px;box-shadow:0 14px 40px rgba(0,0,0,.5);outline:1px solid rgba(255,255,255,.1)}
+.pop .inp{border-radius:99px;padding:6px 14px;margin-bottom:8px;font-size:13px}
+.opt{display:flex;gap:8px;align-items:center;padding:6px 8px;border-radius:10px;font-size:13px}.opt:hover{background:rgba(255,255,255,.06)}
+.opt input{accent-color:var(--sec)}
+.cite{display:flex;align-items:center;gap:10px;background:var(--elev);border-radius:14px;padding:8px 12px;margin-top:10px;max-width:420px}
+.cite .ico{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:10px;font-weight:800;background:#5b1f2b;color:#ff8da1}
+.cite small{color:var(--muted);display:block;font-size:11px}
+.actionbar{position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 0;background:linear-gradient(transparent,var(--bg) 30%);margin-top:6px}
+.actionbar .hint{color:var(--muted);font-size:12px}
+.tcard{background:var(--surface);border-radius:var(--r);padding:22px;margin-bottom:16px}
+.tcard h1{font-size:24px;margin:8px 0}
+.byline{display:flex;gap:10px;align-items:center;color:var(--muted);font-size:13px}
+.body{margin:14px 0}
+.kebab{position:relative}
+.kmenu{position:absolute;right:0;top:36px;z-index:5;width:190px;background:var(--elev);border-radius:14px;padding:6px;box-shadow:0 14px 40px rgba(0,0,0,.5)}
+.kmenu div{padding:8px 12px;border-radius:10px;font-size:13px}.kmenu div:hover{background:rgba(255,255,255,.07)}
+.kmenu .sep{height:1px;background:var(--line);padding:0;margin:4px 0}.kmenu .danger{color:var(--err)}
+.kmenu small{display:block;padding:4px 12px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.cm{display:grid;grid-template-columns:36px 1fr;gap:12px;margin-bottom:14px}
+.cm .box{min-width:0}
+.cm .head{display:flex;gap:8px;align-items:center;font-size:13px}.cm .head span{color:var(--muted)}.cm .head span.pin{color:#d6ecaa}
+.cm p{margin:4px 0 6px}
+.acts{display:flex;gap:2px;align-items:center;font-size:13px;color:var(--muted)}
+.acts button{background:none;border:0;color:var(--muted);padding:3px 9px;border-radius:99px;font-size:13px}.acts button:hover{background:rgba(255,255,255,.08);color:#fff}
+.acts .on{background:rgba(107,142,35,.25);color:#fff}
+.score{min-width:22px;text-align:center;font-weight:600;color:#fff}
+.kids{border-left:2px solid var(--line);margin-left:17px;padding-left:16px}
+.gone{font-style:italic;color:var(--muted)}
+.composer{position:sticky;bottom:0;background:var(--surface);border-radius:var(--r) var(--r) 0 0;padding:12px 16px;box-shadow:0 -10px 30px rgba(0,0,0,.4)}
+.note{max-width:820px;margin:18px auto 0;padding:12px 16px;border-radius:14px;background:var(--elev);color:var(--muted);font-size:13px}
+@media(max-width:900px){.app{grid-template-columns:1fr}.side{display:none}.main{padding:16px}.row{grid-template-columns:40px 1fr}.row .count{display:none}.pop{width:min(270px,80vw)}}
+</style>
+</head>
+<body>
+<div class="switch">
+  <button class="on" data-d="lista">1 · Lista</button>
+  <button data-d="novo">2 · Novo tópico</button>
+  <button data-d="topico">3 · Tópico</button>
+  <button data-d="estados">Estados</button>
+</div>
+
+<template id="side">
+  <aside class="side">
+    <div class="brand"><span class="logo"></span>Portal de Ensino</div>
+    <div class="nav">▤ Biblioteca</div>
+    <div class="nav">☰ Plano pedagógico</div>
+    <div class="nav">⇪ Fila de revisão</div>
+    <div class="nav on">💬 Fórum</div>
+    <div class="nav">⚙ Grupo de professores</div>
+  </aside>
+</template>
+
+<section class="dir on" id="lista"><div class="app"><div data-side></div><div class="main"><div class="wrap">
+  <div class="top"><div class="search">🔍 Buscar no título…</div><button class="btn">＋ Novo tópico</button></div>
+  <h1>Fórum</h1><p class="sub">Conversa entre professores e curadores.</p>
+  <div class="chips">
+    <button class="chip">Assunto ▾</button>
+    <button class="chip subj solid">Cristologia ✕</button>
+    <span style="margin-left:auto;color:var(--muted);font-size:12px">Assunto e busca não se combinam</span>
+  </div>
+  <div class="list">
+    <div class="sect">📌 Fixados</div>
+    <div class="row pinned"><span class="av">AP</span><div style="min-width:0"><div class="nm">Regras do fórum e como citar a Biblioteca</div><div class="meta"><span class="pin">Fixado</span><span>Allan Pires</span><span>·</span><span>atividade 12 out</span></div></div><div class="count"><b>3</b>respostas</div></div>
+    <div class="sect">Recentes</div>
+    <div class="row"><span class="av">CS</span><div style="min-width:0"><div class="nm">Como explicar as duas naturezas de Cristo para adolescentes?</div><div class="meta"><span class="t">Cristologia</span><span class="t">Jovens</span><span>Cleuza Silva</span><span>·</span><span>hoje</span></div></div><div class="count"><b>12</b>respostas</div></div>
+    <div class="row"><span class="av">JF</span><div style="min-width:0"><div class="nm">Material sobre Calcedônia para a classe de adultos</div><div class="meta"><span class="t">Cristologia</span><span>Jackson Felipe</span><span>·</span><span>ontem</span></div></div><div class="count"><b>4</b>respostas</div></div>
+    <div class="row"><span class="av">AP</span><div style="min-width:0"><div class="nm">Sugestão de sequência para o trimestre</div><div class="meta"><span class="lock">Trancado</span><span class="t">Planejamento</span><span>Allan Pires</span><span>·</span><span>3 out</span></div></div><div class="count"><b>0</b>respostas</div></div>
+  </div>
+  <button class="ghost more">Carregar mais</button>
+</div></div></div>
+<div class="note"><b>Lista.</b> Mesmo vocabulário da Biblioteca: busca arredondada no topo, ação primária à direita, filtro por <b>chip de Assunto</b> (menu com busca, como no TagMenus; seleção única por causa da consulta do Firestore), chips na cor de Assunto, <b>fixados em destaque</b> (faixa verde e seção própria), contador de respostas, avatar com iniciais. No celular o contador some e a linha ocupa a largura toda.</div>
+</section>
+
+<section class="dir" id="novo"><div class="app"><div data-side></div><div class="main"><div class="wrap">
+  <a class="back">← Fórum</a>
+  <h1>Novo tópico</h1><p class="sub">Escreva com clareza; os colegas verão o título na lista.</p>
+  <div class="card">
+    <div class="field"><div class="lab"><span>Título</span><span>34 / 120</span></div><input class="inp" value="Como explicar as duas naturezas de Cristo?"></div>
+    <div class="field"><div class="lab"><span>Mensagem</span><span>212 / 5000</span></div><textarea class="inp">Estou preparando a aula de sábado e queria ouvir como vocês abordam Calcedônia com adolescentes…</textarea></div>
+  </div>
+  <div class="card">
+    <div class="field">
+      <div class="lab"><span>Assuntos (opcional)</span><span>2 de 3</span></div>
+      <div class="chips">
+        <span class="menu"><button class="chip">Escolher assuntos ▾</button>
+          <div class="pop">
+            <input class="inp" placeholder="Filtrar…">
+            <div class="opt"><input type="checkbox" checked> Cristologia</div>
+            <div class="opt"><input type="checkbox" checked> História da Igreja</div>
+            <div class="opt"><input type="checkbox"> Confissão de Westminster</div>
+            <div class="opt"><input type="checkbox"> Liturgia</div>
+            <div class="opt" style="opacity:.5">… mais 21 (use o filtro)</div>
+          </div></span>
+        <button class="chip subj">Cristologia ✕</button>
+        <button class="chip subj">História da Igreja ✕</button>
+      </div>
+    </div>
+    <div class="field" style="margin-top:170px">
+      <div class="lab"><span>Citações (opcional)</span><span>1 de 3</span></div>
+      <button class="ghost dash">📎 Citar documento ou aula</button>
+      <div class="cite"><span class="ico">PDF</span><div style="flex:1;min-width:0"><div class="nm">Cristologia na Confissão de Westminster</div><small>Documento da Biblioteca</small></div><button class="icon">✕</button></div>
+    </div>
+  </div>
+  <div class="actionbar"><span class="hint">Você poderá editar depois.</span><span style="display:flex;gap:8px"><button class="ghost">Cancelar</button><button class="btn">Publicar</button></span></div>
+</div></div></div>
+<div class="wrap" style="margin-top:22px"><b>Passo 2 — o botão "Citar documento ou aula" abre este seletor</b>
+  <div style="background:rgba(0,0,0,.55);padding:24px;border-radius:var(--r);margin-top:8px"><div style="background:var(--surface);border-radius:24px;padding:22px;max-width:480px;margin:auto">
+    <div style="display:flex;justify-content:space-between"><b style="font-size:17px">Citar no tópico</b><button class="icon">✕</button></div>
+    <div class="chips" style="margin:12px 0"><button class="chip subj solid">Biblioteca</button><button class="chip">Plano pedagógico</button></div>
+    <div class="search" style="margin-bottom:10px">🔍 Buscar documento publicado… <button class="btn" style="margin-left:auto;padding:5px 14px">Buscar</button></div>
+    <div class="list" style="margin:0;background:var(--elev)">
+      <div class="row" style="grid-template-columns:36px 1fr"><span class="cite" style="all:unset"><span class="ico" style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:10px;font-weight:800;background:#5b1f2b;color:#ff8da1">PDF</span></span><div><div class="nm">Cristologia na Confissão de Westminster</div><div class="meta">clique para citar</div></div></div>
+      <div class="row" style="grid-template-columns:36px 1fr"><span class="ico" style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:10px;font-weight:800;background:#5b3d1f;color:#ffc58d">PPT</span><div><div class="nm">As duas naturezas de Cristo — slides</div><div class="meta">clique para citar</div></div></div>
+    </div></div></div>
+  <p class="sub" style="margin-top:10px">Ao clicar num item, o seletor fecha e o item aparece no formulário como cartão com ✕ (passo 1, acima, logo antes de Publicar). Para trocar: ✕ e citar de novo. Máx. 3 citações.</p>
+</div>
+<div class="note"><b>Novo tópico.</b> Largura máx. 820 px; campos em dois cartões (Conteúdo / Classificação). <b>Assuntos</b>: chip-menu com busca e chips escolhidos na cor de Assunto, contador "2 de 3" (no 3º, as demais opções ficam desabilitadas). <b>Citar</b>: botão secundário tracejado com ícone; o escolhido vira cartão removível (ícone por tipo: documento/aula). <b>Barra de ações fixa no rodapé</b>: Publicar sempre visível. Menu aberto só para ilustrar.</div>
+</section>
+
+<section class="dir" id="topico"><div class="app"><div data-side></div><div class="main"><div class="wrap">
+  <a class="back">← Fórum</a>
+  <div class="tcard">
+    <div style="display:flex;justify-content:space-between;align-items:start;gap:10px">
+      <div class="chips"><span class="pin">📌 Fixado</span><span class="t">Cristologia</span><span class="t">História da Igreja</span></div>
+      <div class="kebab"><button class="icon">⋯</button>
+        <div class="kmenu"><div>Editar</div><div class="sep"></div><small>Moderação</small><div>Desafixar</div><div>Trancar</div><div class="danger">Apagar tópico</div></div></div>
+    </div>
+    <h1>Como explicar as duas naturezas de Cristo para adolescentes?</h1>
+    <div class="byline"><span class="av" style="width:28px;height:28px;font-size:11px">CS</span><span><b style="color:#fff">Cleuza Silva</b> · 12 out 2026 · editado</span></div>
+    <div class="body">Estou preparando a aula de sábado e queria ouvir como vocês abordam Calcedônia com adolescentes, sem cair em heresias.</div>
+    <div class="cite"><span class="ico">PDF</span><div style="flex:1"><div class="nm">Cristologia na Confissão de Westminster</div><small>Documento da Biblioteca</small></div><span style="color:var(--muted)">↗</span></div>
+  </div>
+  <div style="margin:20px 0 14px"><b style="font-size:16px">12 comentários</b></div>
+  <div class="cm"><span class="av">AP</span><div class="box">
+    <div class="head"><b>Allan Pires</b><span>há 2 h</span></div>
+    <p>Eu uso a analogia do “inteiramente Deus e inteiramente homem” e peço que eles mesmos listem textos.</p>
+    <div class="acts"><button class="on">👍</button><span class="score">5</span><button>👎</button><button>↩ Responder</button><button>⋯</button></div>
+    <div class="kids" style="margin-top:12px">
+      <div class="cm"><span class="av" style="width:30px;height:30px;font-size:11px">CS</span><div class="box">
+        <div class="head"><b>Cleuza Silva</b><span class="pin">Autora</span><span>há 1 h</span></div>
+        <p>Boa! Vou testar com Filipenses 2.</p>
+        <div class="acts"><button>👍</button><span class="score">1</span><button>👎</button><button>↩ Responder</button></div>
+      </div></div>
+    </div>
+  </div></div>
+  <div class="cm"><span class="av">JF</span><div class="box"><div class="head"><b>Jackson Felipe</b><span>há 40 min</span></div><p class="gone">Comentário removido</p></div></div>
+  <div class="composer"><div style="display:flex;gap:10px;align-items:flex-end"><textarea class="inp" rows="1" style="min-height:44px" placeholder="Escreva um comentário…"></textarea><button class="btn">Comentar</button></div></div>
+</div></div></div>
+<div class="note"><b>Tópico.</b> Cabeçalho num cartão com selos (Fixado/Trancado), chips de assunto e citações como cartões; <b>moderação agrupada no menu ⋯</b> (Editar, seção Moderação, Apagar em vermelho, só o que a pessoa pode) no lugar de quatro botões soltos. Comentários sem caixa pesada: avatar + nome + tempo, <b>respostas recuadas com linha-guia</b>, ações discretas (voto em pílula com o seu voto em verde, ↩ Responder, ⋯ editar/apagar). <b>Composer fixo</b> no rodapé; se trancado, vira o aviso "Tópico trancado". Responder abre o campo inline.</div>
+</section>
+
+<section class="dir" id="estados"><div class="app"><div data-side></div><div class="main"><div class="wrap">
+  <h1>Estados</h1><p class="sub">Lista (vale também para o tópico).</p>
+  <b>Carregando</b><div class="list"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+  <br><b>Vazio</b><div class="state">💬<br><b style="color:#fff">Nenhum tópico ainda</b><br>Comece a conversa com os colegas.<br><br><button class="btn">＋ Novo tópico</button></div>
+  <br><b>Vazio com filtro</b><div class="state">Nenhum tópico com este assunto.<br><br><button class="ghost">Limpar filtro</button></div>
+  <br><b>Erro</b><div class="state" style="color:var(--err)">Não foi possível carregar o fórum.<br><br><button class="ghost">Tentar de novo</button></div>
+</div></div></div></section>
+
+<script>
+document.querySelectorAll('[data-side]').forEach(e=>e.replaceWith(document.getElementById('side').content.cloneNode(true)));
+document.querySelectorAll('.switch button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.switch button,.dir').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on');document.getElementById(b.dataset.d).classList.add('on');
+});
+</script>
+</body>
+</html>
