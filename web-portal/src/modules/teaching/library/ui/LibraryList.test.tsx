@@ -44,6 +44,31 @@ describe("LibraryList", () => {
     expect(onSelect).toHaveBeenCalledWith("f1");
   });
 
+  it("clicar em qualquer célula da linha (tags, autor, data, tamanho) seleciona o arquivo", () => {
+    const onSelect = vi.fn();
+    render(<LibraryList items={[file()]} {...props} onSelect={onSelect} />);
+    for (const text of ["Artigos", "Felipe", "19/10/2026", "250 KB"]) {
+      fireEvent.click(screen.getByText(text));
+    }
+    expect(onSelect).toHaveBeenCalledTimes(4);
+    expect(onSelect).toHaveBeenCalledWith("f1");
+    expect(screen.getByRole("row", {name: /Santidade/})).toHaveClass("cursor-pointer");
+  });
+
+  it("clicar no botão do nome seleciona uma vez só", () => {
+    const onSelect = vi.fn();
+    render(<LibraryList items={[file()]} {...props} onSelect={onSelect} />);
+    fireEvent.click(screen.getByRole("button", {name: /Santidade/}));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("linha de link não é clicável fora da âncora", () => {
+    const onSelect = vi.fn();
+    render(<LibraryList items={[file({id: "l3", type: "link", name: "Livro", url: "https://x.org", size: undefined})]} {...props} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Felipe"));
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
   it("link vira âncora com target _blank e rel noopener noreferrer, sem abrir a janela", () => {
     const onSelect = vi.fn();
     render(

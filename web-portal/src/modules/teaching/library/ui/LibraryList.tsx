@@ -39,9 +39,14 @@ export function LibraryList({
           {items.map((item) => (
             <tr
               key={item.id}
-              className={`border-t border-white/10 hover:bg-white/5 ${item.id === selectedId ? "bg-white/5 shadow-[inset_3px_0_var(--ipe-secondary)]" : ""}`}
+              // Arquivos: a linha inteira seleciona (o teclado usa o botão do nome, que
+              // sobe o clique até aqui). Links continuam abrindo só pela âncora.
+              onClick={item.type === "link" ? undefined : () => onSelect(item.id)}
+              className={`border-t border-white/10 hover:bg-white/5 focus-within:bg-white/5 ${
+                item.type === "link" ? "" : "cursor-pointer"
+              } ${item.id === selectedId ? "bg-white/5 shadow-[inset_3px_0_var(--ipe-secondary)]" : ""}`}
             >
-              <td className="px-4 py-2.5">{nameCell(item, onSelect)}</td>
+              <td className="px-4 py-2.5">{nameCell(item)}</td>
               <td className="hidden px-4 py-2.5 lg:table-cell">
                 <TagChips
                   ids={[...(item.typeTags ?? []), ...(item.subjectTags ?? []), ...(item.ageTags ?? [])]}
@@ -61,7 +66,7 @@ export function LibraryList({
   );
 }
 
-function nameCell(item: LibraryItem, onSelect: (id: string) => void) {
+function nameCell(item: LibraryItem) {
   const content = (
     <span className="flex items-center gap-3">
       <FileTypeIcon item={item} />
@@ -77,7 +82,7 @@ function nameCell(item: LibraryItem, onSelect: (id: string) => void) {
     );
   }
   return (
-    <button type="button" onClick={() => onSelect(item.id)} className="text-left hover:underline">
+    <button type="button" className="text-left hover:underline">
       {content}
     </button>
   );
