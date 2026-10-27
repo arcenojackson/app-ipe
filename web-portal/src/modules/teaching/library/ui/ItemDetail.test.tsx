@@ -404,6 +404,26 @@ describe("ItemDetail — cartão de reenvio e arquivo do autor", () => {
     expect(screen.queryByTestId("preview")).not.toBeInTheDocument();
   });
 
+  it("autor que também é curador não vê o arquivo nem vota no próprio item", async () => {
+    const authorCurator: Viewer = {uid: "t1", isCurator: true, isAdmin: false};
+    setup(authorCurator, file({status: "in_review"}));
+    expect(await screen.findByTestId("file-info")).toBeInTheDocument();
+    expect(screen.queryByTestId("preview")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", {name: "Aprovar"})).not.toBeInTheDocument();
+  });
+
+  it("autor curador de item devolvido não vê o arquivo, mas vê o cartão de reenvio", async () => {
+    const authorCurator: Viewer = {uid: "t1", isCurator: true, isAdmin: false};
+    setup(authorCurator, file({status: "returned", returnComment: "Ajuste X"}));
+    expect(await screen.findByRole("button", {name: "Reenviar"})).toBeInTheDocument();
+    expect(screen.queryByTestId("preview")).not.toBeInTheDocument();
+  });
+
+  it("autor vê o arquivo quando o item está publicado", async () => {
+    setup(teacher, file({status: "published"}));
+    expect(await screen.findByTestId("preview")).toBeInTheDocument();
+  });
+
   it("curador continua vendo o arquivo de item em revisão", async () => {
     setup(curator2, file({status: "in_review"}));
     expect(await screen.findByTestId("preview")).toBeInTheDocument();

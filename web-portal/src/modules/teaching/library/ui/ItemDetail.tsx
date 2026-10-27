@@ -82,8 +82,8 @@ export function ItemDetail({
   const reason = (cause: unknown) =>
     cause instanceof UploadError ? cause.message : "Não foi possível reenviar o arquivo. Tente novamente.";
   const resubmitCard = permissions.canResubmit && item.type === "file";
-  // O autor não vê o arquivo de um item ainda em revisão/devolvido (não publicado).
-  const hideFile = item.authorId === viewer.uid && !viewer.isCurator && !viewer.isAdmin && item.status !== "published";
+  // O autor nunca vê o arquivo do próprio item em revisão/devolvido (mesmo sendo curador).
+  const hideFile = item.authorId === viewer.uid && item.status !== "published";
   const quiet = (promise: Promise<void>) => void promise.catch(() => undefined);
 
   const vote = (action: VoteAction, comment?: string) =>
