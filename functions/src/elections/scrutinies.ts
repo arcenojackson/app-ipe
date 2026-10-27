@@ -180,25 +180,37 @@ export const castVote = async (
     tx.create(votedRef, {});
     tx.create(ballotRef, {choice});
   });
+  // O voto já está gravado: uma falha ao encerrar não pode derrubá-lo nem
+  // esconder o comprovante. O diretor ainda pode encerrar manualmente.
+  try {
+    await closeIfAllVoted(db, electionId, roundId);
+  } catch (e) {
+    console.error(`Encerramento automático falhou (${electionId}):`, e);
+  }
   return {receipt: ballotRef.id};
 };
+
+interface ClosedRound {
+  stage: CargoStage;
+  result: ScrutinyResult;
+  number: Number123;
+}
 
 // Encerra e apura numa única transação: leitura de `ballots`, `voted` e dos
 // eleitores liberados e a troca de status acontecem juntas, então um voto
 // concorrente ou entra na contagem ou é rejeitado (escrutínio fechado).
-export const closeScrutiny = async (
+// Com `onlyIfAllVoted`, só encerra se todos os liberados já votaram; nesse
+// modo, não haver escrutínio aberto (outro voto encerrou antes) não é erro.
+const closeOpenRound = async (
   db: Firestore,
-  uid: string,
-  data: unknown
-): Promise<{stage: CargoStage; result: ScrutinyResult}> => {
-  const electionId = requireString(data, "electionId");
-  const position = requireString(data, "position");
-  await assertElectionDirector(db, uid, electionId);
-
+  electionId: string,
+  position: string,
+  onlyIfAllVoted: boolean
+): Promise<ClosedRound | null> => {
   const electionRef = db.doc(`elections/${electionId}`);
   const cargoRef = electionRef.collection("cargos").doc(position);
 
-  const closed = await db.runTransaction(async (tx) => {
+  return db.runTransaction(async (tx) => {
     const cargoSnap = await tx.get(cargoRef);
     const openRounds = await tx.get(
       electionRef.collection("rounds")
@@ -208,6 +220,7 @@ export const closeScrutiny = async (
     );
     if (!cargoSnap.exists) throw fail("not-found", "Cargo não encontrado.");
     if (openRounds.empty) {
+      if (onlyIfAllVoted) return null;
       throw fail(
         "failed-precondition", "Não há escrutínio aberto para este cargo."
       );
@@ -218,6 +231,11 @@ export const closeScrutiny = async (
     const approved = await tx.get(
       electionRef.collection("voters").where("status", "==", "approved")
     );
+    if (
+      onlyIfAllVoted && (approved.size === 0 || voted.size < approved.size)
+    ) {
+      return null;
+    }
 
     const options = roundSnap.get("options") as Candidate[];
     const number = roundSnap.get("number") as Number123;
@@ -264,10 +282,20 @@ export const closeScrutiny = async (
     tx.update(cargoRef, patch);
     return {stage: outcome.stage, result, number};
   });
+};
 
-  await logEvent(db, electionId, {
+const logClosed = (
+  db: Firestore,
+  electionId: string,
+  position: string,
+  closed: ClosedRound,
+  actorId: string,
+  auto: boolean
+) =>
+  logEvent(db, electionId, {
     type: "scrutiny_closed",
-    actorId: uid,
+    actorId,
+    ...(auto ? {auto: true} : {}),
     position,
     number: closed.number,
     stage: closed.stage,
@@ -277,7 +305,37 @@ export const closeScrutiny = async (
     presentCount: closed.result.presentCount,
     divergence: closed.result.divergence,
   });
+
+export const closeScrutiny = async (
+  db: Firestore,
+  uid: string,
+  data: unknown
+): Promise<{stage: CargoStage; result: ScrutinyResult}> => {
+  const electionId = requireString(data, "electionId");
+  const position = requireString(data, "position");
+  await assertElectionDirector(db, uid, electionId);
+
+  const closed = await closeOpenRound(db, electionId, position, false);
+  if (!closed) throw fail("internal", "Não foi possível encerrar.");
+  await logClosed(db, electionId, position, closed, uid, false);
   return {stage: closed.stage, result: closed.result};
+};
+
+// Encerra o escrutínio sozinho quando o último liberado vota. Chamado depois
+// de cada voto; seguro contra votos simultâneos: quem chega depois do
+// encerramento não encontra escrutínio aberto e não faz nada.
+export const closeIfAllVoted = async (
+  db: Firestore,
+  electionId: string,
+  roundId: string
+): Promise<boolean> => {
+  const round = await db.doc(`elections/${electionId}/rounds/${roundId}`).get();
+  if (!round.exists || round.get("status") !== "open") return false;
+  const position = String(round.get("position"));
+  const closed = await closeOpenRound(db, electionId, position, true);
+  if (!closed) return false;
+  await logClosed(db, electionId, position, closed, "system", true);
+  return true;
 };
 
 // Contador exibido ao vivo ("X de Y votaram"). Roda num gatilho, fora da

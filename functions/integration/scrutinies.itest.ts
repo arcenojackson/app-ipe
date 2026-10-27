@@ -34,6 +34,9 @@ const approve = (uid: string, status = "approved") =>
     name: uid, email: "", kind: "member", status,
   });
 
+// Liberado que não vota: impede o encerramento automático (todos votaram).
+const IDLE = "idle1";
+
 const cargo = async (position: string) => (await cargoRef(position).get()).data()!;
 const round = async (id: string) => (await roundsRef().doc(id).get()).data()!;
 
@@ -177,6 +180,7 @@ describe("castVote", () => {
   let roundId: string;
   beforeEach(async () => {
     await approve(MEMBER);
+    await approve(IDLE);
     roundId = (await start()).roundId;
   });
 
@@ -235,7 +239,7 @@ describe("castVote", () => {
     await approve("late");
     await vote("late", MEMBER, roundId);
     const out = await close();
-    expect(out.result.presentCount).toBe(2);
+    expect(out.result.presentCount).toBe(3);
     expect(out.result.total).toBe(1);
   });
 });
@@ -267,7 +271,7 @@ describe("closeScrutiny", () => {
 
   it("1º escrutínio: vira confirming com os votados por votos e grava o resultado", async () => {
     const {roundId} = await start();
-    for (const uid of [MEMBER, MEMBER2, MEMBER3]) await approve(uid);
+    for (const uid of [MEMBER, MEMBER2, MEMBER3, IDLE]) await approve(uid);
     await vote(MEMBER, MEMBER2, roundId);
     await vote(MEMBER2, MEMBER2, roundId);
     await vote(MEMBER3, "blank", roundId);
@@ -275,7 +279,7 @@ describe("closeScrutiny", () => {
     expect(out.stage).toBe("confirming");
     expect(out.result).toMatchObject({
       counts: {[MEMBER]: 0, [MEMBER2]: 2, [MEMBER3]: 0},
-      blank: 1, total: 3, presentCount: 3, threshold: 2, winnerId: null, tie: [], divergence: false,
+      blank: 1, total: 3, presentCount: 4, threshold: 3, winnerId: null, tie: [], divergence: false,
     });
     expect((await cargo("presidente")).candidates).toEqual([{id: MEMBER2, name: "Bia", votes: 2}]);
     const r = await round(roundId);
@@ -287,6 +291,7 @@ describe("closeScrutiny", () => {
   it("1º escrutínio sem votos ou só brancos: confirming com lista vazia", async () => {
     const {roundId} = await start();
     await approve(MEMBER);
+    await approve(IDLE);
     await vote(MEMBER, "blank", roundId);
     const out = await close();
     expect(out.stage).toBe("confirming");
@@ -354,15 +359,17 @@ describe("closeScrutiny", () => {
     await approve(MEMBER);
     await approve(MEMBER2, "pending");
     await approve(MEMBER3, "rejected");
+    await approve(IDLE);
     await vote(MEMBER, MEMBER, roundId);
     const out = await close();
-    expect(out.result.presentCount).toBe(1);
-    expect(out.result.threshold).toBe(1);
+    expect(out.result.presentCount).toBe(2);
+    expect(out.result.threshold).toBe(2);
   });
 
   it("marca divergência entre voted e ballots", async () => {
     const {roundId} = await start();
     await approve(MEMBER);
+    await approve(IDLE);
     await vote(MEMBER, MEMBER, roundId);
     await roundsRef().doc(roundId).collection("voted").doc("ghost").set({});
     const out = await close();
@@ -373,6 +380,7 @@ describe("closeScrutiny", () => {
   it("o log do encerramento não identifica votos", async () => {
     const {roundId} = await start();
     await approve(MEMBER);
+    await approve(IDLE);
     await vote(MEMBER, MEMBER2, roundId);
     await close();
     const events = await electionRef().collection("events").get();
@@ -383,7 +391,7 @@ describe("closeScrutiny", () => {
 
   it("voto concorrente com o encerramento: nunca sobra voted sem ballot", async () => {
     const {roundId} = await start();
-    for (const uid of [MEMBER, MEMBER2, MEMBER3]) await approve(uid);
+    for (const uid of [MEMBER, MEMBER2, MEMBER3, IDLE]) await approve(uid);
     const settled = await Promise.allSettled([
       vote(MEMBER, MEMBER, roundId),
       vote(MEMBER2, MEMBER, roundId),
@@ -399,5 +407,74 @@ describe("closeScrutiny", () => {
     expect(voted.size).toBe(accepted);
     expect(r.result.total).toBe(accepted);
     expect(r.result.divergence).toBe(false);
+  });
+});
+
+describe("encerramento automático quando todos os liberados votaram", () => {
+  const eventsOfClose = async () =>
+    (await electionRef().collection("events").get()).docs
+      .filter((d) => d.get("type") === "scrutiny_closed");
+
+  it("o último voto encerra o escrutínio e apura", async () => {
+    await approve(MEMBER);
+    await approve(MEMBER2);
+    const {roundId} = await start();
+    await vote(MEMBER, MEMBER2, roundId);
+    expect((await round(roundId)).status).toBe("open");
+    const res = await vote(MEMBER2, MEMBER2, roundId);
+    expect(res.receipt).toBeTruthy();
+
+    const r = await round(roundId);
+    expect(r.status).toBe("closed");
+    expect(r.votedCount).toBe(2);
+    expect(r.result).toMatchObject({
+      counts: {[MEMBER]: 0, [MEMBER2]: 2, [MEMBER3]: 0},
+      total: 2, presentCount: 2, divergence: false,
+    });
+    const c = await cargo("presidente");
+    expect(c.stage).toBe("confirming");
+    expect(c.candidates).toEqual([{id: MEMBER2, name: "Bia", votes: 2}]);
+    const closed = await eventsOfClose();
+    expect(closed).toHaveLength(1);
+    expect(closed[0].get("actorId")).toBe("system");
+    expect(closed[0].get("auto")).toBe(true);
+  });
+
+  it("enquanto falta alguém votar, continua aberto", async () => {
+    await approve(MEMBER);
+    await approve(MEMBER2);
+    const {roundId} = await start();
+    await vote(MEMBER, "blank", roundId);
+    expect((await round(roundId)).status).toBe("open");
+    expect(await eventsOfClose()).toHaveLength(0);
+  });
+
+  it("no 2º escrutínio decide o cargo quando todos votam na maioria", async () => {
+    await approve(MEMBER);
+    await approve(MEMBER2);
+    await seedCargo("presidente", {
+      stage: "confirming",
+      candidates: [{id: MEMBER, name: "Ana", votes: 1}, {id: MEMBER2, name: "Bia", votes: 1}],
+    });
+    const {roundId, number} = await start();
+    expect(number).toBe(2);
+    await vote(MEMBER, MEMBER, roundId);
+    await vote(MEMBER2, MEMBER, roundId);
+    expect(await cargo("presidente")).toMatchObject({stage: "decided", winnerId: MEMBER});
+  });
+
+  it("últimos votos simultâneos: todos aceitos e um só encerramento", async () => {
+    for (const uid of [MEMBER, MEMBER2, MEMBER3]) await approve(uid);
+    const {roundId} = await start();
+    const settled = await Promise.allSettled([
+      vote(MEMBER, MEMBER2, roundId),
+      vote(MEMBER2, MEMBER2, roundId),
+      vote(MEMBER3, MEMBER, roundId),
+    ]);
+    expect(settled.every((s) => s.status === "fulfilled")).toBe(true);
+    const r = await round(roundId);
+    expect(r.status).toBe("closed");
+    expect(r.result).toMatchObject({total: 3, presentCount: 3, divergence: false});
+    expect(await eventsOfClose()).toHaveLength(1);
   });
 });
