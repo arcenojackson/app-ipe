@@ -51,9 +51,15 @@ class SubjectChip extends StatelessWidget {
 
 /// Botão "Assunto ▾" com contador de filtros ativos.
 class SubjectFilterButton extends StatelessWidget {
-  const SubjectFilterButton({super.key, required this.activeCount, required this.onPressed});
+  const SubjectFilterButton({
+    super.key,
+    required this.activeCount,
+    required this.onPressed,
+    this.label = 'Assunto',
+  });
 
   final int activeCount;
+  final String label;
   final VoidCallback onPressed;
 
   @override
@@ -63,7 +69,7 @@ class SubjectFilterButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(Icons.sell_outlined, size: 18, color: active ? subjectTagColor : Colors.white70),
       label: Text(
-        active ? 'Assunto ($activeCount) ▾' : 'Assunto ▾',
+        active ? '$label ($activeCount) ▾' : '$label ▾',
         style: TextStyle(color: active ? Colors.white : Colors.white70),
       ),
       style: OutlinedButton.styleFrom(

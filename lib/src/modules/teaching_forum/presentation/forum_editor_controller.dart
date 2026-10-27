@@ -27,6 +27,14 @@ class ForumEditorController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Troca a seleção inteira (limitada a [forumMaxTags]).
+  void setTags(Iterable<String> ids) {
+    selectedTags
+      ..clear()
+      ..addAll(ids.take(forumMaxTags));
+    notifyListeners();
+  }
+
   /// Devolve `false` se já houver 3 assuntos marcados.
   bool toggleTag(String id) {
     if (selectedTags.remove(id)) {
