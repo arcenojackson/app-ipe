@@ -26,6 +26,7 @@ export function PortalShell({
   const pathname = usePathname();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(readCollapsed);
   const burgerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -44,6 +45,14 @@ export function PortalShell({
       burger?.focus();
     };
   }, [menuOpen]);
+
+  const toggleCollapsed = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try {
+      localStorage.setItem(COLLAPSED_KEY, next ? "1" : "0");
+    } catch {}
+  };
 
   useEffect(() => {
     if (state.status === "signedOut") router.replace("/login");
@@ -90,12 +99,23 @@ export function PortalShell({
       )}
       <aside
         id="portal-menu"
-        className={`fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85%] overflow-y-auto border-r border-white/5 bg-surface p-4 shadow-2xl transition-[transform,visibility] duration-200 md:static md:z-auto md:min-h-screen md:w-64 md:max-w-none md:translate-x-0 md:overflow-visible md:shadow-none md:visible ${
+        className={`fixed inset-y-0 left-0 z-50 w-[280px] max-w-[85%] overflow-y-auto border-r border-white/5 bg-surface p-4 shadow-2xl transition-[transform,visibility,width] duration-200 motion-reduce:transition-none md:static md:z-auto md:min-h-screen md:max-w-none md:translate-x-0 md:overflow-visible md:shadow-none md:visible ${
           menuOpen ? "translate-x-0" : "invisible -translate-x-full"
-        }`}
+        } ${collapsed ? "md:w-16 md:px-2" : "md:w-64"}`}
       >
-        <div className="mb-5 flex items-center justify-between">
-          <Brand />
+        <div className={`mb-5 flex items-center justify-between ${collapsed ? "md:flex-col md:gap-3" : ""}`}>
+          <Brand compact={collapsed} />
+          <button
+            type="button"
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            aria-expanded={!collapsed}
+            aria-controls="portal-menu"
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            onClick={toggleCollapsed}
+            className="hidden h-10 w-10 place-items-center rounded-button text-white/60 hover:bg-white/10 md:grid"
+          >
+            <Icon name="panel" />
+          </button>
           <button
             ref={closeRef}
             type="button"
@@ -109,20 +129,21 @@ export function PortalShell({
         <nav aria-label="Principal" className="space-y-4">
           {groups.map((group) => (
             <div key={group.moduleId}>
-              <p className="mb-1 px-3 text-xs uppercase tracking-wide text-white/50">{group.label}</p>
+              <p className={`mb-1 px-3 text-xs uppercase tracking-wide text-white/50 ${collapsed ? "md:sr-only" : ""}`}>{group.label}</p>
               <ul className="space-y-1">
                 {group.items.map((item) => (
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      title={item.label}
                       onClick={() => setMenuOpen(false)}
                       aria-current={pathname === item.href ? "page" : undefined}
                       className={`flex items-center gap-3 rounded-button px-3 py-2.5 text-sm hover:bg-white/10 ${
-                        pathname === item.href ? "bg-secondary/20 font-semibold text-white" : "text-white/70"
-                      }`}
+                        collapsed ? "md:justify-center md:px-0" : ""
+                      } ${pathname === item.href ? "bg-secondary/20 font-semibold text-white" : "text-white/70"}`}
                     >
                       {item.icon && <Icon name={item.icon} />}
-                      {item.label}
+                      <span className={collapsed ? "md:sr-only" : ""}>{item.label}</span>
                     </Link>
                   </li>
                 ))}
@@ -131,9 +152,18 @@ export function PortalShell({
           ))}
         </nav>
         <div className="mt-6 border-t border-white/5 pt-4 text-sm">
-          <p className="truncate text-white/70">{state.user.displayName ?? state.user.email}</p>
-          <Button type="button" variant="text" className="mt-1 px-0" onClick={() => void signOut()}>
-            Sair
+          <p className={`truncate text-white/70 ${collapsed ? "md:sr-only" : ""}`}>
+            {state.user.displayName ?? state.user.email}
+          </p>
+          <Button
+            type="button"
+            variant="text"
+            title="Sair"
+            className={`mt-1 px-0 ${collapsed ? "md:mx-auto md:flex md:w-full md:justify-center" : ""}`}
+            onClick={() => void signOut()}
+          >
+            {collapsed && <Icon name="logout" className="hidden h-5 w-5 md:block" />}
+            <span className={collapsed ? "md:sr-only" : ""}>Sair</span>
           </Button>
         </div>
       </aside>
@@ -142,11 +172,23 @@ export function PortalShell({
   );
 }
 
-function Brand() {
+const COLLAPSED_KEY = "ipe-portal-menu-collapsed";
+
+// Preferência por navegador. Só roda depois do login (antes disso a casca
+// mostra "Carregando…"), então não há flash nem divergência de hidratação.
+function readCollapsed() {
+  try {
+    return localStorage.getItem(COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function Brand({compact = false}: {compact?: boolean}) {
   return (
     <p className="flex items-center gap-2.5 px-2 text-base font-bold">
-      <span aria-hidden className="h-7 w-7 rounded-[9px] bg-gradient-to-br from-primary to-secondary" />
-      Portal de Ensino
+      <span aria-hidden className="h-7 w-7 shrink-0 rounded-[9px] bg-gradient-to-br from-primary to-secondary" />
+      <span className={compact ? "md:sr-only" : ""}>Portal de Ensino</span>
     </p>
   );
 }

@@ -4,7 +4,18 @@ import {useEffect, type ReactNode} from "react";
 
 // Painel lateral deslizante (à direita) com fundo escurecido; fecha com Esc ou
 // clicando fora.
-export function Drawer({title, onClose, children}: {title: string; onClose: () => void; children: ReactNode}) {
+export function Drawer({
+  title,
+  onClose,
+  children,
+  footer,
+}: {
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  // Rodapé fixo, sempre visível (ex.: botão de envio).
+  footer?: ReactNode;
+}) {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -28,6 +39,7 @@ export function Drawer({title, onClose, children}: {title: string; onClose: () =
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        {footer && <div className="border-t border-white/10 px-6 py-4">{footer}</div>}
       </div>
     </div>
   );

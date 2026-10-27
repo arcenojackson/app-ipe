@@ -3,10 +3,8 @@
 import {useRouter, useSearchParams} from "next/navigation";
 import {useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
-import {Button} from "@/core/ui/Button";
 import {Icon} from "@/core/ui/icons";
 import {REQUIRED_APPROVALS} from "../files";
-import {createLink} from "../mutations";
 import {iVoted} from "../reviewQueue";
 import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
 import type {LibraryItem, LibraryVote} from "../types";
@@ -15,10 +13,8 @@ import {libraryUrl} from "../url";
 import {useReviewQueue} from "../useReviewQueue";
 import {useTags} from "../useTags";
 import {CuratorWarning} from "./CuratorWarning";
-import {LinkDialog} from "./Dialogs";
-import {Drawer} from "./Drawer";
 import {QueueRow} from "./QueueRow";
-import {UploadPanel} from "./UploadPanel";
+import {UploadDrawer} from "./UploadDrawer";
 
 type TabId = "review" | "mine" | "returned" | "delete";
 
@@ -33,7 +29,6 @@ export default function ReviewQueuePage() {
   const {queue, votes, error} = useReviewQueue(viewer);
   const {byId: tagById} = useTags();
   const [showVoted, setShowVoted] = useState(false);
-  const [linkOpen, setLinkOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(params.get("novo") === "1");
   const [tab, setTab] = useState<TabId | null>(null);
 
@@ -100,25 +95,7 @@ export default function ReviewQueuePage() {
       </div>
       {privileged && <CuratorWarning />}
 
-      {drawerOpen && (
-        <Drawer title="Enviar material" onClose={closeDrawer}>
-          <div className="space-y-4">
-            <UploadPanel uid={viewer.uid} onUploaded={() => undefined} />
-            <Button type="button" variant="text" onClick={() => setLinkOpen(true)}>Adicionar link</Button>
-          </div>
-        </Drawer>
-      )}
-      {linkOpen && (
-        <LinkDialog
-          withTags
-          submitLabel="Adicionar"
-          onSubmit={async (value) => {
-            if (!value.tags) return;
-            await createLink(viewer.uid, {...value, tags: value.tags});
-          }}
-          onClose={() => setLinkOpen(false)}
-        />
-      )}
+      {drawerOpen && <UploadDrawer uid={viewer.uid} onClose={closeDrawer} />}
 
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
       {!queue && !error && (

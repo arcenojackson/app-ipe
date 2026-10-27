@@ -39,6 +39,9 @@ const teacher: AccessClaims = {admin: false, teachingRole: "teacher"};
 const admin: AccessClaims = {admin: true, teachingRole: null};
 
 beforeEach(() => {
+  try {
+    localStorage.removeItem("ipe-portal-menu-collapsed");
+  } catch {}
   nav.replace.mockClear();
   refreshAccess.mockClear();
 });
@@ -163,5 +166,52 @@ describe("PortalShell: menu hambúrguer no celular", () => {
   it("em /eleicoes não há botão de menu", () => {
     renderAt("/eleicoes/abc", signedIn(noRole), [teachingModule, electionsModule]);
     expect(screen.queryByRole("button", {name: "Abrir menu"})).not.toBeInTheDocument();
+  });
+});
+
+describe("PortalShell: menu recolhível no desktop", () => {
+  const menu = () => document.getElementById("portal-menu")!;
+  const toggle = () => screen.getByRole("button", {name: /^(Recolher|Expandir) menu$/});
+
+  it("começa expandido; o botão recolhe e expande com aria-expanded", () => {
+    renderAt("/ensino", signedIn(teacher));
+    expect(toggle()).toHaveAttribute("aria-label", "Recolher menu");
+    expect(toggle()).toHaveAttribute("aria-expanded", "true");
+    expect(menu()).toHaveClass("md:w-64");
+    fireEvent.click(toggle());
+    expect(toggle()).toHaveAttribute("aria-label", "Expandir menu");
+    expect(toggle()).toHaveAttribute("aria-expanded", "false");
+    expect(menu()).toHaveClass("md:w-16");
+    fireEvent.click(toggle());
+    expect(menu()).toHaveClass("md:w-64");
+  });
+
+  it("recolhido, os links mantêm nome acessível e title", () => {
+    renderAt("/ensino", signedIn(teacher));
+    fireEvent.click(toggle());
+    expect(screen.getByRole("link", {name: "Biblioteca"})).toHaveAttribute("title", "Biblioteca");
+    expect(screen.getByRole("button", {name: "Sair"})).toBeInTheDocument();
+  });
+
+  it("lembra a preferência no navegador", () => {
+    const first = renderAt("/ensino", signedIn(teacher));
+    fireEvent.click(toggle());
+    first.unmount();
+    renderAt("/ensino", signedIn(teacher));
+    expect(menu()).toHaveClass("md:w-16");
+  });
+
+  it("funciona sem localStorage", () => {
+    const spy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("bloqueado");
+    });
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("bloqueado");
+    });
+    renderAt("/ensino", signedIn(teacher));
+    fireEvent.click(toggle());
+    expect(menu()).toHaveClass("md:w-16");
+    spy.mockRestore();
+    set.mockRestore();
   });
 });
