@@ -111,7 +111,57 @@ describe("PortalShell: menu só no módulo de ensino", () => {
 
   it("em /ensino o menu do Portal de Ensino continua aparecendo", () => {
     renderAt("/ensino", signedIn(teacher), both);
-    expect(screen.getByText("Portal de Ensino")).toBeInTheDocument();
+    expect(screen.getAllByText("Portal de Ensino").length).toBeGreaterThan(0);
     expect(screen.getByRole("navigation", {name: "Principal"})).toBeInTheDocument();
+  });
+});
+
+describe("PortalShell: menu hambúrguer no celular", () => {
+  const openMenu = () => fireEvent.click(screen.getByRole("button", {name: "Abrir menu"}));
+  const menu = () => document.getElementById("portal-menu")!;
+
+  it("começa fechado e o ☰ abre e expõe aria-expanded", () => {
+    renderAt("/ensino", signedIn(teacher));
+    const burger = screen.getByRole("button", {name: "Abrir menu"});
+    expect(burger).toHaveAttribute("aria-expanded", "false");
+    expect(menu()).toHaveClass("invisible");
+    fireEvent.click(burger);
+    expect(burger).toHaveAttribute("aria-expanded", "true");
+    expect(menu()).not.toHaveClass("invisible");
+  });
+
+  it("ao abrir, o foco vai para o X; ao fechar, volta para o ☰", () => {
+    renderAt("/ensino", signedIn(teacher));
+    openMenu();
+    const [, x] = screen.getAllByRole("button", {name: "Fechar menu"});
+    expect(x).toHaveFocus();
+    fireEvent.click(x);
+    expect(screen.getByRole("button", {name: "Abrir menu"})).toHaveFocus();
+  });
+
+  it("fecha ao tocar fora, no X, com Esc e ao escolher um item", () => {
+    renderAt("/ensino", signedIn(teacher));
+    const closed = () => expect(menu()).toHaveClass("invisible");
+
+    openMenu();
+    fireEvent.click(screen.getAllByRole("button", {name: "Fechar menu"})[0]);
+    closed();
+
+    openMenu();
+    fireEvent.click(screen.getAllByRole("button", {name: "Fechar menu"})[1]);
+    closed();
+
+    openMenu();
+    fireEvent.keyDown(document, {key: "Escape"});
+    closed();
+
+    openMenu();
+    fireEvent.click(screen.getByRole("link", {name: "Biblioteca"}));
+    closed();
+  });
+
+  it("em /eleicoes não há botão de menu", () => {
+    renderAt("/eleicoes/abc", signedIn(noRole), [teachingModule, electionsModule]);
+    expect(screen.queryByRole("button", {name: "Abrir menu"})).not.toBeInTheDocument();
   });
 });
