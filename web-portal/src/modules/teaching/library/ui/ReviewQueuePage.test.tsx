@@ -14,8 +14,6 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({push: nav.push, replace: nav.replace}),
   useSearchParams: () => new URLSearchParams(nav.search),
 }));
-vi.mock("./UploadPanel", () => ({UploadPanel: () => <div data-testid="upload-panel" />}));
-vi.mock("./Dialogs", () => ({LinkDialog: () => <div data-testid="link-dialog" />}));
 const mutations = vi.hoisted(() => ({createLink: vi.fn()}));
 vi.mock("../mutations", () => mutations);
 vi.mock("../notifications", () => ({subscribeNotifications: vi.fn(() => () => undefined)}));
@@ -74,9 +72,9 @@ describe("ReviewQueuePage — professor", () => {
     queue = {mine: [item("m1", "Meu envio")], toReview: [], returned: [], deleteRequests: []};
     asTeacher();
     expect(await screen.findByText("Meu envio")).toBeInTheDocument();
-    expect(screen.queryByTestId("upload-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("drop-zone")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", {name: "Enviar material"}));
-    expect(screen.getByTestId("upload-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("drop-zone")).toBeInTheDocument();
     expect(screen.queryByRole("tab")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", {name: "Para revisar"})).not.toBeInTheDocument();
   });
@@ -154,12 +152,11 @@ describe("ReviewQueuePage — curador", () => {
     expect(await screen.findByText(/Há apenas 1 curador/)).toBeInTheDocument();
   });
 
-  it("Enviar material abre o painel lateral; Adicionar link abre o diálogo de link", async () => {
+  it("Enviar material abre o painel lateral com o botão Enviar desabilitado", async () => {
     renderAs("c1");
     fireEvent.click(await screen.findByRole("button", {name: "Enviar material"}));
     expect(screen.getByRole("dialog", {name: "Enviar material"})).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", {name: "Adicionar link"}));
-    expect(screen.getByTestId("link-dialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "Enviar"})).toBeDisabled();
   });
 
   it("?novo=1 já abre o painel de envio e fechar limpa o endereço", async () => {
