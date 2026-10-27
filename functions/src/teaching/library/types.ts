@@ -51,6 +51,8 @@ export interface ItemPatch {
   status?: ItemStatus;
   // true = grava o horário do servidor (publicação).
   publishedAt?: true;
+  // Curadores que aprovaram a versão publicada (só as Functions gravam).
+  approvedBy?: string[];
   returnComment?: string | null;
   returnedBy?: string | null;
   parentId?: string | null;

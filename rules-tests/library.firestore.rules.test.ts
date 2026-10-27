@@ -196,6 +196,15 @@ describe("tags e qualquer tipo de arquivo", () => {
     await assertFails(updateDoc(doc(curator1(), "teaching_items/pub"), edit({typeTags: []})));
   });
 
+  it("approvedBy é só das Functions: nem curador, nem autor, nem na criação", async () => {
+    const stamp = {updatedBy: "c1", updatedAt: serverTimestamp()};
+    await assertFails(updateDoc(doc(curator1(), "teaching_items/pub"), {approvedBy: ["c1", "c2"], ...stamp}));
+    await assertFails(updateDoc(doc(curator1(), "teaching_items/pub"), {
+      typeTags: ["tipo-aulas"], subjectTags: ["assunto-trindade"], ageTags: ["faixa-upa"], approvedBy: ["c2"], ...stamp,
+    }));
+    await assertFails(setDoc(doc(teacher(), "teaching_items/ab"), fileData("t1", "ab", {approvedBy: ["c1", "c2"]})));
+  });
+
   it("professor e admin sem papel curador não editam tags", async () => {
     const edit = (uid: string) => ({typeTags: ["tipo-aulas"], updatedBy: uid, updatedAt: serverTimestamp()});
     await assertFails(updateDoc(doc(teacher(), "teaching_items/pub"), edit("t1")));

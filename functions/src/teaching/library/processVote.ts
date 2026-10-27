@@ -66,6 +66,7 @@ export async function processVote(
         tx.updateItem(item.id, {
           status: "published",
           publishedAt: true,
+          approvedBy: decision.by,
           returnComment: null,
           returnedBy: null,
         });
