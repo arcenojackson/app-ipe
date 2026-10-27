@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {usePathname, useRouter} from "next/navigation";
 import {useEffect, useRef, useState, type ReactNode} from "react";
@@ -187,7 +188,7 @@ function readCollapsed() {
 function Brand({compact = false}: {compact?: boolean}) {
   return (
     <p className="flex items-center gap-2.5 px-2 text-base font-bold">
-      <span aria-hidden className="h-7 w-7 shrink-0 rounded-[9px] bg-gradient-to-br from-primary to-secondary" />
+      <Image src="/logo-ipe.png" alt="IPE" width={28} height={28} className="h-7 w-7 shrink-0 rounded-[9px]" />
       <span className={compact ? "md:sr-only" : ""}>Portal de Ensino</span>
     </p>
   );
