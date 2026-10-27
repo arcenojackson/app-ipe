@@ -11,6 +11,10 @@ import '../../events/presentation/event_viewer_page.dart';
 import '../../events/presentation/event_editor_page.dart';
 import '../../home/presentation/home_shell.dart';
 import '../../../../src/app.dart';
+import 'package:provider/provider.dart';
+import '../../../shared/state/app_state.dart';
+import '../../teaching_forum/models/teaching_access.dart';
+import '../../teaching_forum/presentation/forum_topic_page.dart';
 import 'teaching_notification_url.dart';
 
 class NotificationService {
@@ -144,11 +148,7 @@ class NotificationService {
   /// Navega para a tela apropriada baseado nos dados da notificação
   void _navigateFromNotification(RemoteMessage message) {
     final data = message.data;
-    final portalUri = teachingPortalUriFromData(data);
-    if (portalUri != null) {
-      launchUrl(portalUri, mode: LaunchMode.externalApplication);
-      return;
-    }
+    if (_handleTeachingTap(data)) return;
     final type = data['type'];
     final navigator = IpeApp.navigatorKey.currentState;
     
@@ -352,6 +352,47 @@ class NotificationService {
     );
   }
 
+  /// Avisos da plataforma pedagógica: o decisor puro escolhe entre abrir o
+  /// tópico no app ou o portal no navegador. Devolve `true` se tratou o toque.
+  bool _handleTeachingTap(Map<String, dynamic> data, {int attempt = 0}) {
+    final type = data['type'];
+    if (type != 'teaching_review' && type != 'teaching_forum') return false;
+    final context = IpeApp.navigatorKey.currentContext;
+    final user = context == null
+        ? null
+        : Provider.of<AppState>(context, listen: false).currentUser;
+    // App abrindo a frio: aguarda navegação e sessão antes de decidir.
+    if (type == 'teaching_forum' &&
+        (context == null || user == null) &&
+        attempt < 6) {
+      Future.delayed(
+        const Duration(milliseconds: 500),
+        () => _handleTeachingTap(data, attempt: attempt + 1),
+      );
+      return true;
+    }
+    final tap = resolveTeachingTap(data, user);
+    switch (tap) {
+      case OpenBrowser(:final uri):
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+        return true;
+      case OpenTopic(:final topicId):
+        final viewer = forumViewerFor(user);
+        final navigator = IpeApp.navigatorKey.currentState;
+        if (viewer == null || navigator == null) return false;
+        navigator.push(MaterialPageRoute(
+          builder: (_) => ForumTopicPage(
+            topicId: topicId,
+            viewer: viewer,
+            openPortalIfMissing: true,
+          ),
+        ));
+        return true;
+      case IgnoreTap():
+        return false;
+    }
+  }
+
   /// Handler quando o usuário toca em uma notificação local
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('Notificação tocada: ${response.payload}');
@@ -360,10 +401,7 @@ class NotificationService {
     try {
       final decoded = jsonDecode(payload);
       if (decoded is Map<String, dynamic>) {
-        final portalUri = teachingPortalUriFromData(decoded);
-        if (portalUri != null) {
-          launchUrl(portalUri, mode: LaunchMode.externalApplication);
-        }
+        _handleTeachingTap(decoded);
       }
     } catch (_) {
       // Payload antigo (não JSON): nada a fazer.

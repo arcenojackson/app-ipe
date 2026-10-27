@@ -1,3 +1,4 @@
+import 'src/modules/teaching_forum/data/forum_repository.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -65,6 +66,7 @@ void main() async {
           value: societiesRepository,
         ),
         Provider<ElectionsRepository>.value(value: ElectionsRepository()),
+        Provider<ForumRepository>.value(value: ForumRepository()),
         Provider<WeeklyTeamAssignmentsRepository>.value(
           value: WeeklyTeamAssignmentsRepository(),
         ),
