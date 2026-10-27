@@ -1,6 +1,9 @@
 "use client";
 
 import {useEffect, useMemo, useState} from "react";
+import {hasAccess} from "@/core/auth/access";
+import {useAuth} from "@/core/auth/AuthContext";
+import {AccessDenied} from "@/core/ui/AccessDenied";
 import {Card} from "@/core/ui/Card";
 import {TextField} from "@/core/ui/TextField";
 import {
@@ -11,7 +14,18 @@ import {
 } from "../data/memberRows";
 import {listMembers, setTeachingRole} from "../data/membersRepository";
 
+// Só Curador (que também é admin) gerencia papéis de ensino.
+function useCanManageRoles() {
+  const {state} = useAuth();
+  return state.status === "signedIn" && hasAccess(state.claims, "teachingManager");
+}
+
 export default function GroupAdminPage() {
+  return useCanManageRoles() ? <GroupAdmin /> : <AccessDenied />;
+}
+
+function GroupAdmin() {
+  const canManage = useCanManageRoles();
   const [members, setMembers] = useState<MemberRow[] | null>(null);
   const [term, setTerm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -45,6 +59,7 @@ export default function GroupAdminPage() {
   }
 
   async function onChangeRole(member: MemberRow, role: TeachingRoleValue) {
+    if (!canManage) return;
     const previous = member.teachingRole;
     setError(null);
     patch(member.id, role);

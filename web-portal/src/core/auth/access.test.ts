@@ -27,7 +27,7 @@ describe("parseClaims", () => {
 
 describe("hasAccess", () => {
   it("sem claims (deslogado) nega tudo", () => {
-    for (const req of ["authenticated", "teacher", "curator", "admin"] as const) {
+    for (const req of ["authenticated", "teacher", "curator", "admin", "teachingManager"] as const) {
       expect(hasAccess(null, req)).toBe(false);
     }
   });
@@ -49,6 +49,16 @@ describe("hasAccess", () => {
     expect(hasAccess(curator, "teacher")).toBe(true);
     expect(hasAccess(curator, "curator")).toBe(true);
     expect(hasAccess(curator, "admin")).toBe(false);
+  });
+
+  it("teachingManager: só admin que também é curador", () => {
+    expect(hasAccess({admin: true, teachingRole: "curator"}, "teachingManager")).toBe(true);
+    expect(hasAccess(admin, "teachingManager")).toBe(false);
+    expect(hasAccess({admin: true, teachingRole: "teacher"}, "teachingManager")).toBe(false);
+    expect(hasAccess(curator, "teachingManager")).toBe(false);
+    expect(hasAccess(teacher, "teachingManager")).toBe(false);
+    expect(hasAccess(none, "teachingManager")).toBe(false);
+    expect(hasAccess(null, "teachingManager")).toBe(false);
   });
 
   it("admin sem papel de ensino passa em authenticated e admin, mas não em teacher/curator", () => {

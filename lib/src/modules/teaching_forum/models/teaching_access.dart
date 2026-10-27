@@ -9,6 +9,12 @@ bool canUseTeachingForum(UserModel? user) =>
     (user.teachingRole == TeachingRole.teacher ||
         user.teachingRole == TeachingRole.curator);
 
+/// Só quem é Curador (não pendente) gerencia papéis de ensino. Admin sem papel
+/// de curador não concede nem remove Professor/Curador. Restrição de interface:
+/// as regras do Firestore ainda deixam admin gravar `teaching_role`.
+bool canManageTeachingRoles(UserModel? user) =>
+    user != null && !user.isPending && user.teachingRole == TeachingRole.curator;
+
 ForumViewer? forumViewerFor(UserModel? user) => user == null
     ? null
     : ForumViewer(
