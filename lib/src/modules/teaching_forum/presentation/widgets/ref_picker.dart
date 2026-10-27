@@ -63,7 +63,12 @@ class RefPickerField extends StatelessWidget {
                   },
             icon: const Icon(Icons.attach_file, size: 18),
             label: const Text('Citar documento ou aula'),
-            style: OutlinedButton.styleFrom(shape: const StadiumBorder()),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.white,
+              disabledForegroundColor: Colors.white38,
+              side: BorderSide(color: full ? Colors.white12 : Colors.white38),
+              shape: const StadiumBorder(),
+            ),
           ),
           const SizedBox(width: 8),
           Text('${value.length} de $max',

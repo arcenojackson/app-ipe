@@ -14,12 +14,16 @@ class CommentComposer extends StatefulWidget {
     this.onCancel,
     this.submitLabel = 'Enviar',
     this.allowRefs = false,
+    this.header,
   });
 
   final Future<bool> Function(String text, List<ForumRef> refs) onSubmit;
 
   /// Mostra "Citar documento ou aula" (novo comentário e resposta).
   final bool allowRefs;
+
+  /// Cabeçalho acima do campo ("Novo comentário", "Respondendo a …").
+  final Widget? header;
   final String initialText;
   final String hint;
   final String submitLabel;
@@ -58,6 +62,8 @@ class _CommentComposerState extends State<CommentComposer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        if (widget.header != null)
+          Align(alignment: Alignment.centerLeft, child: widget.header),
         TextField(
           controller: _controller,
           minLines: 2,

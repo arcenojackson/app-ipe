@@ -39,6 +39,7 @@ class ForumTopicPage extends StatefulWidget {
 
 class _ForumTopicPageState extends State<ForumTopicPage> {
   late final ForumTopicController _controller;
+  ForumComment? _replyTo;
 
   @override
   void initState() {
@@ -190,8 +191,8 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
     final perms = c.permissions!;
     final theme = Theme.of(context);
     final tree = buildCommentTree(c.comments);
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 48),
+    final list = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         Text(t.title,
             style: theme.textTheme.titleLarge
@@ -218,22 +219,98 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
             perms: c.commentPerms,
             myVotes: c.myVotes,
             onVote: (cm, v) => c.vote(cm, v),
-            onReply: (cm, text, refs) => c.submitComment(text, cm, refs: refs),
+            replyingToId: _replyTo?.id,
+            onReply: (cm) => setState(() => _replyTo = cm),
             onEdit: (cm, text) => c.editComment(cm, text),
             onDelete: (cm) async {
               if (await _confirm('Apagar este comentário?')) await c.deleteComment(cm);
             },
           ),
-        const SizedBox(height: 16),
+      ],
+    );
+    final reply = _replyTo;
+    return Column(
+      children: [
+        Expanded(child: list),
         if (perms.canComment)
-          CommentComposer(
-            allowRefs: true,
-            onSubmit: (text, refs) => c.submitComment(text, null, refs: refs),
+          Material(
+            color: const Color(0xFF111828),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                child: Column(
+                  children: [
+                    // Os dois ficam montados: trocar de modo preserva os rascunhos.
+                    Offstage(
+                      offstage: reply != null,
+                      child: CommentComposer(
+                        key: const ValueKey('topic-composer'),
+                        allowRefs: true,
+                        header: const _ComposerHeader('Novo comentário'),
+                        onSubmit: (text, refs) => c.submitComment(text, null, refs: refs),
+                      ),
+                    ),
+                    if (reply != null)
+                      CommentComposer(
+                        key: ValueKey('reply-${reply.id}'),
+                        allowRefs: true,
+                        submitLabel: 'Responder',
+                        hint: 'Escreva uma resposta',
+                        header: _ComposerHeader('Respondendo a ${reply.authorName}',
+                            quote: reply.body),
+                        onCancel: () => setState(() => _replyTo = null),
+                        onSubmit: (text, refs) async {
+                          final ok = await c.submitComment(text, reply, refs: refs);
+                          if (ok && mounted) setState(() => _replyTo = null);
+                          return ok;
+                        },
+                      ),
+                  ],
+                ),
+              ),
+            ),
           )
         else
-          const Text('Este tópico não aceita novos comentários.',
-              style: TextStyle(color: Colors.white54)),
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Text('Este tópico não aceita novos comentários.',
+                style: TextStyle(color: Colors.white54)),
+          ),
       ],
+    );
+  }
+}
+
+class _ComposerHeader extends StatelessWidget {
+  const _ComposerHeader(this.title, {this.quote});
+
+  final String title;
+  final String? quote;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title,
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+          if (quote != null)
+            Container(
+              margin: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(left: 8),
+              decoration: const BoxDecoration(
+                border: Border(left: BorderSide(color: Colors.white38, width: 2)),
+              ),
+              child: Text(quote!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white60, fontSize: 12)),
+            ),
+        ],
+      ),
     );
   }
 }
