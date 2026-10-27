@@ -143,7 +143,7 @@ export function LibraryContent({
                   onSelect={setSelectedId}
                 />
               ) : (
-                <LibraryGrid items={library.items} authorNames={authorNames} onOpenFile={open} />
+                <LibraryGrid items={library.items} authorNames={authorNames} byTagId={byId} onOpenFile={open} />
               )}
               {view === "list" && selected && (
                 <ItemSidePanel
