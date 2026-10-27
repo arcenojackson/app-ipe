@@ -275,8 +275,7 @@ describe("ItemDetail — organizar e excluir", () => {
 
 describe("ItemDetail — reenvio", () => {
   it("autor reenvia arquivo devolvido", async () => {
-    const {onChanged} = setup(teacher, file({status: "returned", returnComment: "Falta a referência"}));
-    expect(await screen.findByText(/Falta a referência/)).toBeInTheDocument();
+    const {onChanged} = setup(teacher, file({status: "returned"}));
     const input = screen.getByLabelText("Escolher novo arquivo");
     const novo = new File(["x"], "novo.pdf", {type: "application/pdf"});
     await act(async () => fireEvent.change(input, {target: {files: [novo]}}));
@@ -371,10 +370,19 @@ describe("ItemDetail — acabamentos", () => {
 });
 
 describe("ItemDetail — cartão de reenvio e arquivo do autor", () => {
-  it("cartão mostra o motivo, 'Falta' sem arquivo e permite remover o escolhido", async () => {
-    setup(teacher, file({status: "returned", returnComment: "Ajuste X"}));
-    expect(await screen.findByText(/Motivo da devolução/)).toBeInTheDocument();
+  it("o motivo da devolução aparece só uma vez (no histórico), não no cartão", async () => {
+    setup(teacher, file({status: "returned", returnComment: "Ajuste X"}), [
+      {id: "v1", voterId: "c1", action: "return", version: 1, comment: "Ajuste X", createdAt: 5},
+    ]);
+    expect(await screen.findByRole("button", {name: "Reenviar"})).toBeInTheDocument();
     expect(screen.getAllByText(/Ajuste X/)).toHaveLength(1);
+    expect(screen.queryByText(/Motivo da devolução/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Devolvido pelos curadores/)).not.toBeInTheDocument();
+  });
+
+  it("cartão mostra 'Falta' sem arquivo e permite remover o escolhido", async () => {
+    setup(teacher, file({status: "returned"}));
+    await screen.findByRole("button", {name: "Reenviar"});
     expect(screen.getByRole("button", {name: "Reenviar"})).toBeDisabled();
     expect(screen.getByText("Falta: o arquivo corrigido")).toBeInTheDocument();
     const novo = new File(["x"], "novo.pdf", {type: "application/pdf"});

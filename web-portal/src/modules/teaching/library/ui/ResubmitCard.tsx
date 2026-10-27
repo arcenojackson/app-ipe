@@ -8,12 +8,10 @@ import {formatBytes} from "../labels";
 // escolher o arquivo: só ao clicar em "Reenviar". Se falhar, o arquivo escolhido
 // fica para tentar de novo.
 export function ResubmitCard({
-  returnComment,
   busy,
   progress,
   onResubmit,
 }: {
-  returnComment?: string;
   busy: boolean;
   progress: number | null;
   onResubmit: (file: File) => Promise<void>;
@@ -43,12 +41,6 @@ export function ResubmitCard({
   return (
     <section aria-label="Reenviar arquivo corrigido" className="space-y-3 rounded-card border border-secondary/40 bg-secondary/10 p-4">
       <h3 className="font-semibold">Reenviar arquivo corrigido</h3>
-      {returnComment && (
-        <p className="text-sm text-white/80">
-          <span className="text-white/60">Motivo da devolução: </span>
-          {returnComment}
-        </p>
-      )}
       <div
         data-testid="resubmit-drop"
         onDragOver={(e) => e.preventDefault()}

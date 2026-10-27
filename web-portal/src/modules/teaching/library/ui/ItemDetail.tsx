@@ -113,9 +113,6 @@ export function ItemDetail({
           Pedido de exclusão aberto{request.reason ? `: ${request.reason}` : ""}.{votesLoaded && ` Aprovações: ${deleteApprovals}/${REQUIRED_APPROVALS}`}
         </p>
       )}
-      {item.status === "returned" && item.returnComment && !resubmitCard && (
-        <p className="rounded-card bg-white/10 p-3 text-sm">Devolvido pelos curadores: {item.returnComment}</p>
-      )}
       {item.status === "in_review" && !request && votesLoaded && (
         <p className="text-sm text-white/70">Aprovações: {approvals}/{REQUIRED_APPROVALS}</p>
       )}
@@ -140,7 +137,6 @@ export function ItemDetail({
 
       {resubmitCard && (
         <ResubmitCard
-          returnComment={item.returnComment ?? undefined}
           busy={busy}
           progress={progress}
           onResubmit={(file) =>
