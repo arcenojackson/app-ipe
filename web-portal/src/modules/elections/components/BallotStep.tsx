@@ -58,7 +58,8 @@ export function BallotStep({round, busy, error, onSubmit}: Props) {
       <Button
         type="button"
         className="w-full"
-        disabled={busy || choice === null}
+        disabled={choice === null}
+        loading={busy}
         onClick={() => choice !== null && onSubmit(choice)}
       >
         Confirmar voto

@@ -4,9 +4,11 @@ import {useEffect, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {Button} from "@/core/ui/Button";
 import {GlassCard} from "@/core/ui/GlassCard";
+import {LoadingText} from "@/core/ui/Spinner";
+import {boardNotice} from "../conduct/boardNotice";
 import type {ConductActionKind} from "../conduct/cargoView";
-import {CargoCard} from "../components/CargoCard";
-import {PresentesPanel} from "../components/PresentesPanel";
+import {CargoCard, cargoKey} from "../components/CargoCard";
+import {PresentesPanel, reviewKey} from "../components/PresentesPanel";
 import {QrPanel} from "../components/QrPanel";
 import {
   applyBoard,
@@ -25,7 +27,6 @@ import {
   watchVoters,
 } from "../data/conductClient";
 import {
-  positionLabel,
   type Cargo,
   type ConductElection,
   type ConductRound,
@@ -53,6 +54,8 @@ export function ConductPage({electionId}: {electionId: string}) {
   const [voters, setVoters] = useState<ConductVoter[] | null>(null);
   const [votedIds, setVotedIds] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  // Chave da ação em andamento: só o botão clicado mostra o spinner.
+  const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -76,8 +79,9 @@ export function ConductPage({electionId}: {electionId: string}) {
     return watchVoted(electionId, openRoundId, setVotedIds, setError);
   }, [electionId, isDirector, openRoundId]);
 
-  async function run(action: () => Promise<unknown>) {
+  async function run(key: string, action: () => Promise<unknown>) {
     setBusy(true);
+    setPending(key);
     setError(null);
     setNotice(null);
     try {
@@ -86,13 +90,14 @@ export function ConductPage({electionId}: {electionId: string}) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
+      setPending(null);
     }
   }
 
   if (election === undefined) {
     return error ?
       <p role="alert" className="p-6 text-error">{error}</p> :
-      <p className="p-6 text-white/70">Carregando…</p>;
+      <div className="p-6"><LoadingText>Carregando…</LoadingText></div>;
   }
   if (election === null) return <p className="p-6">Eleição não encontrada.</p>;
   if (!isDirector) {
@@ -106,7 +111,7 @@ export function ConductPage({electionId}: {electionId: string}) {
   const anyDecided = (cargos ?? []).some((c) => c.stage === "decided");
 
   function onAction(position: string, kind: ConductActionKind, targetId?: string) {
-    void run(async () => {
+    void run(cargoKey(position, kind, targetId), async () => {
       if (kind === "start") await startScrutiny(electionId, position);
       else if (kind === "close") await closeScrutiny(electionId, position);
       else if (kind === "restart") await restartCargo(electionId, position);
@@ -124,12 +129,12 @@ export function ConductPage({electionId}: {electionId: string}) {
             <p className="text-sm text-white/70">{election.societyName}</p>
           </div>
           {election.status === "draft" && (
-            <Button type="button" disabled={busy} onClick={() => void run(() => setStatus(electionId, "open"))}>
+            <Button type="button" disabled={busy} loading={pending === "status"} onClick={() => void run("status", () => setStatus(electionId, "open"))}>
               Abrir eleição
             </Button>
           )}
           {election.status === "open" && (
-            <Button type="button" variant="text" disabled={busy} onClick={() => void run(() => setStatus(electionId, "closed"))}>
+            <Button type="button" variant="text" disabled={busy || openRound !== null} loading={pending === "status"} onClick={() => void run("status", () => setStatus(electionId, "closed"))}>
               Encerrar eleição
             </Button>
           )}
@@ -145,12 +150,13 @@ export function ConductPage({electionId}: {electionId: string}) {
         <PresentesPanel
           voters={voters ?? []}
           busy={busy}
-          onReview={(voterId, decision) => void run(() => reviewVoter(electionId, voterId, decision))}
+          pending={pending}
+          onReview={(voterId, decision) => void run(reviewKey(voterId, decision), () => reviewVoter(electionId, voterId, decision))}
         />
       </GlassCard>
 
       <section className="space-y-3">
-        {!loaded && <p className="text-sm text-white/70">Carregando cargos…</p>}
+        {!loaded && <LoadingText>Carregando cargos…</LoadingText>}
         {loaded && election.positions.map((position) => {
           const cargo = cargos.find((c) => c.position === position) ?? idleCargo(position);
           return (
@@ -162,6 +168,8 @@ export function ConductPage({electionId}: {electionId: string}) {
               approved={approved}
               votedIds={openRound?.position === position ? votedIds : []}
               busy={busy}
+              roundOpenElsewhere={openRound !== null && openRound.position !== position}
+              pending={pending}
               onAction={(kind, targetId) => onAction(position, kind, targetId)}
             />
           );
@@ -171,14 +179,11 @@ export function ConductPage({electionId}: {electionId: string}) {
       <GlassCard className="space-y-2">
         <Button
           type="button"
-          disabled={busy || !anyDecided}
-          onClick={() => void run(async () => {
+          disabled={busy || !anyDecided || openRound !== null}
+          loading={pending === "applyBoard"}
+          onClick={() => void run("applyBoard", async () => {
             const res = await applyBoard(electionId);
-            setNotice(
-              res.missingRequired.length > 0 ?
-                `Faltam cargos obrigatórios: ${res.missingRequired.map(positionLabel).join(", ")}` :
-                "Diretoria aplicada."
-            );
+            setNotice(boardNotice(res));
           })}
         >
           Aplicar diretoria

@@ -111,7 +111,11 @@ export const pickOldest = (
 ) => call<void>("electionPickOldest", {electionId, position, candidateId});
 
 export const applyBoard = (electionId: string) =>
-  call<{winners: Record<string, string>; missingRequired: string[]}>(
+  call<{
+    winners: Record<string, string>;
+    missingRequired: string[];
+    effectiveAtMs: number;
+  }>(
     "electionApplyBoard",
     {electionId}
   );

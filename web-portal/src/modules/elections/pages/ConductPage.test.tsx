@@ -84,7 +84,7 @@ beforeEach(() => {
     api.setStatus, api.reviewVoter, api.startScrutiny, api.closeScrutiny,
     api.removeCandidate, api.restartCargo, api.pickOldest, api.applyBoard,
   ]) fn.mockReset().mockResolvedValue(undefined);
-  api.applyBoard.mockResolvedValue({winners: {}, missingRequired: []});
+  api.applyBoard.mockResolvedValue({winners: {}, missingRequired: [], effectiveAtMs: Date.UTC(2027, 0, 1, 3, 0)});
 });
 
 describe("ConductPage", () => {
@@ -243,10 +243,10 @@ describe("ConductPage", () => {
       cargo("presidente", {stage: "decided", winnerId: "a", candidates: [{id: "a", name: "Ana", votes: 6}]}),
       cargo("vice"),
     ];
-    api.applyBoard.mockResolvedValue({winners: {presidente: "a"}, missingRequired: ["vice"]});
+    api.applyBoard.mockResolvedValue({winners: {presidente: "a"}, missingRequired: ["vice"], effectiveAtMs: Date.UTC(2027, 0, 1, 3, 0)});
     render(<ConductPage electionId="e1" />);
     fireEvent.click(screen.getByRole("button", {name: "Aplicar diretoria"}));
-    expect(await screen.findByText("Faltam cargos obrigatórios: Vice")).toBeInTheDocument();
+    expect(await screen.findByText(/Assume em 01\/01\/2027\. Faltam cargos obrigatórios: Vice/)).toBeInTheDocument();
   });
 
   it("aplicar diretoria fica desabilitado enquanto nenhum cargo foi decidido", () => {

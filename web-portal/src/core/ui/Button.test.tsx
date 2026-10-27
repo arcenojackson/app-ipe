@@ -23,4 +23,15 @@ describe("Button", () => {
     expect(button.className).toContain("bg-primary");
     expect(button.className).toContain("rounded-button");
   });
+
+  it("em loading mostra o spinner, fica ocupado e não dispara", () => {
+    const onClick = vi.fn();
+    render(<Button loading onClick={onClick}>Salvar</Button>);
+    const button = screen.getByRole("button", {name: "Salvar"});
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute("aria-busy", "true");
+    expect(button.querySelector("svg.animate-spin")).not.toBeNull();
+    fireEvent.click(button);
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });
