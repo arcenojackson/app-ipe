@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
+import '../../notifications/services/teaching_notification_url.dart';
 import '../data/forum_repository.dart';
 import '../models/forum_logic.dart';
 import '../models/forum_models.dart';
@@ -14,6 +15,7 @@ import 'widgets/comment_composer.dart';
 import 'widgets/comment_tile.dart';
 import 'widgets/forum_scaffold.dart';
 import 'widgets/linkified_text.dart';
+import 'widgets/ref_card.dart';
 
 const forumPortalTopicBase = 'https://ipe-ensino.vercel.app/ensino/forum/';
 
@@ -82,6 +84,19 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
     super.dispose();
   }
 
+  Future<void> _openOnWeb() async {
+    final uri = teachingPortalTopicUri(widget.topicId);
+    var opened = false;
+    if (uri != null) {
+      try {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (_) {}
+    }
+    if (!opened && mounted) {
+      showErrorToast(context, 'Não foi possível abrir o tópico na web.');
+    }
+  }
+
   Future<bool> _confirm(String text) async =>
       await showDialog<bool>(
         context: context,
@@ -110,6 +125,8 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
         iconColor: Colors.white,
         onSelected: (v) async {
           switch (v) {
+            case 'web':
+              await _openOnWeb();
             case 'edit':
               final id = await Navigator.of(context).push<String>(MaterialPageRoute(
                 builder: (_) => ForumEditorPage(viewer: widget.viewer, editing: t),
@@ -127,6 +144,14 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
           }
         },
         itemBuilder: (_) => [
+          const PopupMenuItem(
+            value: 'web',
+            child: Row(children: [
+              Icon(Icons.open_in_new, size: 18),
+              SizedBox(width: 8),
+              Text('Abrir na web'),
+            ]),
+          ),
           if (perms.canEdit) const PopupMenuItem(value: 'edit', child: Text('Editar')),
           if (perms.canPin)
             PopupMenuItem(value: 'pin', child: Text(t.pinned ? 'Desafixar' : 'Fixar')),
@@ -183,19 +208,7 @@ class _ForumTopicPageState extends State<ForumTopicPage> {
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white))
         else
           const Text('Tópico removido.', style: TextStyle(color: Colors.white54)),
-        for (final ref in t.refs)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Row(children: [
-              Icon(ref.kind == 'plan' ? Icons.event_note : Icons.description_outlined,
-                  size: 16, color: Colors.white54),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(ref.label.isEmpty ? 'Item citado' : ref.label,
-                    style: const TextStyle(color: Colors.white70)),
-              ),
-            ]),
-          ),
+        for (final ref in t.refs) RefCard(ref: ref),
         const Divider(height: 32, color: Colors.white24),
         Text('Comentários (${c.comments.where((x) => !x.deleted).length})',
             style: theme.textTheme.titleMedium?.copyWith(color: Colors.white)),

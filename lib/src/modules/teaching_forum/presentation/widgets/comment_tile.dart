@@ -5,6 +5,7 @@ import '../../models/forum_models.dart';
 import 'comment_composer.dart';
 import 'forum_scaffold.dart';
 import 'linkified_text.dart';
+import 'ref_card.dart';
 
 class CommentTile extends StatefulWidget {
   const CommentTile({
@@ -75,6 +76,8 @@ class _CommentTileState extends State<CommentTile> {
             else
               LinkifiedText(c.body,
                   style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white)),
+            if (!c.deleted && !_editing)
+              for (final ref in c.refs) RefCard(ref: ref),
             if (!c.deleted && !_editing)
               Row(
                 children: [
