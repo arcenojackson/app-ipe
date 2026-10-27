@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../models/forum_logic.dart';
+import '../../models/forum_models.dart';
+import 'ref_picker.dart';
 
 /// Campo de texto de comentário/resposta/edição. Só limpa se o envio der certo.
 class CommentComposer extends StatefulWidget {
@@ -11,9 +13,17 @@ class CommentComposer extends StatefulWidget {
     this.hint = 'Escreva um comentário',
     this.onCancel,
     this.submitLabel = 'Enviar',
+    this.allowRefs = false,
+    this.header,
   });
 
-  final Future<bool> Function(String text) onSubmit;
+  final Future<bool> Function(String text, List<ForumRef> refs) onSubmit;
+
+  /// Mostra "Citar documento ou aula" (novo comentário e resposta).
+  final bool allowRefs;
+
+  /// Cabeçalho acima do campo ("Novo comentário", "Respondendo a …").
+  final Widget? header;
   final String initialText;
   final String hint;
   final String submitLabel;
@@ -27,6 +37,7 @@ class _CommentComposerState extends State<CommentComposer> {
   late final TextEditingController _controller =
       TextEditingController(text: widget.initialText);
   bool _busy = false;
+  List<ForumRef> _refs = [];
 
   @override
   void dispose() {
@@ -37,10 +48,13 @@ class _CommentComposerState extends State<CommentComposer> {
   Future<void> _send() async {
     if (_busy) return;
     setState(() => _busy = true);
-    final ok = await widget.onSubmit(_controller.text);
+    final ok = await widget.onSubmit(_controller.text, _refs);
     if (!mounted) return;
     setState(() => _busy = false);
-    if (ok) _controller.clear();
+    if (ok) {
+      _controller.clear();
+      setState(() => _refs = []);
+    }
   }
 
   @override
@@ -48,6 +62,8 @@ class _CommentComposerState extends State<CommentComposer> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
+        if (widget.header != null)
+          Align(alignment: Alignment.centerLeft, child: widget.header),
         TextField(
           controller: _controller,
           minLines: 2,
@@ -66,6 +82,11 @@ class _CommentComposerState extends State<CommentComposer> {
             ),
           ),
         ),
+        if (widget.allowRefs)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: RefPickerField(value: _refs, onChanged: (v) => setState(() => _refs = v)),
+          ),
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [

@@ -7,6 +7,9 @@ import '../models/forum_logic.dart';
 import '../models/forum_models.dart';
 import 'forum_editor_controller.dart';
 import 'widgets/forum_scaffold.dart';
+import 'widgets/ref_picker.dart';
+import 'widgets/subject_filter.dart';
+import 'widgets/subject_multi_sheet.dart';
 
 class ForumEditorPage extends StatefulWidget {
   const ForumEditorPage({super.key, required this.viewer, this.editing});
@@ -87,31 +90,37 @@ class _ForumEditorPageState extends State<ForumEditorPage> {
           ),
           if (c.tags.isNotEmpty) ...[
             const SizedBox(height: 12),
-            const Text('Assuntos (até 3)', style: TextStyle(color: Colors.white70)),
+            const Text('Assuntos (opcional, até 3)',
+                style: TextStyle(color: Colors.white70)),
+            const SizedBox(height: 6),
             Wrap(
               spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                for (final tag in c.tags)
-                  FilterChip(
-                    label: Text(tag.name),
-                    selected: c.selectedTags.contains(tag.id),
-                    onSelected: (_) {
-                      if (!c.toggleTag(tag.id)) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                            content: Text('Escolha no máximo 3 assuntos.')));
-                      }
-                    },
+                for (final id in c.selectedTags)
+                  SubjectChip(
+                    label: c.tags.where((t) => t.id == id).map((t) => t.name).firstOrNull ?? id,
+                    onRemove: () => c.toggleTag(id),
                   ),
+                SubjectFilterButton(
+                  activeCount: c.selectedTags.length,
+                  label: 'Escolher assuntos',
+                  onPressed: () async {
+                    final picked = await showSubjectMultiSheet(
+                      context,
+                      tags: c.tags,
+                      selected: c.selectedTags,
+                      max: forumMaxTags,
+                    );
+                    if (picked != null) c.setTags(picked);
+                  },
+                ),
               ],
             ),
           ],
-          if (widget.editing != null && widget.editing!.refs.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Text('Citações (somente leitura no app)',
-                style: TextStyle(color: Colors.white70)),
-            for (final r in widget.editing!.refs)
-              Text('• ${r.label}', style: const TextStyle(color: Colors.white54)),
-          ],
+          const SizedBox(height: 12),
+          RefPickerField(value: c.refs, onChanged: c.setRefs),
           if (c.error != null)
             Padding(
               padding: const EdgeInsets.only(top: 12),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../shared/state/app_state.dart';
+import '../../../shared/utils/app_toast.dart';
 import '../data/forum_repository.dart';
 import '../models/forum_logic.dart';
 import '../models/teaching_access.dart';
@@ -11,6 +12,7 @@ import 'forum_editor_page.dart';
 import 'forum_list_controller.dart';
 import 'forum_topic_page.dart';
 import 'widgets/forum_scaffold.dart';
+import 'widgets/subject_filter.dart';
 import 'widgets/topic_card.dart';
 
 class ForumListPage extends StatefulWidget {
@@ -56,6 +58,19 @@ class _ForumListPageState extends State<ForumListPage> {
       builder: (_) => ForumTopicPage(topicId: topicId, viewer: viewer),
     ));
     if (mounted) _controller.load();
+  }
+
+  Future<void> _pickSubject() async {
+    final picked = await showSubjectFilterSheet(
+      context,
+      tags: _controller.tags,
+      selected: _controller.tagId,
+    );
+    if (picked == null || !mounted) return;
+    final next = picked.isEmpty ? null : picked;
+    if (next == _controller.tagId) return;
+    _searchController.clear();
+    _controller.setTagId(next);
   }
 
   Future<void> _create() async {
@@ -109,23 +124,21 @@ class _ForumListPageState extends State<ForumListPage> {
             ),
           ),
           if (c.tags.isNotEmpty)
-            SizedBox(
-              height: 52,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  for (final tag in c.tags)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(tag.name),
-                        selected: c.tagId == tag.id,
-                        onSelected: (on) {
-                          _searchController.clear();
-                          c.setTagId(on ? tag.id : null);
-                        },
-                      ),
+                  SubjectFilterButton(
+                    activeCount: c.tagId == null ? 0 : 1,
+                    onPressed: _pickSubject,
+                  ),
+                  if (c.tagId != null)
+                    SubjectChip(
+                      label: names[c.tagId] ?? c.tagId!,
+                      onRemove: () => c.setTagId(null),
                     ),
                 ],
               ),
@@ -136,13 +149,40 @@ class _ForumListPageState extends State<ForumListPage> {
     );
   }
 
+  Future<void> _onRefresh() async {
+    final ok = await _controller.refresh();
+    if (!ok && mounted) {
+      showErrorToast(context, 'Não foi possível atualizar. Tente de novo.');
+    }
+  }
+
+  Widget _refreshable(Widget child) => RefreshIndicator(
+        color: Theme.of(context).colorScheme.secondary,
+        backgroundColor: const Color(0xFF111828),
+        onRefresh: _onRefresh,
+        child: child,
+      );
+
+  /// Estado vazio/erro que também aceita puxar para atualizar.
+  Widget _pullable(Widget message) => _refreshable(
+        LayoutBuilder(
+          builder: (context, box) => SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: SizedBox(
+              height: box.maxHeight,
+              child: Center(child: message),
+            ),
+          ),
+        ),
+      );
+
   Widget _body(ForumListController c, List all, Map<String, String> names) {
     if (c.loading && all.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
     if (c.error && all.isEmpty) {
-      return Center(
-        child: Column(
+      return _pullable(
+        Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('Não foi possível carregar o Fórum.',
@@ -153,13 +193,13 @@ class _ForumListPageState extends State<ForumListPage> {
       );
     }
     if (all.isEmpty) {
-      return const Center(
-        child: Text('Nenhum tópico ainda.', style: TextStyle(color: Colors.white70)),
+      return _pullable(
+        const Text('Nenhum tópico ainda.', style: TextStyle(color: Colors.white70)),
       );
     }
-    return RefreshIndicator(
-      onRefresh: c.load,
-      child: ListView.builder(
+    return _refreshable(
+      ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         controller: _scroll,
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
         itemCount: all.length + (c.loadingMore ? 1 : 0),

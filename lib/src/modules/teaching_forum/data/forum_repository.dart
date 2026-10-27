@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../models/forum_logic.dart';
 import '../models/forum_models.dart';
+import '../models/ref_options.dart';
 
 const forumPageSize = 20;
 const forumMaxComments = 500;
@@ -206,6 +207,49 @@ class ForumRepository {
 
   Future<void> setCommentDeleted(String topicId, String commentId) =>
       _comments(topicId).doc(commentId).update({'deleted': true});
+
+  /// Documentos PUBLICADOS da Biblioteca, com busca por prefixo no nome (mesma
+  /// consulta do portal: status + searchTokens + publishedAt) e filtro de
+  /// palavras no cliente. Uma página só, sem pastas.
+  Future<List<RefOption>> loadPublishedDocs(String search) async {
+    final words = searchWords(search);
+    var q = _db.collection('teaching_items').where('status', isEqualTo: 'published');
+    if (words.isNotEmpty) {
+      var longest = words.first;
+      for (final w in words) {
+        if (w.length > longest.length) longest = w;
+      }
+      final token = longest.length < forumMaxTokenLength
+          ? longest
+          : longest.substring(0, forumMaxTokenLength);
+      q = q.where('searchTokens', arrayContains: token);
+    }
+    final snap = await q.orderBy('publishedAt', descending: true).limit(50).get();
+    final out = <RefOption>[];
+    for (final d in snap.docs) {
+      final option = libraryOptionFrom(d.id, d.data());
+      if (option != null && refNameMatches(option.ref.label, words)) out.add(option);
+    }
+    return out.take(20).toList();
+  }
+
+  /// Aulas do Plano pedagógico (52 linhas), na ordem das aulas.
+  Future<List<ForumRef>> loadPlanLessons() async {
+    final snap = await _db.collection('teaching_plan').orderBy('lesson').get();
+    return snap.docs
+        .map((d) => planRefFrom(d.id, d.data()))
+        .whereType<ForumRef>()
+        .toList();
+  }
+
+  /// Nome de todas as tags (qualquer tipo), para os chips da Biblioteca.
+  Future<Map<String, String>> loadAllTagNames() async {
+    final snap = await _db.collection('teaching_tags').get();
+    return {
+      for (final d in snap.docs)
+        if (d.data()['name'] is String) d.id: d.data()['name'] as String,
+    };
+  }
 
   /// Lê `teaching_tags` inteira (poucas dezenas) e filtra no cliente, como o portal.
   Future<List<SubjectTag>> loadSubjectTags() async {

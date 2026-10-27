@@ -5,6 +5,7 @@ import '../../models/forum_models.dart';
 import 'comment_composer.dart';
 import 'forum_scaffold.dart';
 import 'linkified_text.dart';
+import 'ref_card.dart';
 
 class CommentTile extends StatefulWidget {
   const CommentTile({
@@ -14,6 +15,7 @@ class CommentTile extends StatefulWidget {
     required this.myVotes,
     required this.onVote,
     required this.onReply,
+    this.replyingToId,
     required this.onEdit,
     required this.onDelete,
   });
@@ -22,7 +24,10 @@ class CommentTile extends StatefulWidget {
   final CommentPermissions Function(ForumComment) perms;
   final Map<String, int> myVotes;
   final void Function(ForumComment, int) onVote;
-  final Future<bool> Function(ForumComment, String) onReply;
+  final void Function(ForumComment) onReply;
+
+  /// Comentário que está sendo respondido (destacado enquanto o composer de resposta está aberto).
+  final String? replyingToId;
   final Future<bool> Function(ForumComment, String) onEdit;
   final Future<void> Function(ForumComment) onDelete;
 
@@ -31,7 +36,6 @@ class CommentTile extends StatefulWidget {
 }
 
 class _CommentTileState extends State<CommentTile> {
-  bool _replying = false;
   bool _editing = false;
 
   @override
@@ -44,6 +48,7 @@ class _CommentTileState extends State<CommentTile> {
       padding: EdgeInsets.only(left: c.depth > 1 ? 14 : 0, top: 10),
       child: Container(
         decoration: BoxDecoration(
+          color: widget.replyingToId == c.id ? Colors.white10 : null,
           border: c.depth > 1
               ? const Border(left: BorderSide(color: Colors.white24, width: 2))
               : null,
@@ -66,7 +71,7 @@ class _CommentTileState extends State<CommentTile> {
                 initialText: c.body,
                 submitLabel: 'Salvar',
                 onCancel: () => setState(() => _editing = false),
-                onSubmit: (text) async {
+                onSubmit: (text, _) async {
                   final ok = await widget.onEdit(c, text);
                   if (ok && mounted) setState(() => _editing = false);
                   return ok;
@@ -75,6 +80,8 @@ class _CommentTileState extends State<CommentTile> {
             else
               LinkifiedText(c.body,
                   style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white)),
+            if (!c.deleted && !_editing)
+              for (final ref in c.refs) RefCard(ref: ref),
             if (!c.deleted && !_editing)
               Row(
                 children: [
@@ -95,7 +102,7 @@ class _CommentTileState extends State<CommentTile> {
                   ),
                   if (p.canReply)
                     TextButton(
-                      onPressed: () => setState(() => _replying = !_replying),
+                      onPressed: () => widget.onReply(c),
                       child: const Text('Responder'),
                     ),
                   if (p.canEdit)
@@ -110,16 +117,6 @@ class _CommentTileState extends State<CommentTile> {
                     ),
                 ],
               ),
-            if (_replying)
-              CommentComposer(
-                hint: 'Escreva uma resposta',
-                onCancel: () => setState(() => _replying = false),
-                onSubmit: (text) async {
-                  final ok = await widget.onReply(c, text);
-                  if (ok && mounted) setState(() => _replying = false);
-                  return ok;
-                },
-              ),
             for (final child in widget.node.children)
               CommentTile(
                 node: child,
@@ -127,6 +124,7 @@ class _CommentTileState extends State<CommentTile> {
                 myVotes: widget.myVotes,
                 onVote: widget.onVote,
                 onReply: widget.onReply,
+                replyingToId: widget.replyingToId,
                 onEdit: widget.onEdit,
                 onDelete: widget.onDelete,
               ),

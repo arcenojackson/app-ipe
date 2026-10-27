@@ -33,6 +33,12 @@ String? teachingForumTopicIdFromData(Map<String, dynamic> data) {
   return id;
 }
 
+/// Endereço do tópico no portal, ou `null` se o id não for um id válido.
+Uri? teachingPortalTopicUri(String topicId) {
+  if (!_topicIdPattern.hasMatch(topicId)) return null;
+  return Uri.https(_teachingPortalHost, '/ensino/forum/$topicId');
+}
+
 /// O que fazer ao tocar num aviso da plataforma pedagógica.
 sealed class TeachingTap {
   const TeachingTap();
