@@ -3,8 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../../shared/state/app_state.dart';
 import '../../../shared/widgets/glass_container.dart';
+import '../../societies/data/societies_repository.dart';
+import '../../societies/models/society.dart';
 import '../data/elections_repository.dart';
 import '../models/election.dart';
+import '../models/election_logic.dart';
 import 'election_detail_page.dart';
 import 'widgets/election_form_sheet.dart';
 
@@ -17,12 +20,15 @@ class ElectionsPage extends StatefulWidget {
 
 class _ElectionsPageState extends State<ElectionsPage> {
   late final Stream<List<Election>> _stream;
+  late final Future<List<SocietyModel>> _societies;
+  late final String _userId;
 
   @override
   void initState() {
     super.initState();
-    final userId = context.read<AppState>().currentUser?.id ?? '';
-    _stream = context.read<ElectionsRepository>().watchElections(userId);
+    _userId = context.read<AppState>().currentUser?.id ?? '';
+    _stream = context.read<ElectionsRepository>().watchElections(_userId);
+    _societies = context.read<SocietiesRepository>().fetchAll();
   }
 
   String _statusLabel(ElectionStatus s) => switch (s) {
@@ -76,14 +82,23 @@ class _ElectionsPageState extends State<ElectionsPage> {
               Expanded(
                 child: StreamBuilder<List<Election>>(
                   stream: _stream,
-                  builder: (context, snapshot) {
-                    if (snapshot.hasError) {
-                      return Center(child: Text('Erro: ${snapshot.error}'));
+                  builder: (context, snapshot) => FutureBuilder<List<SocietyModel>>(
+                  future: _societies,
+                  builder: (context, societies) {
+                    final error = snapshot.error ?? societies.error;
+                    if (error != null) {
+                      return Center(child: Text('Erro: $error'));
                     }
-                    if (!snapshot.hasData) {
+                    if (!snapshot.hasData || !societies.hasData) {
                       return const Center(child: CircularProgressIndicator());
                     }
-                    final elections = snapshot.data!;
+                    // `directorIds` da eleição é um snapshot da criação: a
+                    // lista segue a diretoria atual das sociedades.
+                    final elections = electionsOfCurrentDirector(
+                      snapshot.data!,
+                      societies.data!,
+                      _userId,
+                    );
                     if (elections.isEmpty) {
                       return const Center(
                         child: Text(
@@ -132,6 +147,7 @@ class _ElectionsPageState extends State<ElectionsPage> {
                       },
                     );
                   },
+                  ),
                 ),
               ),
             ],

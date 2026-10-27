@@ -35,6 +35,15 @@ String _nameOf(ElectionCargo? cargo, List<ElectionRound> rounds, String id) {
   return id;
 }
 
+String _effectiveDate(ElectionEvent e) {
+  final ms = e.data['effectiveAtMs'];
+  if (ms is! num) return '01/01';
+  // O mandato começa à 0h de São Paulo (UTC-3), sem horário de verão.
+  final d = DateTime.fromMillisecondsSinceEpoch(ms.toInt(), isUtc: true)
+      .subtract(const Duration(hours: 3));
+  return '${_two(d.day)}/${_two(d.month)}/${d.year}';
+}
+
 String _eventLine(ElectionEvent e) {
   final cargo = positionLabel((e.data['position'] ?? '').toString());
   final number = e.data['number'];
@@ -43,7 +52,9 @@ String _eventLine(ElectionEvent e) {
     'election_closed' => 'Eleição encerrada',
     'scrutiny_started' => 'Escrutínio iniciado — $cargo ($numberº)',
     'scrutiny_closed' => 'Escrutínio encerrado — $cargo ($numberº)',
-    'board_applied' => 'Diretoria aplicada na sociedade',
+    'board_scheduled' =>
+      'Diretoria registrada para assumir em ${_effectiveDate(e)}',
+    'board_applied' => 'Diretoria assumiu na sociedade',
     _ => null,
   };
   if (label == null || e.at == null) return '';
@@ -93,8 +104,12 @@ String buildMinutesText({
     for (final r in list) {
       final res = r.result;
       if (res == null) continue;
+      // No 1º escrutínio todos os membros são opção; quem não teve voto fica
+      // fora da ata.
       final parts = [
-        for (final o in r.options) '${o.name}: ${res.counts[o.id] ?? 0}',
+        for (final o in r.options)
+          if (r.number > 1 || (res.counts[o.id] ?? 0) >= 1)
+            '${o.name}: ${res.counts[o.id] ?? 0}',
         'Branco: ${res.blank}',
       ];
       final prefix = r.cycle > 1 ? 'Ciclo ${r.cycle} · ' : '';

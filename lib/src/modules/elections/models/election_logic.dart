@@ -1,4 +1,5 @@
 import '../../societies/models/society.dart';
+import 'election.dart';
 
 /// URL base do portal web (votação em /votar/{id}, condução em /eleicoes/{id}).
 /// Fica aqui, e não em AppConfig, para a lógica continuar testável sem o
@@ -30,3 +31,16 @@ List<SocietyModel> directorSocieties(
   String userId,
 ) =>
     societies.where((s) => s.allBoardIds.contains(userId)).toList();
+
+/// Eleições que [userId] pode ver na lista: só as de sociedades em que ele
+/// ainda está na diretoria. `directorIds` da eleição é um snapshot da criação e
+/// não encolhe, então quem saiu da diretoria continua nele; a sociedade atual é
+/// a fonte de verdade para a lista.
+List<Election> electionsOfCurrentDirector(
+  List<Election> elections,
+  List<SocietyModel> societies,
+  String userId,
+) {
+  final ids = directorSocieties(societies, userId).map((s) => s.id).toSet();
+  return elections.where((e) => ids.contains(e.societyId)).toList();
+}
