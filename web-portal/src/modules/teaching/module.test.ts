@@ -2,6 +2,13 @@ import {describe, expect, it} from "vitest";
 import {teachingModule} from "./module";
 
 describe("teachingModule", () => {
+  it("o módulo não é liberado por ser admin: cada item define seu acesso", () => {
+    expect(teachingModule.access).toBe("authenticated");
+    for (const item of teachingModule.navItems.filter((i) => i.href !== "/ensino/admin")) {
+      expect(item.access).toBe("teacher");
+    }
+  });
+
   it("a Fila de revisão está disponível para professores", () => {
     const item = teachingModule.navItems.find((i) => i.href === "/ensino/revisao");
     expect(item?.access).toBe("teacher");

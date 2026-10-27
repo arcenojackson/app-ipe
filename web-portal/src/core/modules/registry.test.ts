@@ -8,7 +8,7 @@ const modules: PortalModule[] = [
     id: "teaching",
     label: "Ensino",
     basePath: "/ensino",
-    access: "teacher",
+    access: "authenticated",
     navItems: [
       {label: "Início", href: "/ensino", access: "teacher"},
       {label: "Grupo", href: "/ensino/admin", access: "admin"},
@@ -39,9 +39,14 @@ describe("visibleNavGroups", () => {
     expect(groups[0].items.map((i) => i.href)).toEqual(["/ensino"]);
   });
 
-  it("admin vê todos os módulos e itens", () => {
+  it("admin sem papel de ensino vê só o Grupo, além dos módulos de admin", () => {
     const groups = visibleNavGroups(modules, admin);
     expect(groups.map((g) => g.moduleId)).toEqual(["teaching", "members"]);
+    expect(groups[0].items.map((i) => i.href)).toEqual(["/ensino/admin"]);
+  });
+
+  it("admin com papel de ensino vê o ensino completo", () => {
+    const groups = visibleNavGroups(modules, {admin: true, teachingRole: "teacher"});
     expect(groups[0].items.map((i) => i.href)).toEqual(["/ensino", "/ensino/admin"]);
   });
 });
@@ -59,6 +64,9 @@ describe("isPathAllowed", () => {
 
   it("usa o item mais específico e respeita o acesso do módulo", () => {
     expect(isPathAllowed(modules, "/ensino/admin", admin)).toBe(true);
+    expect(isPathAllowed(modules, "/ensino", admin)).toBe(false);
+    expect(isPathAllowed(modules, "/ensino/forum/x", admin)).toBe(false);
+    expect(isPathAllowed(modules, "/ensino/forum/x", {admin: true, teachingRole: "teacher"})).toBe(true);
     expect(isPathAllowed(modules, "/ensino/outra-pagina", teacher)).toBe(true);
     expect(isPathAllowed(modules, "/ensino/outra-pagina", none)).toBe(false);
     expect(isPathAllowed(modules, "/membros", teacher)).toBe(false);
@@ -73,5 +81,6 @@ describe("defaultLandingPath", () => {
   it("devolve o primeiro item visível ou null", () => {
     expect(defaultLandingPath(modules, teacher)).toBe("/ensino");
     expect(defaultLandingPath(modules, none)).toBeNull();
+    expect(defaultLandingPath(modules, admin)).toBe("/ensino/admin");
   });
 });
