@@ -3,7 +3,11 @@
 import Link from "next/link";
 import {useCallback, useEffect, useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
+import {ItemModal} from "../../library/ui/ItemModal";
+import {useOverlayParam} from "../../library/useItemOverlay";
 import {viewerFrom} from "../../library/types";
+import PlanLessonModal from "../../plan/ui/PlanLessonModal";
+import {usePathname} from "next/navigation";
 import {topicPermissions} from "../permissions";
 import {
   createComment,
@@ -48,6 +52,10 @@ export default function TopicPage({topicId}: {topicId: string}) {
   const [error, setError] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [tagNames, setTagNames] = useState<Record<string, string>>({});
+  // Citações abrem em janela sobre o tópico (?item= documento, ?aula= aula).
+  const pathname = usePathname();
+  const itemOverlay = useOverlayParam(pathname, "item");
+  const lessonOverlay = useOverlayParam(pathname, "aula");
 
   useEffect(() => {
     let cancelled = false;
@@ -237,6 +245,10 @@ export default function TopicPage({topicId}: {topicId: string}) {
           <CommentForm label="Novo comentário" submitLabel="Comentar" onSubmit={addComment} />
         </div>
       )}
+      {itemOverlay.value && viewer && (
+        <ItemModal itemId={itemOverlay.value} viewer={viewer} onClose={itemOverlay.close} />
+      )}
+      {lessonOverlay.value && <PlanLessonModal id={lessonOverlay.value} onClose={lessonOverlay.close} />}
     </div>
   );
 }

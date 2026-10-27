@@ -19,6 +19,9 @@ const repo = vi.hoisted(() => ({
   loadPlanLessons: vi.fn(),
 }));
 vi.mock("../repository", () => repo);
+vi.mock("next/navigation", async () => await import("@/test/fakeNavigation"));
+vi.mock("../../library/ui/ItemModal", () => ({ItemModal: () => null}));
+vi.mock("../../plan/ui/PlanLessonModal", () => ({default: () => null}));
 
 const topic = (extra: Partial<Topic> = {}): Topic => ({
   id: "t", title: "Dúvida", body: "Veja https://a.com/x e <script>x</script>", authorUid: "u1",
@@ -76,7 +79,9 @@ describe("TopicPage — leitura", () => {
     const link = screen.getByRole("link", {name: "https://a.com/x"});
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(screen.getByText(/<script>x<\/script>/)).toBeInTheDocument();
-    expect(screen.getByRole("link", {name: /Catecismo/})).toHaveAttribute("href", "/ensino/biblioteca?item=d1");
+    // A citação abre uma janela sobre o tópico (não é mais um link para outra página).
+    expect(screen.getByRole("button", {name: /Catecismo/})).toBeInTheDocument();
+    expect(screen.queryByRole("link", {name: /Catecismo/})).not.toBeInTheDocument();
     for (const id of ["c1", "c2", "c3"]) expect(screen.getByText(`Corpo ${id}`)).toBeInTheDocument();
     // nível 3 não tem "Responder": 2 respostas possíveis (c1, c2)
     expect(screen.getAllByRole("button", {name: "Responder"})).toHaveLength(2);

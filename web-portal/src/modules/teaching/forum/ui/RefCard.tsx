@@ -1,14 +1,9 @@
-import Link from "next/link";
+import {useOverlayOpener} from "../../library/useItemOverlay";
 import type {Ref} from "../types";
 
-// Citação de documento publicado da Biblioteca ou de aula do Plano. Se o
-// alvo sumiu, o link leva à tela de origem, que mostra o estado atual.
-export function refHref(item: Ref): string {
-  return item.kind === "library" ?
-    `/ensino/biblioteca?item=${encodeURIComponent(item.id)}` :
-    "/ensino/plano";
-}
-
+// Citação de documento publicado da Biblioteca ou de aula do Plano. Abre uma
+// janela SOBRE o tópico (?item= ou ?aula= na rota atual); se o alvo sumiu, a
+// própria janela mostra o estado atual.
 // Selo do tipo da citação (documento ou aula).
 export function RefBadge({item}: {item: Pick<Ref, "kind">}) {
   const library = item.kind === "library";
@@ -25,16 +20,18 @@ export function RefBadge({item}: {item: Pick<Ref, "kind">}) {
 }
 
 export default function RefCard({item}: {item: Ref}) {
+  const openOverlay = useOverlayOpener();
   return (
-    <Link
-      href={refHref(item)}
-      className="flex max-w-md items-center gap-3 rounded-input bg-surface-elevated px-3 py-2 text-sm hover:bg-white/10"
+    <button
+      type="button"
+      onClick={() => openOverlay(item.kind === "library" ? "item" : "aula", item.id)}
+      className="flex max-w-md items-center gap-3 rounded-input bg-surface-elevated px-3 py-2 text-left text-sm hover:bg-white/10"
     >
       <RefBadge item={item} />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{item.label}</span>
         <span className="block text-xs text-white/60">{item.kind === "library" ? "Documento" : "Aula"}</span>
       </span>
-    </Link>
+    </button>
   );
 }
