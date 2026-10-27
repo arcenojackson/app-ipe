@@ -17,7 +17,7 @@ export const DELETION_ACTIONS: VoteAction[] = [
 
 export type PublicationDecision =
   | {type: "none"}
-  | {type: "publish"}
+  | {type: "publish"; by: string[]}
   | {type: "return"; by: string; comment: string}
   | {type: "reject"; comments: string[]; by: string[]};
 
@@ -60,7 +60,9 @@ export function decidePublication(
   }
 
   const approvals = latest.filter((v) => v.action === "approve");
-  if (approvals.length >= REQUIRED_APPROVALS) return {type: "publish"};
+  if (approvals.length >= REQUIRED_APPROVALS) {
+    return {type: "publish", by: approvals.map((v) => v.voterId)};
+  }
 
   const rejects = latest.filter((v) => v.action === "reject");
   if (rejects.length >= REQUIRED_REJECTIONS) {

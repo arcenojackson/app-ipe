@@ -7,15 +7,20 @@ import type {Tag} from "../tags";
 import type {LibraryItem, LibraryVote} from "../types";
 import ReviewQueuePage from "./ReviewQueuePage";
 
-const repo = vi.hoisted(() => ({subscribeReviewQueue: vi.fn(), loadVotes: vi.fn(), countCurators: vi.fn()}));
+const repo = vi.hoisted(() => ({subscribeReviewQueue: vi.fn(), loadVotes: vi.fn(), countCurators: vi.fn(), loadUserNames: vi.fn()}));
 vi.mock("../repository", () => repo);
-const nav = vi.hoisted(() => ({push: vi.fn(), replace: vi.fn(), search: ""}));
+const nav = vi.hoisted(() => ({push: vi.fn(), replace: vi.fn(), back: vi.fn(), search: ""}));
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({push: nav.push, replace: nav.replace}),
+  useRouter: () => ({push: nav.push, replace: nav.replace, back: nav.back}),
   useSearchParams: () => new URLSearchParams(nav.search),
 }));
 const mutations = vi.hoisted(() => ({createLink: vi.fn()}));
 vi.mock("../mutations", () => mutations);
+vi.mock("./ItemModal", () => ({
+  ItemModal: ({itemId, onClose}: {itemId: string; onClose: () => void}) => (
+    <div role="dialog" aria-label="Janela do item">{itemId}<button type="button" onClick={onClose}>Fechar janela</button></div>
+  ),
+}));
 vi.mock("../notifications", () => ({subscribeNotifications: vi.fn(() => () => undefined)}));
 
 const tagList: Tag[] = [
@@ -48,6 +53,8 @@ beforeEach(() => {
   nav.replace.mockReset();
   nav.search = "";
   repo.countCurators.mockReset().mockResolvedValue(3);
+  repo.loadUserNames.mockReset().mockImplementation(async (ids: string[]) =>
+    Object.fromEntries(ids.map((id) => [id, id === "c2" ? "Ana Curadora" : "Bia Curadora"])));
   repo.loadVotes.mockReset().mockImplementation(async (id: string): Promise<LibraryVote[]> =>
     id === "i1" ? [{id: "v1", voterId: "c3", action: "approve", version: 1, createdAt: 1}] : []);
   queue = {
@@ -79,6 +86,28 @@ describe("ReviewQueuePage — professor", () => {
     expect(screen.queryByRole("region", {name: "Para revisar"})).not.toBeInTheDocument();
   });
 
+  it("histórico: envio aprovado continua em Meus envios com data e quem aprovou", async () => {
+    queue = {
+      mine: [
+        item("p1", "Aula publicada", {authorId: "t1", status: "published", version: 2, createdAt: 1_700_000_000_000, publishedAt: 1_700_100_000_000}),
+        item("m3", "Em andamento", {authorId: "t1", createdAt: 1_700_200_000_000}),
+      ],
+      toReview: [], returned: [], deleteRequests: [],
+    };
+    repo.loadVotes.mockImplementation(async (id: string): Promise<LibraryVote[]> => id === "p1" ? [
+      {id: "v1", voterId: "c2", action: "approve", version: 2, createdAt: 1},
+      {id: "v2", voterId: "c3", action: "approve", version: 2, createdAt: 2},
+      {id: "v0", voterId: "c4", action: "approve", version: 1, createdAt: 0},
+    ] : []);
+    asTeacher();
+    expect(await screen.findByText("Aula publicada")).toBeInTheDocument();
+    expect(screen.queryByText("Você ainda não enviou nada.")).not.toBeInTheDocument();
+    expect(await screen.findByText("Aprovado por Ana Curadora, Bia Curadora")).toBeInTheDocument();
+    expect(screen.getByText(/Enviado em .* · Publicado em /)).toBeInTheDocument();
+    expect(screen.getByText("Publicado")).toBeInTheDocument();
+    expect(screen.getByText(/Enviado em [^·]*· 0\/2 aprovações/)).toBeInTheDocument();
+  });
+
   it("sem envios mostra a mensagem da seção", async () => {
     queue = {mine: [], toReview: [], returned: [], deleteRequests: []};
     asTeacher();
@@ -106,7 +135,7 @@ describe("ReviewQueuePage — curador", () => {
     await screen.findByText("Parado no autor");
     expect(section("Devolvidos aguardando o autor").getByText(/Sem resposta do autor/)).toBeInTheDocument();
     fireEvent.click(section("Devolvidos aguardando o autor").getByRole("button", {name: "Abrir Parado no autor"}));
-    expect(nav.push).toHaveBeenCalledWith("/ensino?item=r1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino/revisao?item=r1", {scroll: false});
   });
 
   it("mostra as tags de cada item", async () => {
@@ -132,10 +161,19 @@ describe("ReviewQueuePage — curador", () => {
     expect(await screen.findByText("Já votei")).toBeInTheDocument();
   });
 
-  it("clicar numa linha abre ?item=ID", async () => {
+  it("clicar numa linha abre ?item=ID sobre a própria Fila, sem trocar de rota", async () => {
     renderAs("c1");
     fireEvent.click(await screen.findByRole("button", {name: "Abrir Aula 1"}));
-    expect(nav.push).toHaveBeenCalledWith("/ensino?item=i1");
+    expect(nav.push).toHaveBeenCalledWith("/ensino/revisao?item=i1", {scroll: false});
+  });
+
+  it("com ?item= a janela aparece sobre a Fila; fechar volta uma entrada (ou troca a URL em link direto)", async () => {
+    nav.search = "item=i1";
+    renderAs("c1");
+    expect(await screen.findByRole("dialog", {name: "Janela do item"})).toHaveTextContent("i1");
+    expect(screen.getByRole("heading", {name: "Fila de revisão"})).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Fechar janela"}));
+    expect(nav.replace).toHaveBeenCalledWith("/ensino/revisao", {scroll: false});
   });
 
   it("nada para revisar mostra a mensagem da seção", async () => {

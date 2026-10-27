@@ -1,18 +1,21 @@
 "use client";
 
 import {useRouter, useSearchParams} from "next/navigation";
-import {useMemo, useState} from "react";
+import {useEffect, useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {Icon} from "@/core/ui/icons";
 import {REQUIRED_APPROVALS} from "../files";
+import {formatDate} from "../labels";
+import {loadUserNames} from "../repository";
 import {iVoted} from "../reviewQueue";
-import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
+import {approverIds, countApprovals, countDeleteApprovals, statusBadge} from "../status";
 import type {LibraryItem, LibraryVote} from "../types";
 import {viewerFrom} from "../types";
-import {libraryUrl} from "../url";
+import {useItemOverlay} from "../useItemOverlay";
 import {useReviewQueue} from "../useReviewQueue";
 import {useTags} from "../useTags";
 import {CuratorWarning} from "./CuratorWarning";
+import {ItemModal} from "./ItemModal";
 import {QueueRow} from "./QueueRow";
 import {UploadDrawer} from "./UploadDrawer";
 
@@ -31,10 +34,29 @@ export default function ReviewQueuePage() {
   const [showVoted, setShowVoted] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(params.get("novo") === "1");
   const [tab, setTab] = useState<TabId | null>(null);
+  const overlay = useItemOverlay("/ensino/revisao");
+  const [approverNames, setApproverNames] = useState<Record<string, string>>({});
+
+  // Nomes de quem aprovou os envios já publicados do próprio usuário.
+  useEffect(() => {
+    if (!queue || !viewer) return;
+    const ids = queue.mine
+      .filter((i) => i.status === "published")
+      .flatMap((i) => approverIds(i, votes[i.id] ?? []));
+    const missing = [...new Set(ids)].filter((id) => !(id in approverNames));
+    if (missing.length === 0) return;
+    let active = true;
+    loadUserNames(missing)
+      .then((names) => active && setApproverNames((known) => ({...known, ...names})))
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [queue, votes, viewer, approverNames]);
 
   if (!viewer) return null;
   const privileged = viewer.isCurator || viewer.isAdmin;
-  const open = (item: LibraryItem) => router.push(libraryUrl({item: item.id}));
+  const open = (item: LibraryItem) => overlay.open(item.id);
   const votesOf = (item: LibraryItem): LibraryVote[] => votes[item.id] ?? [];
   const pending = (item: LibraryItem) => showVoted || !iVoted(item, votesOf(item), viewer.uid);
   const closeDrawer = () => {
@@ -52,14 +74,24 @@ export default function ReviewQueuePage() {
         `Devolvido: ${item.returnComment}` :
         deletion ? `Pedido de exclusão${reason ? `: ${reason}` : ""}` : undefined;
     const showProgress = deletion || item.status === "in_review";
+    const approvedBy = kind === "mine" && item.status === "published" ?
+      approverIds(item, itemVotes).map((id) => approverNames[id] ?? "Curador") :
+      [];
+    const history = kind === "mine" ?
+      [
+        `Enviado em ${formatDate(item.createdAt)}`,
+        item.status === "published" ? `Publicado em ${formatDate(item.publishedAt)}` : null,
+        showProgress ? `${approvals}/${REQUIRED_APPROVALS} aprovações` : null,
+      ].filter(Boolean).join(" · ") :
+      undefined;
     return (
       <QueueRow
         key={`${kind}-${item.id}`}
         item={item}
         badge={statusBadge(item, countApprovals(item, itemVotes))}
         byTagId={tagById}
-        note={note}
-        progress={showProgress ? `${approvals}/${REQUIRED_APPROVALS} aprovações` : undefined}
+        note={approvedBy.length > 0 ? `Aprovado por ${approvedBy.join(", ")}` : note}
+        progress={history ?? (showProgress ? `${approvals}/${REQUIRED_APPROVALS} aprovações` : undefined)}
         onOpen={() => open(item)}
       />
     );
@@ -73,11 +105,11 @@ export default function ReviewQueuePage() {
   const tabs: Array<{id: TabId; label: string; count: number}> = privileged ?
     [
       {id: "review", label: "Para revisar", count: toReview.length},
-      {id: "mine", label: "Meus envios", count: mine.length},
+      {id: "mine", label: "Meus envios", count: mine.filter((i) => i.status !== "published").length},
       ...(returned.length > 0 ? [{id: "returned" as const, label: "Devolvidos", count: returned.length}] : []),
       {id: "delete", label: "Pedidos de exclusão", count: deleteRequests.length},
     ] :
-    [{id: "mine", label: "Meus envios", count: mine.length}];
+    [{id: "mine", label: "Meus envios", count: mine.filter((i) => i.status !== "published").length}];
   const current = tabs.find((t) => t.id === tab)?.id ?? tabs[0].id;
 
   return (
@@ -95,6 +127,7 @@ export default function ReviewQueuePage() {
       </div>
       {privileged && <CuratorWarning />}
 
+      {overlay.itemId && <ItemModal itemId={overlay.itemId} viewer={viewer} onClose={overlay.close} />}
       {drawerOpen && <UploadDrawer uid={viewer.uid} onClose={closeDrawer} />}
 
       {error && <p role="alert" className="text-sm text-error">{error}</p>}

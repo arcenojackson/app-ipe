@@ -40,6 +40,9 @@ export interface LibraryItem {
   ageTags?: string[];
   searchTokens?: string[];
   publishedAt?: number;
+  // Curadores que aprovaram a versão publicada (gravado pela Function; itens
+  // antigos só ganham o campo após o backfill).
+  approvedBy?: string[];
   returnComment?: string | null;
   returnedBy?: string | null;
   deleteRequest?: DeleteRequest | null;

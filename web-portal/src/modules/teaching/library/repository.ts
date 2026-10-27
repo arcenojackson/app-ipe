@@ -111,7 +111,8 @@ export function subscribeReviewQueue(
   const privileged = viewer.isCurator || viewer.isAdmin;
   type QueueKey = "mine" | "inReview" | "returned" | "deleteRequested";
   const sources: Array<{key: QueueKey; q: Query<DocumentData>}> = [
-    {key: "mine", q: query(items(), where("authorId", "==", viewer.uid), where("status", "in", ["in_review", "returned"]))},
+    // Histórico de todos os envios do autor (qualquer status); o filtro por autor basta para as regras.
+    {key: "mine", q: query(items(), where("authorId", "==", viewer.uid))},
   ];
   if (privileged) {
     sources.push(

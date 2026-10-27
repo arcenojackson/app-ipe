@@ -34,7 +34,18 @@ describe("LibraryList", () => {
 
   it("autor desconhecido aparece como traço", () => {
     render(<LibraryList items={[file({authorId: "x"})]} {...props} />);
-    expect(within(screen.getByRole("row", {name: /Santidade/})).getByText("—", {selector: "td"})).toBeInTheDocument();
+    // Autor desconhecido e item ainda sem approvedBy (antes do backfill): um traço em cada coluna.
+    expect(within(screen.getByRole("row", {name: /Santidade/})).getAllByText("—", {selector: "td"})).toHaveLength(2);
+  });
+
+  it("coluna Aprovado por: primeiros nomes, +N e title com todos; sem campo mostra traço", () => {
+    const names = {u1: "Felipe", c1: "Ana Curadora", c2: "Bia Souza", c3: "Caio Lima"};
+    render(<LibraryList items={[file({approvedBy: ["c1", "c2", "c3"]})]} {...props} authorNames={names} />);
+    const titled = within(screen.getByRole("row", {name: /Santidade/})).getAllByTitle("Ana Curadora, Bia Souza, Caio Lima");
+    // Coluna (lg+) e linha secundária sob o nome (abaixo de lg).
+    expect(titled.map((el) => el.tagName)).toEqual(["SPAN", "TD"]);
+    expect(titled[1]).toHaveTextContent("Ana, Bia +1");
+    expect(titled[0]).toHaveTextContent("Aprovado por Ana, Bia +1");
   });
 
   it("clicar num arquivo chama onSelect com o id", () => {
@@ -42,6 +53,31 @@ describe("LibraryList", () => {
     render(<LibraryList items={[file()]} {...props} onSelect={onSelect} />);
     fireEvent.click(screen.getByRole("button", {name: /Santidade/}));
     expect(onSelect).toHaveBeenCalledWith("f1");
+  });
+
+  it("clicar em qualquer célula da linha (tags, autor, data, tamanho) seleciona o arquivo", () => {
+    const onSelect = vi.fn();
+    render(<LibraryList items={[file()]} {...props} onSelect={onSelect} />);
+    for (const text of ["Artigos", "Felipe", "19/10/2026", "250 KB"]) {
+      fireEvent.click(screen.getByText(text));
+    }
+    expect(onSelect).toHaveBeenCalledTimes(4);
+    expect(onSelect).toHaveBeenCalledWith("f1");
+    expect(screen.getByRole("row", {name: /Santidade/})).toHaveClass("cursor-pointer");
+  });
+
+  it("clicar no botão do nome seleciona uma vez só", () => {
+    const onSelect = vi.fn();
+    render(<LibraryList items={[file()]} {...props} onSelect={onSelect} />);
+    fireEvent.click(screen.getByRole("button", {name: /Santidade/}));
+    expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it("linha de link não é clicável fora da âncora", () => {
+    const onSelect = vi.fn();
+    render(<LibraryList items={[file({id: "l3", type: "link", name: "Livro", url: "https://x.org", size: undefined})]} {...props} onSelect={onSelect} />);
+    fireEvent.click(screen.getByText("Felipe"));
+    expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("link vira âncora com target _blank e rel noopener noreferrer, sem abrir a janela", () => {

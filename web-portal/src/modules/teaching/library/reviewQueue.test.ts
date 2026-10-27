@@ -18,6 +18,18 @@ const input = {
 };
 
 describe("buildReviewQueue", () => {
+  it("histórico do autor: devolvidos no topo, depois do mais novo ao mais antigo (inclui publicados)", () => {
+    const queue = buildReviewQueue(teacher, {
+      ...input,
+      mine: [
+        item("a", {authorId: "t1", status: "published", createdAt: 5}),
+        item("b", {authorId: "t1", status: "returned", createdAt: 1}),
+        item("c", {authorId: "t1", createdAt: 9}),
+      ],
+    });
+    expect(queue.mine.map((i) => i.id)).toEqual(["b", "c", "a"]);
+  });
+
   it("professor vê só os próprios envios, mais novos primeiro", () => {
     const queue = buildReviewQueue(teacher, input);
     expect(queue.mine.map((i) => i.id)).toEqual(["m2", "m1"]);

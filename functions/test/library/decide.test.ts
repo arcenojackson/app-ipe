@@ -28,7 +28,7 @@ describe("latestPerVoter", () => {
 describe("decidePublication", () => {
   it("2 aprovações de curadores distintos publicam", () => {
     const d = decidePublication(item, [approve("a", "c1"), approve("b", "c2")], curators);
-    expect(d).toEqual({type: "publish"});
+    expect(d).toEqual({type: "publish", by: ["c1", "c2"]});
   });
 
   it("1 aprovação não publica", () => {

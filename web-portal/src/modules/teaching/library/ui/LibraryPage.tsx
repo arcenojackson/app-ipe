@@ -2,15 +2,16 @@
 
 import Link from "next/link";
 import {useRouter, useSearchParams} from "next/navigation";
-import {useEffect, useMemo, useState} from "react";
+import {useCallback, useEffect, useMemo, useState} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
 import {Button} from "@/core/ui/Button";
 import {Icon} from "@/core/ui/icons";
 import {EMPTY_FILTERS, type LibraryFilters} from "../libraryQuery";
-import {loadUserNames} from "../repository";
+import {loadUserNames, subscribeItem} from "../repository";
 import {EMPTY_TAGS, type ItemTags} from "../tags";
 import {viewerFrom, type Viewer} from "../types";
 import {libraryUrl, readParams} from "../url";
+import {useItemOverlay} from "../useItemOverlay";
 import {useLibraryPage} from "../useLibraryPage";
 import {useTags} from "../useTags";
 import {ItemModal} from "./ItemModal";
@@ -78,7 +79,7 @@ export function LibraryContent({
 
   // Nomes dos autores: só busca os que ainda não são conhecidos.
   useEffect(() => {
-    const missing = [...new Set(library.items.map((i) => i.authorId))].filter(
+    const missing = [...new Set(library.items.flatMap((i) => [i.authorId, ...(i.approvedBy ?? [])]))].filter(
       (uid) => uid && !(uid in authorNames)
     );
     if (missing.length === 0) return;
@@ -142,7 +143,7 @@ export function LibraryContent({
                   onSelect={setSelectedId}
                 />
               ) : (
-                <LibraryGrid items={library.items} authorNames={authorNames} onOpenFile={open} />
+                <LibraryGrid items={library.items} authorNames={authorNames} byTagId={byId} onOpenFile={open} />
               )}
               {view === "list" && selected && (
                 <ItemSidePanel
@@ -170,14 +171,51 @@ export function LibraryContent({
   );
 }
 
+// Link para item que não está publicado (ex.: push de revisão): ele não aparece
+// na Biblioteca, então a janela abre sobre a Fila de Revisão, onde o autor e os
+// curadores o encontram.
+export function UnpublishedRedirect({itemId, onRedirect}: {itemId: string | null; onRedirect: (id: string) => void}) {
+  useEffect(() => {
+    if (!itemId) return;
+    let redirected = false;
+    const stop = subscribeItem(
+      itemId,
+      (item) => {
+        if (!redirected && item && item.status !== "published") {
+          redirected = true;
+          onRedirect(itemId);
+        }
+      },
+      () => undefined
+    );
+    return stop;
+  }, [itemId, onRedirect]);
+  return null;
+}
+
 export default function LibraryPage() {
   const {state} = useAuth();
   const router = useRouter();
+  const overlay = useItemOverlay("/ensino");
   const params = readParams(useSearchParams());
   const viewer = useMemo(
     () => (state.status === "signedIn" ? viewerFrom(state.user.uid, state.claims) : null),
     [state]
   );
+  const toQueue = useCallback(
+    (id: string) => router.replace(`/ensino/revisao?item=${encodeURIComponent(id)}`, {scroll: false}),
+    [router]
+  );
   if (!viewer) return null;
-  return <LibraryContent viewer={viewer} itemId={params.item} navigate={(url) => router.push(url)} />;
+  const navigate = (url: string) => {
+    const id = new URL(url, "http://local").searchParams.get("item");
+    if (id) overlay.open(id);
+    else overlay.close();
+  };
+  return (
+    <>
+      <UnpublishedRedirect itemId={params.item} onRedirect={toQueue} />
+      <LibraryContent viewer={viewer} itemId={params.item} navigate={navigate} />
+    </>
+  );
 }

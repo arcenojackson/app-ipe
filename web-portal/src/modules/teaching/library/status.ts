@@ -26,6 +26,17 @@ export function countApprovals(item: LibraryItem, votes: LibraryVote[]): number 
   return latestPerVoter(eligible).filter((v) => v.action === "approve").length;
 }
 
+// Quem aprovou a versão atual (último voto de cada curador é aprovação).
+export function approverIds(item: LibraryItem, votes: LibraryVote[]): string[] {
+  const eligible = votes.filter(
+    (v) =>
+      (v.action === "approve" || v.action === "reject" || v.action === "return") &&
+      v.version === item.version &&
+      v.voterId !== item.authorId
+  );
+  return latestPerVoter(eligible).filter((v) => v.action === "approve").map((v) => v.voterId);
+}
+
 export function countDeleteApprovals(
   item: LibraryItem,
   votes: LibraryVote[]

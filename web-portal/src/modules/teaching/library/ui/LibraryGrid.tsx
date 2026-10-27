@@ -1,8 +1,10 @@
 "use client";
 
-import {formatDate} from "../labels";
+import {approverLabel, formatDate} from "../labels";
+import type {Tag} from "../tags";
 import type {LibraryItem} from "../types";
 import {FileTypeIcon} from "./FileTypeIcon";
+import {CompactTagChips} from "./TagChips";
 
 const isWebUrl = (url: string | undefined): url is string => !!url && /^https?:\/\//.test(url);
 
@@ -11,10 +13,12 @@ const isWebUrl = (url: string | undefined): url is string => !!url && /^https?:\
 export function LibraryGrid({
   items,
   authorNames,
+  byTagId,
   onOpenFile,
 }: {
   items: LibraryItem[];
   authorNames: Record<string, string>;
+  byTagId: Map<string, Tag>;
   onOpenFile: (id: string) => void;
 }) {
   return (
@@ -27,16 +31,25 @@ export function LibraryGrid({
             </span>
             <span className="block space-y-1 p-3 text-left">
               <span className="line-clamp-2 block font-medium">{item.name}</span>
+              <CompactTagChips
+                ids={[...(item.typeTags ?? []), ...(item.subjectTags ?? []), ...(item.ageTags ?? [])]}
+                byId={byTagId}
+              />
               <span className="block text-xs text-white/60">
                 {authorNames[item.authorId] ?? "—"} · {formatDate(item.publishedAt)}
               </span>
+              {item.approvedBy && item.approvedBy.length > 0 && (
+                <span className="block truncate text-xs text-white/60" title={approverLabel(item.approvedBy, authorNames).title}>
+                  Aprovado por {approverLabel(item.approvedBy, authorNames).text}
+                </span>
+              )}
             </span>
           </>
         );
         const cls =
-          "block w-full overflow-hidden rounded-card border border-transparent bg-surface transition hover:-translate-y-0.5 hover:border-secondary";
+          "block h-full w-full overflow-hidden rounded-card border border-transparent bg-surface transition hover:-translate-y-0.5 hover:border-secondary";
         return (
-          <li key={item.id}>
+          <li key={item.id} className="h-full">
             {item.type === "link" ? (
               isWebUrl(item.url) ? (
                 <a href={item.url} target="_blank" rel="noopener noreferrer" className={cls}>{body}</a>

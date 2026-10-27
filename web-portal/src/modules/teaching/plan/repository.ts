@@ -3,6 +3,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -48,4 +49,11 @@ export async function addPlanRow(uid: string, lesson: number, theme: string): Pr
 
 export async function deletePlanRow(id: string): Promise<void> {
   await deleteDoc(doc(rows(), id));
+}
+
+// Uma aula pelo id do documento (citações do Fórum); undefined se não existe mais.
+export async function loadPlanRow(id: string): Promise<PlanRow | undefined> {
+  const snapshot = await getDoc(doc(rows(), id));
+  if (!snapshot.exists()) return undefined;
+  return toPlanRow(snapshot.id, snapshot.data()) ?? undefined;
 }

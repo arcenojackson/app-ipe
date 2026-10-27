@@ -33,6 +33,7 @@ describe("processVote — publicação", () => {
     expect(await processVote(t.deps, "i1", "v2")).toBe("published");
     const published = (await t.db.getItem("i1")) as unknown as Record<string, unknown>;
     expect(published.publishedAt).toBe(true);
+    expect([...(published.approvedBy as string[])].sort()).toEqual(["c1", "c2"]);
 
     const returned = makeDeps({
       items: [makeItem({id: "i2"})],
@@ -42,6 +43,7 @@ describe("processVote — publicação", () => {
     expect(await processVote(returned.deps, "i2", "v1")).toBe("returned");
     const after = (await returned.db.getItem("i2")) as unknown as Record<string, unknown>;
     expect(after.publishedAt).toBeUndefined();
+    expect(after.approvedBy).toBeUndefined();
   });
 
   it("reprocessar o voto depois de publicar não faz nada", async () => {
