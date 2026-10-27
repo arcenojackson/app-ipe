@@ -3,7 +3,7 @@
 import {useState} from "react";
 import {Button} from "@/core/ui/Button";
 import {REQUIRED_APPROVALS, validateName} from "../files";
-import {formatDateTime, voteLabel} from "../labels";
+import {formatDate, formatDateTime, voteLabel} from "../labels";
 import {cancelDelete, castVote, editTags, renameItem, requestDelete, resubmitFile, resubmitLink} from "../mutations";
 import {itemPermissions} from "../permissions";
 import {countApprovals, countDeleteApprovals, statusBadge} from "../status";
@@ -31,7 +31,7 @@ export function ItemDetail({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const {item, error, votes, votesLoaded, votesError, names, authorName} = useItemDetail(itemId, viewer);
+  const {item, error, votes, votesLoaded, votesError, names, authorName, approverNames} = useItemDetail(itemId, viewer);
   const {byId: tagById} = useTags();
   const [modal, setModal] = useState<Modal>(null);
   const [busy, setBusy] = useState(false);
@@ -101,6 +101,13 @@ export function ItemDetail({
 
       <div className="space-y-1">
         {authorName && <p className="text-sm text-white/70">Enviado por {authorName}</p>}
+        <p className="text-sm text-white/70">
+          Enviado em {formatDate(item.createdAt)}
+          {item.status === "published" && ` · Publicado em ${formatDate(item.publishedAt)}`}
+        </p>
+        {item.status === "published" && approverNames.length > 0 && (
+          <p className="text-sm text-white/70">Aprovado por {approverNames.join(", ")}</p>
+        )}
         <TagChips
           ids={[...(item.typeTags ?? []), ...(item.subjectTags ?? []), ...(item.ageTags ?? [])]}
           byId={tagById}

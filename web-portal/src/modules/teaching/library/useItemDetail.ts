@@ -62,16 +62,17 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
   }, [voterKey]);
 
   const authorId = item?.authorId;
+  const approvedKey = (item?.approvedBy ?? []).join(",");
   useEffect(() => {
     if (!authorId) return;
     let active = true;
-    loadUserNames([authorId])
+    loadUserNames([authorId, ...(approvedKey ? approvedKey.split(",") : [])])
       .then((map) => active && setAuthorNames((known) => ({...known, ...map})))
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, [authorId]);
+  }, [authorId, approvedKey]);
 
   return {
     item,
@@ -81,5 +82,6 @@ export function useItemDetail(itemId: string, viewer: Viewer) {
     votesError,
     names,
     authorName: authorId ? authorNames[authorId] : undefined,
+    approverNames: (item?.approvedBy ?? []).map((id) => authorNames[id] ?? "Curador"),
   };
 }

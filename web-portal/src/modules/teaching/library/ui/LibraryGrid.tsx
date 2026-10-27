@@ -1,14 +1,14 @@
 "use client";
 
-import {approverLabel, formatDate} from "../labels";
 import type {Tag} from "../tags";
 import type {LibraryItem} from "../types";
 import {FileTypeIcon} from "./FileTypeIcon";
-import {CompactTagChips} from "./TagChips";
+import {TagChips} from "./TagChips";
 
 const isWebUrl = (url: string | undefined): url is string => !!url && /^https?:\/\//.test(url);
 
-// Grade de cartões com selo grande do tipo. Arquivos abrem a visualização
+// Grade de cartões com selo grande do tipo: título, tags (por extenso) e autor;
+// data e aprovadores ficam na janela do item. Arquivos abrem a visualização
 // completa; links abrem em nova aba.
 export function LibraryGrid({
   items,
@@ -31,18 +31,11 @@ export function LibraryGrid({
             </span>
             <span className="block space-y-1 p-3 text-left">
               <span className="line-clamp-2 block font-medium">{item.name}</span>
-              <CompactTagChips
+              <TagChips
                 ids={[...(item.typeTags ?? []), ...(item.subjectTags ?? []), ...(item.ageTags ?? [])]}
                 byId={byTagId}
               />
-              <span className="block text-xs text-white/60">
-                {authorNames[item.authorId] ?? "—"} · {formatDate(item.publishedAt)}
-              </span>
-              {item.approvedBy && item.approvedBy.length > 0 && (
-                <span className="block truncate text-xs text-white/60" title={approverLabel(item.approvedBy, authorNames).title}>
-                  Aprovado por {approverLabel(item.approvedBy, authorNames).text}
-                </span>
-              )}
+              <span className="block text-xs text-white/60">{authorNames[item.authorId] ?? "—"}</span>
             </span>
           </>
         );

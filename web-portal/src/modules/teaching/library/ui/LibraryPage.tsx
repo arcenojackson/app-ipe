@@ -150,6 +150,7 @@ export function LibraryContent({
                   item={selected}
                   byTagId={byId}
                   authorName={authorNames[selected.authorId]}
+                  approverNames={(selected.approvedBy ?? []).map((id) => authorNames[id] ?? "Curador")}
                   onOpen={() => open(selected.id)}
                   onClose={() => setSelectedId(null)}
                 />

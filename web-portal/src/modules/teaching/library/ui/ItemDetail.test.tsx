@@ -158,6 +158,18 @@ describe("ItemDetail — histórico e visualização", () => {
     expect(await screen.findByText("Enviado por Felipe")).toBeInTheDocument();
   });
 
+  it("item publicado mostra datas de envio/publicação e quem aprovou", async () => {
+    setup(other, file({status: "published", createdAt: Date.UTC(2026, 9, 20, 15), publishedAt: Date.UTC(2026, 9, 27, 15), approvedBy: ["c1", "c2"]}));
+    expect(await screen.findByText(/Enviado em 20\/10\/2026 · Publicado em 27\/10\/2026/)).toBeInTheDocument();
+    expect(await screen.findByText("Aprovado por Ana Curadora, Beto Curador")).toBeInTheDocument();
+  });
+
+  it("sem approvedBy (antes do backfill) não mostra a linha Aprovado por", async () => {
+    setup(other, file({status: "published"}));
+    await screen.findByText(/Enviado em/);
+    expect(screen.queryByText(/Aprovado por/)).not.toBeInTheDocument();
+  });
+
   it("link abre em nova aba com rel seguro", async () => {
     setup(other, {id: "i1", type: "link", name: "Livro", parentId: null, authorId: "t1", status: "published", version: 1, url: "https://x.org/livro", description: "Bom livro"});
     const anchor = await screen.findByRole("link", {name: "https://x.org/livro"});

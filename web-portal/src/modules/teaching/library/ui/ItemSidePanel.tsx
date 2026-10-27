@@ -13,12 +13,14 @@ export function ItemSidePanel({
   item,
   byTagId,
   authorName,
+  approverNames = [],
   onOpen,
   onClose,
 }: {
   item: LibraryItem;
   byTagId: Map<string, Tag>;
   authorName?: string;
+  approverNames?: string[];
   onOpen: () => void;
   onClose: () => void;
 }) {
@@ -36,8 +38,12 @@ export function ItemSidePanel({
       <dl className="grid grid-cols-[6rem_1fr] gap-x-3 gap-y-2 text-sm">
         <dt className="text-white/60">Enviado por</dt>
         <dd>{authorName ?? "—"}</dd>
+        <dt className="text-white/60">Enviado em</dt>
+        <dd>{formatDate(item.createdAt)}</dd>
         <dt className="text-white/60">Publicado</dt>
         <dd>{formatDate(item.publishedAt)}</dd>
+        <dt className="text-white/60">Aprovado por</dt>
+        <dd>{approverNames.length > 0 ? approverNames.join(", ") : "—"}</dd>
         {item.type === "file" && item.size ? (
           <>
             <dt className="text-white/60">Tamanho</dt>
