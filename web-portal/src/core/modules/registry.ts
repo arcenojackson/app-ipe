@@ -9,6 +9,14 @@ function isUnder(pathname: string, base: string): boolean {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
+/** Módulo dono da rota, se houver. */
+export function moduleForPath(
+  modules: PortalModule[],
+  pathname: string
+): PortalModule | undefined {
+  return modules.find((m) => isUnder(pathname, m.basePath));
+}
+
 export function visibleNavGroups(
   modules: PortalModule[],
   claims: AccessClaims | null
