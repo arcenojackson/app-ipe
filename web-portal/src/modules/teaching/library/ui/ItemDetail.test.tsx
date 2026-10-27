@@ -18,6 +18,11 @@ const mutations = vi.hoisted(() => ({
 vi.mock("./PreviewPane", () => ({
   PreviewPane: ({item}: {item: LibraryItem}) => <div data-testid="preview">{`preview de ${item.name}`}</div>,
 }));
+vi.mock("./FileInfo", () => ({
+  FileInfo: ({item, download = true}: {item: LibraryItem; download?: boolean}) => (
+    <div data-testid="file-info">{`info de ${item.name}${download ? " com download" : ""}`}</div>
+  ),
+}));
 vi.mock("../useTags", () => {
   const list = [
     {id: "tipo-artigos", kind: "type", name: "Artigos", order: 1, active: true},
@@ -275,6 +280,9 @@ describe("ItemDetail — reenvio", () => {
     const input = screen.getByLabelText("Escolher novo arquivo");
     const novo = new File(["x"], "novo.pdf", {type: "application/pdf"});
     await act(async () => fireEvent.change(input, {target: {files: [novo]}}));
+    expect(mutations.resubmitFile).not.toHaveBeenCalled();
+    expect(screen.getByText("novo.pdf")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", {name: "Reenviar"}));
     await waitFor(() => expect(mutations.resubmitFile).toHaveBeenCalledWith("t1", expect.objectContaining({id: "i1"}), novo, expect.any(Function)));
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
   });
@@ -300,6 +308,7 @@ describe("ItemDetail — reenvio com erro", () => {
     const input = await screen.findByLabelText("Escolher novo arquivo");
     const novo = new File(["x"], "novo.exe", {type: "application/x-msdownload"});
     await act(async () => fireEvent.change(input, {target: {files: [novo]}}));
+    fireEvent.click(screen.getByRole("button", {name: "Reenviar"}));
   }
 
   it("arquivo inválido mostra a mensagem do UploadError", async () => {
@@ -358,5 +367,45 @@ describe("ItemDetail — acabamentos", () => {
     });
     setup(curator2);
     expect(await screen.findByText("Não foi possível carregar o histórico de revisão.")).toBeInTheDocument();
+  });
+});
+
+describe("ItemDetail — cartão de reenvio e arquivo do autor", () => {
+  it("cartão mostra o motivo, 'Falta' sem arquivo e permite remover o escolhido", async () => {
+    setup(teacher, file({status: "returned", returnComment: "Ajuste X"}));
+    expect(await screen.findByText(/Motivo da devolução/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Ajuste X/)).toHaveLength(1);
+    expect(screen.getByRole("button", {name: "Reenviar"})).toBeDisabled();
+    expect(screen.getByText("Falta: o arquivo corrigido")).toBeInTheDocument();
+    const novo = new File(["x"], "novo.pdf", {type: "application/pdf"});
+    await act(async () => fireEvent.change(screen.getByLabelText("Escolher novo arquivo"), {target: {files: [novo]}}));
+    expect(screen.getByRole("button", {name: "Reenviar"})).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", {name: "Remover novo.pdf"}));
+    expect(screen.getByRole("button", {name: "Reenviar"})).toBeDisabled();
+  });
+
+  it("falha mantém o arquivo escolhido para tentar de novo", async () => {
+    mutations.resubmitFile.mockRejectedValueOnce(new Error("network"));
+    setup(teacher, file({status: "returned"}));
+    const novo = new File(["x"], "novo.pdf", {type: "application/pdf"});
+    await act(async () => fireEvent.change(await screen.findByLabelText("Escolher novo arquivo"), {target: {files: [novo]}}));
+    fireEvent.click(screen.getByRole("button", {name: "Reenviar"}));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByText("novo.pdf")).toBeInTheDocument();
+    mutations.resubmitFile.mockResolvedValue(undefined);
+    fireEvent.click(screen.getByRole("button", {name: "Reenviar"}));
+    await waitFor(() => expect(mutations.resubmitFile).toHaveBeenCalledTimes(2));
+  });
+
+  it("autor de item em revisão não vê visualização nem Baixar; só as informações", async () => {
+    setup(teacher, file({status: "in_review"}));
+    expect(await screen.findByTestId("file-info")).toHaveTextContent(/^info de [^]*$/);
+    expect(screen.getByTestId("file-info")).not.toHaveTextContent("com download");
+    expect(screen.queryByTestId("preview")).not.toBeInTheDocument();
+  });
+
+  it("curador continua vendo o arquivo de item em revisão", async () => {
+    setup(curator2, file({status: "in_review"}));
+    expect(await screen.findByTestId("preview")).toBeInTheDocument();
   });
 });

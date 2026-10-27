@@ -38,7 +38,7 @@ export function DownloadButton({item}: {item: LibraryItem}) {
 }
 
 // Para tipos sem visualização: nome, tipo, tamanho e botão de baixar.
-export function FileInfo({item}: {item: LibraryItem}) {
+export function FileInfo({item, download = true}: {item: LibraryItem; download?: boolean}) {
   return (
     <div className="space-y-2 rounded-card bg-white/5 p-4 text-sm">
       <p className="font-medium">{item.fileName ?? item.name}</p>
@@ -48,7 +48,7 @@ export function FileInfo({item}: {item: LibraryItem}) {
         <dt>Tamanho</dt>
         <dd>{item.size ? formatBytes(item.size) : "—"}</dd>
       </dl>
-      <DownloadButton item={item} />
+      {download && <DownloadButton item={item} />}
     </div>
   );
 }
