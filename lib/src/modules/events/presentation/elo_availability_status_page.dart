@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../../../shared/widgets/glass_container.dart';
 import '../../../shared/utils/sort_utils.dart';
 import '../../../shared/utils/app_toast.dart';
+import '../../../core/config/app_environment.dart';
 import '../../../core/config/firebase_config.dart';
 import '../../auth/models/user.dart';
 import '../../people/data/people_repository.dart';
@@ -465,8 +466,9 @@ class _EloAvailabilityStatusPageState
 
       // URL da Cloud Function HTTP
       // Formato: https://{region}-{project-id}.cloudfunctions.net/{function-name}
-      const functionUrl =
-          'https://us-central1-app-ipe.cloudfunctions.net/sendEloAvailabilityReminder';
+      final functionUrl = AppEnvironment.cloudFunctionUrl(
+        'sendEloAvailabilityReminder',
+      );
 
       // Fazer requisição HTTP POST para a Cloud Function
       final response = await http.post(

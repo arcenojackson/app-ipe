@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import {initScriptApp} from "./lib/target";
 import {PLAN_SEED} from "../src/teaching/planSeed";
 
 // Cria as 52 linhas do plano pedagógico em teaching_plan que ainda não
@@ -6,7 +7,7 @@ import {PLAN_SEED} from "../src/teaching/planSeed";
 async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   console.log(dryRun ? "Modo DRY-RUN: nada será gravado." : "Gravando o plano.");
-  admin.initializeApp({projectId: "app-ipe"});
+  initScriptApp(process.argv);
   const collection = admin.firestore().collection("teaching_plan");
   let created = 0;
   let skipped = 0;

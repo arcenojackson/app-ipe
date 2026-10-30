@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import {initScriptApp} from "./lib/target";
 import {
   BackfillCounts,
   formatChangeLine,
@@ -23,7 +24,7 @@ import {
 async function main(): Promise<void> {
   const dryRun = isDryRun(process.argv);
   console.log(formatMode(dryRun));
-  admin.initializeApp({projectId: "app-ipe"});
+  initScriptApp(process.argv);
   const snapshot = await admin.firestore().collection("users").get();
   let updated = 0;
   let unchanged = 0;

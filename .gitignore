@@ -54,7 +54,9 @@ upload-keystore.jks
 lib/src/core/config/app_secrets.dart
 plexels_key.txt
 .superpowers/
-.claude/
+# Config local pessoal do Claude Code; só os comandos compartilhados são versionados
+.claude/*
+!.claude/commands/
 
 # Firebase config files (gerados pelo FlutterFire CLI - não commitar)
 lib/firebase_options.dart
@@ -65,3 +67,9 @@ node_modules/
 rules-tests/node_modules/
 web-portal/node_modules/
 web-portal/.next/
+
+# Ambiente local (emuladores Firebase)
+.emulator-data/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

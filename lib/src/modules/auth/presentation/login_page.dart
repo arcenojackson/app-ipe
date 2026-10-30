@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, Tar
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../core/config/app_environment.dart';
 import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 
@@ -298,8 +299,8 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                 ],
-                // Separador "ou"
-                if (!_isSignUp) ...[
+                // Separador "ou" + login social (indisponível nos emuladores)
+                if (!_isSignUp && !AppEnvironment.useEmulator) ...[
                   const SizedBox(height: 24),
                   Row(
                     children: [
@@ -441,6 +442,21 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ),
                   ],
+                ],
+                if (AppEnvironment.useEmulator) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    'Ambiente LOCAL (emuladores)\n'
+                    'Contas de teste: admin@ipe.test, curador@ipe.test, '
+                    'professor@ipe.test, membro@ipe.test\n'
+                    'Senha: senha123',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.amberAccent.withOpacity(0.9),
+                      height: 1.4,
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 16),
                 // Texto de termos

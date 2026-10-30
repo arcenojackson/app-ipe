@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "app-ipe"
+    "default": "app-ipe",
+    "local": "demo-ipe"
   }
 }

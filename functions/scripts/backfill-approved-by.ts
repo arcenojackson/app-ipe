@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import {initScriptApp} from "./lib/target";
 import {
   ITEMS_COLLECTION,
   VOTES_SUBCOLLECTION,
@@ -12,7 +13,7 @@ import {toItem, toVote} from "../src/teaching/library/convert";
 // Sem `--execute` só conta e imprime (padrão); nada é gravado.
 async function main(): Promise<void> {
   const execute = process.argv.includes("--execute");
-  admin.initializeApp({projectId: "app-ipe"});
+  initScriptApp(process.argv);
   const firestore = admin.firestore();
   console.log(execute ? "MODO: EXECUTAR (grava)" : "MODO: DRY-RUN (não grava)");
 

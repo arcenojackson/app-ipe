@@ -9,6 +9,15 @@
 # packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
+analyzer:
+  exclude:
+    # Dependências Node (o firebase-tools traz templates .dart que não são nossos)
+    - node_modules/**
+    - functions/node_modules/**
+    - web-portal/node_modules/**
+    - rules-tests/node_modules/**
+    - .emulator-data/**
+
 linter:
   # The lint rules applied to this project can be customized in the
   # section below to disable rules from the `package:flutter_lints/flutter.yaml`
