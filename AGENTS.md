@@ -38,7 +38,20 @@ Siga na ordem e **confirme cada passo antes do próximo**. Sistemas: Windows (pr
 7. Entre com uma conta de teste (senha `senha123`): `admin@ipe.test`, `curador@ipe.test`, `professor@ipe.test`, `membro@ipe.test`, `louvor@ipe.test`, `pendente@ipe.test`.
 8. (Opcional) Portal web: `npm run dev -- --portal` e abra http://localhost:3000.
 
+**Quer rodar em emulador Android ou simulador iOS?** Siga a seção 2.1 abaixo.
+
 **Critério de pronto:** login funciona, o app mostra 3 cultos na Agenda e aparece o aviso "Running in emulator mode" no rodapé do app web.
+
+## 2.1 Playbook: emulador Android / simulador iOS
+
+Só depois do playbook da seção 2. Detalhes e solução de problemas: `docs/DESENVOLVIMENTO_LOCAL.md` (seção "Emulador Android e simulador iOS").
+
+1. Rode `npm run doctor -- --native --json` e leia os itens `android`, `xcode`, `cocoapods`, `emulators` e `devices`. Mostre ao usuário o que falta e **peça confirmação antes de instalar** qualquer software (Android Studio, Xcode e runtimes são grandes).
+2. **Android** (Windows/macOS/Linux): Android Studio instalado e aberto uma vez (baixa o SDK) → `flutter doctor --android-licenses` → criar um emulador no Device Manager → `flutter emulators --launch <id>`.
+3. **iOS** (apenas macOS; no Windows não existe): Xcode completo da App Store (`sudo xcode-select --switch /Applications/Xcode.app && sudo xcodebuild -runFirstLaunch`), CocoaPods (`brew install cocoapods`), runtime de simulador baixado → `open -a Simulator`. Mínimo: iOS 15.0.
+4. Pegue o id em `flutter devices` e rode, com `npm run dev` já no ar: `npm run app -- -d <id>` (Android: `emulator-5554`; iOS: `ios` ou o id do simulador).
+5. **Nunca** substitua `android/app/google-services.json` nem `ios/Runner/GoogleService-Info.plist` por arquivos reais e nunca rode `flutterfire configure`: os fictícios criados pelo `npm run setup` bastam. Rodar pelo Android Studio/Xcode exige `--dart-define=USE_EMULATOR=true`.
+6. Critério de pronto: o app abre no emulador, mostra o aviso de ambiente local no login, `admin@ipe.test` / `senha123` entra e a Agenda mostra 3 cultos.
 
 ## 3. Comandos do dia a dia
 
@@ -51,7 +64,7 @@ Siga na ordem e **confirme cada passo antes do próximo**. Sistemas: Windows (pr
 | App em emulador Android | `npm run app -- -d emulator-5554` (veja `flutter devices`) |
 | App em simulador iOS (só macOS) | `npm run app -- -d ios` |
 | Celular físico na mesma rede Wi‑Fi | `EMULATOR_HOST=<IP-da-máquina> npm run app -- -d <id>` |
-| Diagnóstico | `npm run doctor` |
+| Diagnóstico | `npm run doctor` (`-- --native` inclui Android/iOS) |
 
 Verificações antes de abrir PR:
 

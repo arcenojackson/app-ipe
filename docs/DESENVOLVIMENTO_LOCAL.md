@@ -130,6 +130,66 @@ Também dá para criar contas novas pelo próprio app.
 
 Veja os dispositivos com `flutter devices`. Argumentos extras depois de `npm run app --` vão direto ao `flutter run`.
 
+### Emulador Android e simulador iOS
+
+Roteiro para quem quer rodar o app **nativo** (e para a IA que for configurar isso). O Chrome continua sendo o caminho mais simples; use o nativo para testar o que difere da web (teclado, gestos, layout de celular, plugins nativos).
+
+> Regra de ouro: o app nativo **só pode** rodar via `npm run app` (que passa `USE_EMULATOR=true`). Nunca use o `google-services.json`/`GoogleService-Info.plist` de produção, nem `flutterfire configure`: o `npm run setup` já cria versões fictícias (`demo-ipe`) a partir de `scripts/local/templates/`, só para o projeto compilar.
+
+**Diagnóstico:** `npm run doctor -- --native` confere Android SDK, Xcode, CocoaPods e lista emuladores/simuladores criados e ligados. Resolva o que ele apontar e rode de novo.
+
+#### O que o projeto exige
+
+| Item | Android | iOS (só macOS) |
+|---|---|---|
+| IDE/SDK | Android Studio (baixa o Android SDK e o emulador); licenças aceitas com `flutter doctor --android-licenses` | Xcode completo da App Store (não basta o Command Line Tools) |
+| Versão mínima | `minSdk` vem do Flutter; AGP 8.9.1 + Gradle 8.12 (precisa de JDK 17+; o JDK 21 do setup serve) | iOS **15.0** ou maior (`Podfile` e `Runner.xcodeproj`) |
+| Extras | — | CocoaPods (`brew install cocoapods`) e um runtime de simulador baixado (Xcode → Settings → Platforms) |
+| Arquivos de config | `android/app/google-services.json` (fictício, criado pelo setup) | `ios/Runner/GoogleService-Info.plist` (fictício, criado pelo setup) |
+| `applicationId` / bundle | `com.ipe.app` | `com.ipe.app` |
+| Rede até os emuladores | host `10.0.2.2` (automático); HTTP local liberado só no build debug | host `127.0.0.1` (automático) |
+
+#### Passo a passo — Android
+
+1. Instale o Android Studio, abra-o uma vez e deixe baixar o SDK. Aceite as licenças: `flutter doctor --android-licenses`.
+2. Crie um emulador: Android Studio → **Device Manager** → *Create Device* (qualquer Pixel com imagem recente). Ou liste os existentes: `flutter emulators`.
+3. Ligue o emulador: `flutter emulators --launch <id>` (ou pelo Device Manager) e confira o id com `flutter devices` (algo como `emulator-5554`).
+4. Backend local no ar: `npm run dev` (terminal 1).
+5. App: `npm run app -- -d emulator-5554` (terminal 2). A primeira compilação do Gradle demora alguns minutos.
+
+#### Passo a passo — iOS (macOS)
+
+1. Instale o Xcode, abra-o uma vez, aceite a licença e rode `sudo xcode-select --switch /Applications/Xcode.app && sudo xcodebuild -runFirstLaunch`.
+2. Baixe um runtime de simulador (Xcode → Settings → Platforms) e instale o CocoaPods se faltar.
+3. Ligue um simulador: `open -a Simulator` (ou `flutter emulators --launch apple_ios_simulator`).
+4. Backend local no ar: `npm run dev` (terminal 1).
+5. App: `npm run app -- -d ios` (terminal 2). Se houver mais de um simulador, use o id de `flutter devices`.
+
+#### Celular físico
+
+Celular e computador na mesma rede Wi‑Fi, depuração USB (Android) ou Modo Desenvolvedor (iOS) ativos. Informe o IP do computador: `EMULATOR_HOST=192.168.x.x npm run app -- -d <id>` (PowerShell: `$env:EMULATOR_HOST="192.168.x.x"; npm run app -- -d <id>`). Em iOS físico é preciso configurar assinatura (Team) no Xcode; como o bundle é `com.ipe.app`, use um Team pessoal e, se o identificador conflitar, troque-o **só localmente** (nunca commite essa mudança).
+
+#### Critério de pronto (nativo)
+
+O app abre no emulador/simulador, mostra o aviso de ambiente local na tela de login, `admin@ipe.test` / `senha123` entra, e a Agenda lista 3 cultos.
+
+#### Problemas comuns no nativo
+
+| Sintoma | Causa e solução |
+|---|---|
+| `flutter doctor` mostra "Android license status unknown" ou licenças pendentes | `flutter doctor --android-licenses` e aceite todas. |
+| Falha de Gradle com "Unsupported class file major version" | JDK incompatível com o Gradle. Use JDK 17 ou 21 (`flutter config --jdk-dir <caminho>` se o Flutter pegar outro). |
+| `SDK location not found` | Defina `ANDROID_HOME` (ou abra o Android Studio uma vez para ele criar o SDK). |
+| App no emulador Android mostra erro de rede / não loga | Confirme `npm run dev` ligado e que usou `npm run app` com `-d emulator-…` (usa `10.0.2.2`). Em aparelho físico use `EMULATOR_HOST`. |
+| `CocoaPods not installed` ou erro em `pod install` | `brew install cocoapods`; depois `cd ios && pod repo update && pod install`. Em Mac Apple Silicon, se falhar, `arch -x86_64 pod install`. |
+| Erro de assinatura (`Signing for "Runner" requires a development team`) | Só em iOS físico: selecione um Team pessoal no Xcode. Simulador não precisa de assinatura. |
+| O app abre e mostra erro pedindo `USE_EMULATOR` | Foi iniciado sem a flag (ex.: Run do Android Studio/Xcode). Rode pelo `npm run app` ou adicione `--dart-define=USE_EMULATOR=true` (e `EMULATOR_HOST`/`PORTAL_BASE_URL` se precisar) nos argumentos da configuração de execução. |
+| Login Google/Apple ou push não funcionam | Esperado: não existem localmente (veja a seção 5). |
+
+#### Rodar pelo Android Studio / Xcode em vez do terminal
+
+É possível, mas **sempre** com `--dart-define=USE_EMULATOR=true`. No Android Studio: *Run → Edit Configurations → Additional run args*. Para emulador Android acrescente também `--dart-define=EMULATOR_HOST=10.0.2.2` e `--dart-define=PORTAL_BASE_URL=http://10.0.2.2:3000`. A forma recomendada continua sendo `npm run app`, que já faz tudo isso.
+
 ### Portal web
 
 `npm run dev -- --portal` (ou, depois dos emuladores no ar, `cd web-portal && npm run dev`). O `.env.local` já aponta para os emuladores. Entre com `curador@ipe.test` / `senha123`.

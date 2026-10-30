@@ -1,6 +1,7 @@
 // Verifica se a máquina está pronta para o ambiente local.
 // Uso: npm run doctor            (texto)
 //      npm run doctor -- --json  (saída estruturada, boa para IAs)
+//      npm run doctor -- --native (também confere Android/iOS: SDK, Xcode, emuladores)
 import {existsSync, readFileSync} from "node:fs";
 import {
   PORTS, c, capture, commandExists, fail, flutterInfo, info, installHint, javaMajor,
@@ -8,6 +9,7 @@ import {
 } from "./lib.mjs";
 
 const asJson = process.argv.includes("--json");
+const withNative = process.argv.includes("--native");
 export async function runDoctor() {
   const results = [];
   const add = (id, level, message, fix) => results.push({id, level, message, fix});
@@ -58,7 +60,45 @@ export async function runDoctor() {
   if (busy.length) add("ports", "info", `Portas em uso: ${busy.join(", ")} (ok se forem os emuladores já rodando; senão libere-as)`);
   else add("ports", "ok", "Portas dos emuladores livres");
 
+  if (withNative) checkNative(add, fl);
+
   return results;
+}
+
+/** Confere o que falta para rodar em emulador Android / simulador iOS. */
+function checkNative(add, fl) {
+  if (!fl) return;
+  const doctor = capture("flutter", ["doctor"]).stdout;
+  const line = (re) => doctor.split("\n").find((l) => re.test(l));
+  const status = (l) => (l?.includes("[✓]") ? "ok" : l?.includes("[!]") ? "warn" : "error");
+
+  const android = line(/Android toolchain/);
+  if (!android) add("android", "warn", "Android toolchain não reportado pelo `flutter doctor`", "Instale o Android Studio: https://developer.android.com/studio");
+  else if (status(android) === "ok") add("android", "ok", "Android toolchain pronta");
+  else add("android", "warn", "Android toolchain incompleta (veja `flutter doctor -v`)", "Abra o Android Studio uma vez (baixa o SDK) e rode `flutter doctor --android-licenses`");
+
+  if (process.platform === "darwin") {
+    const xcode = line(/Xcode - develop for iOS/);
+    if (xcode && status(xcode) === "ok") add("xcode", "ok", "Xcode pronto");
+    else add("xcode", "warn", "Xcode incompleto ou ausente (só necessário para iOS)", "Instale o Xcode pela App Store, depois: sudo xcode-select --switch /Applications/Xcode.app && sudo xcodebuild -runFirstLaunch");
+    if (commandExists("pod")) add("cocoapods", "ok", "CocoaPods");
+    else add("cocoapods", "warn", "CocoaPods ausente (necessário para iOS)", "brew install cocoapods");
+  } else {
+    add("xcode", "info", "iOS só roda em macOS; neste sistema use Chrome ou Android");
+  }
+
+  const emus = capture("flutter", ["emulators"]).stdout.split("\n").filter((l) => / • /.test(l) && !/^Id /.test(l));
+  if (emus.length) add("emulators", "ok", `Emuladores/simuladores disponíveis:\n      ${emus.map((l) => l.trim()).join("\n      ")}`);
+  else add("emulators", "warn", "Nenhum emulador criado", "Android: Android Studio → Device Manager → Create Device. iOS: abra o Xcode → Settings → Platforms e baixe um runtime");
+
+  const devices = capture("flutter", ["devices", "--machine"]).stdout;
+  try {
+    const list = JSON.parse(devices).filter((d) => d.targetPlatform?.startsWith("android") || d.targetPlatform === "ios");
+    if (list.length) add("devices", "ok", `Dispositivos prontos agora: ${list.map((d) => `${d.name} (-d ${d.id})`).join(", ")}`);
+    else add("devices", "info", "Nenhum emulador/simulador ligado agora. Ligue um (veja docs/DESENVOLVIMENTO_LOCAL.md, seção 'Emulador Android e simulador iOS').");
+  } catch {
+    add("devices", "info", "Não foi possível listar dispositivos (`flutter devices`)");
+  }
 }
 
 function readIfExists(file) {

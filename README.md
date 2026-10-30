@@ -57,7 +57,7 @@ Portal web (opcional): `npm run dev -- --portal` → http://localhost:3000.
 | JDK 21+ | `winget install EclipseAdoptium.Temurin.21.JDK` | `brew install --cask temurin@21` |
 | Flutter | [guia oficial (Windows)](https://docs.flutter.dev/get-started/install/windows) | [guia oficial (macOS)](https://docs.flutter.dev/get-started/install/macos) |
 
-Para rodar em **emulador Android** (Android Studio) ou **simulador iOS** (só macOS, Xcode), veja o guia completo: **[docs/DESENVOLVIMENTO_LOCAL.md](docs/DESENVOLVIMENTO_LOCAL.md)**. O caminho mais leve é o Chrome, que não exige Android Studio nem Xcode (alguns recursos nativos, como push, não existem na web).
+Para rodar em **emulador Android** (Android Studio) ou **simulador iOS** (só macOS, Xcode), veja o guia completo: **[docs/DESENVOLVIMENTO_LOCAL.md](docs/DESENVOLVIMENTO_LOCAL.md#emulador-android-e-simulador-ios)** (`npm run doctor -- --native` diz o que falta). Uma IA também consegue configurar isso: peça *"configure o emulador Android/iOS"* e ela segue o `AGENTS.md`. O caminho mais leve é o Chrome, que não exige Android Studio nem Xcode (alguns recursos nativos, como push, não existem na web).
 
 ### Usando uma IA para configurar
 

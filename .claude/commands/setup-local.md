@@ -11,3 +11,5 @@ Configure o ambiente de desenvolvimento local deste repositório **sem tocar na 
 5. Resuma ao usuário: o que foi instalado/criado, como subir e derrubar o ambiente no dia a dia (`npm run dev`, `npm run app`) e as limitações locais (sem push, sem login Google/Apple, sem funções agendadas).
 
 Se qualquer passo exigir quebrar uma regra inviolável, pare e pergunte.
+
+Se o usuário também quiser rodar em **emulador Android ou simulador iOS**, siga a seção "2.1 Playbook: emulador Android / simulador iOS" do `AGENTS.md` (comece por `npm run doctor -- --native --json`).
