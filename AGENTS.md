@@ -76,6 +76,8 @@ cd functions && npm run lint && npm run build && npm test
 cd web-portal && npm run lint && npm run typecheck && npm test
 ```
 
+Todo PR para a `main` roda o CI (`.github/workflows/ci.yml`: Flutter, Functions, Portal web, Regras e integração) com estes mesmos comandos; o PR só pode ser mesclado com o check **CI ok** verde. Rode-os localmente antes de abrir o PR.
+
 Testes que usam emulador (regras do Firestore/Storage e integração) exigem JDK 21:
 `cd rules-tests && npm install && npm test` · `cd functions && npm run test:integration`.
 
