@@ -59,10 +59,16 @@ docs: adicionar guia de configuração do Firebase
 
 ## Como abrir um Pull Request
 
-1. Crie sua branch a partir de `main`:
+1. **Faça um fork** do repositório no GitHub (botão *Fork*) e clone o **seu** fork. Contribuições chegam sempre por PR de fork: ninguém precisa de acesso direto ao repositório principal.
    ```bash
-   git checkout main && git pull
-   git checkout -b feat/minha-feature
+   git clone https://github.com/<seu-usuario>/app-ipe.git
+   cd app-ipe
+   git remote add upstream https://github.com/arcenojackson/app-ipe.git
+   ```
+   Mantenha o fork atualizado e crie a branch a partir da `main` do projeto:
+   ```bash
+   git fetch upstream
+   git checkout -b feat/minha-feature upstream/main
    ```
 
 2. Implemente as mudanças e faça commits seguindo o padrão acima.
@@ -76,9 +82,11 @@ docs: adicionar guia de configuração do Firebase
    cd web-portal && npm run lint && npm run typecheck && npm test # se mexeu no portal
    ```
 
-4. Abra um Pull Request para `main`. O template em `.github/pull_request_template.md` será carregado automaticamente — preencha todas as seções.
+4. Envie a branch para o seu fork (`git push -u origin feat/minha-feature`) e abra um Pull Request do seu fork para `arcenojackson/app-ipe`, base `main`. O template em `.github/pull_request_template.md` será carregado automaticamente — preencha todas as seções.
 
-5. Aguarde review. A branch `main` é **protegida**: não aceita push direto nem `--force`, e o merge exige a aprovação de um mantenedor (o *Code Owner* das áreas sensíveis, definido em `.github/CODEOWNERS`). Após aprovado, o mantenedor faz o merge.
+5. O CI (`.github/workflows/ci.yml`) roda no seu PR. Por segurança, em PRs de fork um mantenedor precisa aprovar a execução na primeira vez (e nas seguintes, se mudar o código). Se algum check falhar, corrija e envie novos commits à mesma branch.
+
+6. Aguarde review. A branch `main` é **protegida**: não aceita push direto nem `--force`, e o merge exige a aprovação de um mantenedor (o *Code Owner* das áreas sensíveis, definido em `.github/CODEOWNERS`). Após aprovado, o mantenedor faz o merge.
 
 ## Reportar bugs
 
@@ -86,8 +94,8 @@ Use os [issue templates do GitHub](.github/ISSUE_TEMPLATE/) para reportar bugs o
 
 ## Convenções de código
 
-- **Análise estática:** siga as regras definidas em `analysis_options.yaml`. Execute `flutter analyze` antes de abrir o PR — PRs com warnings não serão aprovados.
-- **Formatação:** use `dart format .` para formatar o código.
+- **Análise estática:** siga as regras definidas em `analysis_options.yaml`. Execute `flutter analyze` antes de abrir o PR — o CI bloqueia erros, e novos warnings serão pedidos para corrigir na revisão.
+- **Formatação:** use `dart format lib test` (nunca `dart format .` na raiz, que pega `node_modules`).
 - **Idioma do código:** inglês (nomes de variáveis, funções, classes, arquivos).
 - **Idioma dos comentários e documentação:** português, pois o app é voltado para a IPE e a equipe é brasileira.
 - **Padrão arquitetural:** Provider + Repository pattern. Consulte o `CLAUDE.md` para detalhes da arquitetura.

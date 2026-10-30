@@ -107,6 +107,7 @@ Aceite estas limitações em vez de tentar contorná-las:
 
 ## 6. Convenções
 
+- Contribuição é por **fork + Pull Request** (ninguém recebe acesso direto ao repositório). Se o usuário ainda não tem um fork, oriente-o a criar; não tente dar push no repositório principal.
 - Branches: `feat/`, `fix/`, `chore/`, `docs/`, `refactor/`. Commits: Conventional Commits (`feat: …`). Detalhes em `CONTRIBUTING.md`.
 - Código em inglês; comentários e documentação em português.
 - `main` é protegida: só entra por Pull Request aprovado. Não faça push direto nem `--force`.
