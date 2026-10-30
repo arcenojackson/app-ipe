@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import {initScriptApp} from "./lib/target";
 import {TAG_SEED} from "../src/teaching/tagSeed";
 
 // Cria as tags iniciais em teaching_tags que ainda não existem. Nunca
@@ -7,7 +8,7 @@ import {TAG_SEED} from "../src/teaching/tagSeed";
 async function main(): Promise<void> {
   const dryRun = process.argv.includes("--dry-run");
   console.log(dryRun ? "Modo DRY-RUN: nada será gravado." : "Gravando tags.");
-  admin.initializeApp({projectId: "app-ipe"});
+  initScriptApp(process.argv);
   const collection = admin.firestore().collection("teaching_tags");
   let created = 0;
   let skipped = 0;

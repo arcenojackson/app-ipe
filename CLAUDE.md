@@ -1,5 +1,8 @@
 # CLAUDE.md
 
+> **Leia primeiro o [`AGENTS.md`](AGENTS.md)**: regras invioláveis (nunca usar produção), playbook de setup do ambiente local e comandos. Este arquivo complementa com a visão de arquitetura.
+> Para desenvolver use `npm run dev` + `npm run app` (emuladores, projeto `demo-ipe`). Os comandos da seção *Commands* abaixo, com chaves e deploy, são dos mantenedores.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
@@ -79,12 +82,3 @@ Single entry point: `functions/src/index.ts`. Key triggers:
 - **Firestore direct access:** Most repositories use `cloud_firestore` directly (not through ApiClient). ApiClient exists for external HTTP APIs.
 - **Token refresh:** `_AppHome` in `app.dart` listens to app lifecycle and refreshes Firebase ID token on resume to avoid permission-denied errors.
 - **Firestore collection names:** Changing collection/route names requires coordinated updates in both Flutter code and Firebase Functions.
-
-## Memory
-
-### Me
-**Jackson Felipe** — `jackson.f205@gmail.com`
-Notion user ID: `f3034d8a-427a-4dda-b587-c582ff147df4`
-
-### Preferences
-- Ao criar tasks no Notion, sempre definir **Responsável** como Jackson Felipe (ID acima)

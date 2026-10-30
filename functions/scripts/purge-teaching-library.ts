@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import {initScriptApp} from "./lib/target";
 import {
   DEFAULT_BUCKET,
   ITEMS_COLLECTION,
@@ -14,7 +15,7 @@ import {describePurge} from "../src/teaching/purge";
 // Sem `--execute` só conta e imprime (padrão); nada é apagado.
 async function main(): Promise<void> {
   const execute = process.argv.includes("--execute");
-  admin.initializeApp({projectId: "app-ipe", storageBucket: DEFAULT_BUCKET});
+  initScriptApp(process.argv, {storageBucket: DEFAULT_BUCKET});
   const firestore = admin.firestore();
   const bucket = admin.storage().bucket();
 

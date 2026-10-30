@@ -6,6 +6,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 
 import 'src/app.dart';
+import 'src/core/config/app_environment.dart';
 import 'src/core/config/firebase_config.dart';
 import 'src/core/network/api_client.dart';
 import 'src/modules/auth/data/auth_repository.dart';
@@ -43,7 +44,8 @@ void main() async {
   await appState.bootstrap();
 
   // Firebase Messaging não tem suporte web — notificações ignoradas na web
-  if (!kIsWeb) {
+  // No ambiente local (emuladores) não há FCM.
+  if (!kIsWeb && !AppEnvironment.useEmulator) {
     await NotificationService().initialize();
   }
 

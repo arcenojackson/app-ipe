@@ -5,9 +5,15 @@ Portal web (Next.js) da área de ensino da IPE. Usa o mesmo projeto Firebase
 
 ## Rodar localmente
 
-1. `cp .env.example .env.local` e preencha com `firebase apps:sdkconfig WEB <APP_ID> --project app-ipe`.
-2. `npm install`
-3. `npm run dev` → http://localhost:3000
+Use o ambiente local do repositório (emuladores Firebase, sem produção). Na **raiz** do repo:
+
+1. `npm run setup` (uma vez) — cria o `web-portal/.env.local` já apontando para os emuladores.
+2. `npm run dev -- --portal` — sobe os emuladores, os dados de teste e este portal em http://localhost:3000.
+3. Entre com `curador@ipe.test` / `senha123` (ou `admin@ipe.test`, `professor@ipe.test`).
+
+Guia completo: [`docs/DESENVOLVIMENTO_LOCAL.md`](../docs/DESENVOLVIMENTO_LOCAL.md).
+
+> Mantenedores: para apontar o portal para o Firebase real, use as variáveis `NEXT_PUBLIC_FIREBASE_*` do `.env.example` e **não** defina `NEXT_PUBLIC_USE_EMULATORS`.
 
 Scripts: `npm test`, `npm run lint`, `npm run typecheck`, `npm run build`.
 O `build` precisa das variáveis `NEXT_PUBLIC_FIREBASE_*` definidas.

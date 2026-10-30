@@ -2,6 +2,17 @@
 
 Obrigado pelo interesse em contribuir! Este guia descreve o processo e as convenções adotadas no projeto.
 
+## Antes de começar
+
+Configure o ambiente local seguindo o [README](README.md#início-rápido-ambiente-local) e o [guia de desenvolvimento local](docs/DESENVOLVIMENTO_LOCAL.md). Tudo roda nos emuladores do Firebase (projeto `demo-ipe`) — **ninguém usa a produção**. Se for usar uma IA, ela deve seguir o [`AGENTS.md`](AGENTS.md).
+
+Combinados do projeto:
+
+- Nunca faça `firebase login`/`firebase deploy` para o projeto real, nem peça chaves de produção. Deploy e publicação são dos mantenedores.
+- Nunca faça commit de arquivos de configuração local ou segredos (`firebase_options.dart`, `google-services.json`, `GoogleService-Info.plist`, `app_secrets.dart`, `.env.local`).
+- Use apenas os dados fictícios do seed; nunca dados reais de membros.
+- Mudanças em `firestore.rules`, `storage.rules`, `firebase.json`, `.github/` e `functions/` exigem atenção extra na revisão — descreva o impacto no PR.
+
 ## Fluxo de branches
 
 Use os seguintes prefixos para nomear suas branches:
@@ -56,16 +67,18 @@ docs: adicionar guia de configuração do Firebase
 
 2. Implemente as mudanças e faça commits seguindo o padrão acima.
 
-3. Antes de abrir o PR, execute:
+3. Antes de abrir o PR, execute (veja o que se aplica à sua mudança):
    ```bash
    flutter analyze
-   dart format .
+   dart format lib test        # não use "dart format ." na raiz (pega node_modules)
    flutter test
+   cd functions && npm run lint && npm run build && npm test     # se mexeu em functions/
+   cd web-portal && npm run lint && npm run typecheck && npm test # se mexeu no portal
    ```
 
 4. Abra um Pull Request para `main`. O template em `.github/pull_request_template.md` será carregado automaticamente — preencha todas as seções.
 
-5. Aguarde review. Após aprovação, o merge é feito em `main`.
+5. Aguarde review. A branch `main` é **protegida**: não aceita push direto nem `--force`, e o merge exige a aprovação de um mantenedor (o *Code Owner* das áreas sensíveis, definido em `.github/CODEOWNERS`). Após aprovado, o mantenedor faz o merge.
 
 ## Reportar bugs
 
@@ -79,3 +92,4 @@ Use os [issue templates do GitHub](.github/ISSUE_TEMPLATE/) para reportar bugs o
 - **Idioma dos comentários e documentação:** português, pois o app é voltado para a IPE e a equipe é brasileira.
 - **Padrão arquitetural:** Provider + Repository pattern. Consulte o `CLAUDE.md` para detalhes da arquitetura.
 - **Testes:** adicione testes unitários para lógica de negócio nova sempre que possível.
+- **Windows e macOS:** o fluxo local funciona nos dois; os scripts em `scripts/local/` são Node puro. Use `npm run doctor` se algo não funcionar.

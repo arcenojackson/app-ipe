@@ -1,0 +1,13 @@
+# Revisão obrigatória dos mantenedores nas áreas sensíveis.
+# (Efeito completo quando "Require review from Code Owners" estiver ativo na proteção da main.)
+*                    @arcenojackson
+/firestore.rules     @arcenojackson
+/storage.rules       @arcenojackson
+/firebase.json       @arcenojackson
+/.firebaserc         @arcenojackson
+/.github/            @arcenojackson
+/functions/          @arcenojackson
+/android/            @arcenojackson
+/ios/                @arcenojackson
+/AGENTS.md           @arcenojackson
+/scripts/local/      @arcenojackson

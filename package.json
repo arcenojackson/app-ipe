@@ -1,0 +1,19 @@
+{
+  "name": "app-ipe-local",
+  "private": true,
+  "description": "Orquestração do ambiente local (emuladores Firebase) do App IPE. Não é um pacote publicável.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup": "node scripts/local/setup.mjs",
+    "doctor": "node scripts/local/doctor.mjs",
+    "dev": "node scripts/local/dev.mjs",
+    "dev:persist": "node scripts/local/dev.mjs --persist",
+    "seed": "node scripts/local/seed.mjs",
+    "app": "node scripts/local/app.mjs"
+  },
+  "devDependencies": {
+    "firebase-tools": "^15.4.0"
+  }
+}

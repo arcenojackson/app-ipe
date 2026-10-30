@@ -17,7 +17,11 @@ import 'widgets/forum_scaffold.dart';
 import 'widgets/linkified_text.dart';
 import 'widgets/ref_card.dart';
 
-const forumPortalTopicBase = 'https://ipe-ensino.vercel.app/ensino/forum/';
+const _portalBaseUrl = String.fromEnvironment(
+  'PORTAL_BASE_URL',
+  defaultValue: 'https://ipe-ensino.vercel.app',
+);
+const forumPortalTopicBase = '$_portalBaseUrl/ensino/forum/';
 
 class ForumTopicPage extends StatefulWidget {
   const ForumTopicPage({

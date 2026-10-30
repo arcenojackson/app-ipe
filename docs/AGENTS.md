@@ -1,4 +1,6 @@
-# AGENTS.md
+# Convenções de código para agentes
+
+> O arquivo principal é o [`AGENTS.md`](../AGENTS.md) na raiz (regras de ambiente e setup). Este documento complementa com comandos e estilo.
 
 Este arquivo orienta agentes automatizados (e humanos) a trabalhar no repositório, descrevendo comandos de build/linters/test, convenções de código e boas práticas. Aborda tanto o frontend Flutter quanto o backend Functions em Node/TypeScript presentes neste projeto.
 

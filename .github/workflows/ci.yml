@@ -1,0 +1,135 @@
+name: CI
+
+# Valida cada Pull Request para a main. Sem filtro de caminhos de propósito:
+# os checks são obrigatórios na proteção da main e precisam rodar sempre.
+# Usa `pull_request` (nunca `pull_request_target`): PRs de forks rodam sem
+# acesso a segredos.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  FLUTTER_VERSION: "3.35.7"
+  NODE_VERSION: "22"
+
+jobs:
+  flutter:
+    name: Flutter
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      # Arquivos locais ignorados pelo git, necessários para compilar.
+      # São os mesmos fictícios que o `npm run setup` cria (projeto demo-ipe).
+      - name: Criar configuração local fictícia
+        run: |
+          cp scripts/local/templates/firebase_options.dart lib/firebase_options.dart
+          cp lib/src/core/config/app_secrets.dart.example lib/src/core/config/app_secrets.dart
+
+      - run: flutter pub get
+
+      # Só erros bloqueiam. Já existem 200+ avisos "info" e 3 "warning" antigos;
+      # quando forem limpos, troque por `flutter analyze --fatal-warnings`.
+      - name: Análise estática
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - run: flutter test
+
+  functions:
+    name: Functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: functions
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run build
+      - run: npm test
+
+  portal:
+    name: Portal web
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web-portal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web-portal/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+
+  emulators:
+    name: Regras e integração
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # O Firebase CLI 15 exige JDK 21+ para os emuladores.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Regras do Firestore e Storage
+        working-directory: rules-tests
+        run: |
+          npm ci --no-audit --no-fund
+          npm test
+
+      - name: Integração das Functions (Firestore emulado)
+        working-directory: functions
+        run: |
+          npm ci --no-audit --no-fund
+          npm run build
+          npm run test:integration
+
+  # Ponto único para a proteção da main: exige só este check e ele só passa
+  # se todos os anteriores passarem (assim, renomear um job não quebra a regra).
+  ci-ok:
+    name: CI ok
+    if: always()
+    needs: [flutter, functions, portal, emulators]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir resultado dos jobs
+        run: |
+          echo '${{ toJSON(needs) }}'
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "Algum job falhou."
+            exit 1
+          fi

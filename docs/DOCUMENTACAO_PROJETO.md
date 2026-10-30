@@ -1,3 +1,5 @@
+> **Atenção:** documento histórico, parcialmente desatualizado (não cobre Eleições, Portal de Ensino e Fórum). Para configurar o ambiente use o [README](../README.md) e [DESENVOLVIMENTO_LOCAL.md](DESENVOLVIMENTO_LOCAL.md).
+
 # DOCUMENTACAO DO PROJETO ipe_flutter
 
 Este documento fornece uma visão geral do aplicativo, sua arquitetura, dependencias, fluxos de negocio e instrucoes para desenvolvedao e operacao local. O objetivo e facilitar a onboarding de novos integrantes e servir como referencia de alto nivel durante manutencao.
