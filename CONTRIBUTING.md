@@ -84,7 +84,7 @@ docs: adicionar guia de configuração do Firebase
 
 4. Envie a branch para o seu fork (`git push -u origin feat/minha-feature`) e abra um Pull Request do seu fork para `arcenojackson/app-ipe`, base `main`. O template em `.github/pull_request_template.md` será carregado automaticamente — preencha todas as seções.
 
-5. O CI (`.github/workflows/ci.yml`) roda no seu PR. Por segurança, em PRs de fork um mantenedor precisa aprovar a execução na primeira vez (e nas seguintes, se mudar o código). Se algum check falhar, corrija e envie novos commits à mesma branch.
+5. O CI (`.github/workflows/ci.yml`) roda no seu PR. Por segurança, no **primeiro** PR de cada pessoa um mantenedor precisa aprovar a execução; depois que um PR seu for mesclado, o CI passa a rodar direto. Se algum check falhar, corrija e envie novos commits à mesma branch.
 
 6. Aguarde review. A branch `main` é **protegida**: não aceita push direto nem `--force`, e o merge exige a aprovação de um mantenedor (o *Code Owner* das áreas sensíveis, definido em `.github/CODEOWNERS`). Após aprovado, o mantenedor faz o merge.
 
