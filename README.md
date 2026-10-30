@@ -82,9 +82,9 @@ docs/           documentação (docs/mantenedores/ = só para quem publica)
 
 ## Contribuindo
 
-1. Faça o setup acima e crie uma branch (`feat/…`, `fix/…`) a partir de `main`.
-2. Desenvolva e teste localmente.
-3. Abra um Pull Request para `main` — a branch é protegida e exige aprovação de um mantenedor.
+1. Faça um **fork** do repositório, clone o seu fork e siga o setup acima.
+2. Crie uma branch (`feat/…`, `fix/…`) a partir da `main`, desenvolva e teste localmente.
+3. Abra um Pull Request do seu fork para `main` — o CI roda e a branch é protegida: exige aprovação de um mantenedor.
 
 Guia completo: [CONTRIBUTING.md](CONTRIBUTING.md). Deploy, publicação nas lojas e regras de produção são feitos pelos mantenedores ([docs/mantenedores/](docs/mantenedores/)).
 
