@@ -55,7 +55,7 @@ describe("PortalShell", () => {
 
   it("deslogado é enviado para /login", () => {
     renderAt("/ensino", {status: "signedOut"});
-    expect(nav.replace).toHaveBeenCalledWith("/login");
+    expect(nav.replace).toHaveBeenCalledWith("/login?next=%2Fensino");
     expect(screen.queryByText("conteúdo da página")).not.toBeInTheDocument();
   });
 
@@ -121,9 +121,9 @@ describe("PortalShell: menu só no módulo de ensino", () => {
     expect(screen.queryByRole("navigation", {name: "Principal"})).not.toBeInTheDocument();
   });
 
-  it("em /eleicoes, deslogado continua indo para /login", () => {
+  it("em /eleicoes, deslogado vai para /login lembrando o destino", () => {
     renderAt("/eleicoes/abc", {status: "signedOut"}, both);
-    expect(nav.replace).toHaveBeenCalledWith("/login");
+    expect(nav.replace).toHaveBeenCalledWith("/login?next=%2Feleicoes%2Fabc");
   });
 
   it("em /ensino o menu do Portal de Ensino continua aparecendo", () => {
