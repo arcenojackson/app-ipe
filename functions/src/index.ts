@@ -1827,6 +1827,7 @@ export {
   electionCheckIn,
   electionCloseScrutiny,
   electionCreate,
+  electionOpened,
   electionPickOldest,
   electionRemoveCandidate,
   electionRestartCargo,

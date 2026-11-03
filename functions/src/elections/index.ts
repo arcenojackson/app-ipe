@@ -2,6 +2,7 @@ import * as functions from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import {pickOldest, removeCandidate, restartCargo} from "./cargoActions";
 import {assertNotAnonymous} from "./common";
+import {inviteMembers, isOpening} from "./invites";
 import {applyBoard, createElection, setElectionStatus} from "./lifecycle";
 import {
   bumpVotedCount, castVote, closeScrutiny, startScrutiny,
@@ -98,3 +99,16 @@ export const electionVoteRecorded = functions.firestore
       context.params.electionId,
       context.params.roundId
     ));
+
+// Ao abrir a eleição (rascunho → aberta): convite e push para os membros da
+// sociedade. Só publicar depois que o app com a votação estiver nas lojas.
+export const electionOpened = functions.firestore
+  .document("elections/{electionId}")
+  .onUpdate((change, context) => {
+    if (!isOpening(change.before.data(), change.after.data())) return null;
+    return inviteMembers(
+      admin.firestore(),
+      context.params.electionId,
+      (message) => admin.messaging().sendEachForMulticast(message)
+    );
+  });
