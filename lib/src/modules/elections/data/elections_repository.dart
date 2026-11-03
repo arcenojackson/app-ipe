@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../../core/utils/app_exception.dart';
 import '../models/election.dart';
+import '../models/election_logic.dart';
 
 /// Leitura das eleições (Firestore), criação e voto (Functions). Abrir
 /// escrutínios, liberar presentes etc. é feito na tela web de condução, não
@@ -101,6 +104,56 @@ class ElectionsRepository {
       .map(
         (s) => s.docs.map((d) => ElectionInvite.fromJson(d.id, d.data())).toList(),
       );
+
+  /// Convites cuja eleição está aberta: combina os convites do usuário com o
+  /// status atual de cada eleição, então o balão some quando ela encerra.
+  Stream<List<ElectionInvite>> watchOpenInvites(String uid) {
+    late final StreamController<List<ElectionInvite>> controller;
+    StreamSubscription<List<ElectionInvite>>? invitesSub;
+    final statusSubs = <String, StreamSubscription<Election?>>{};
+    final statuses = <String, ElectionStatus>{};
+    var invites = <ElectionInvite>[];
+
+    void emit() => controller.add(invitesToShow(invites, statuses));
+
+    void syncStatuses() {
+      final ids = invites.map((i) => i.id).toSet();
+      for (final id in statusSubs.keys.toList()) {
+        if (ids.contains(id)) continue;
+        statusSubs.remove(id)?.cancel();
+        statuses.remove(id);
+      }
+      for (final id in ids) {
+        if (statusSubs.containsKey(id)) continue;
+        statusSubs[id] = watchElection(id).listen((election) {
+          if (election == null) {
+            statuses.remove(id);
+          } else {
+            statuses[id] = election.status;
+          }
+          emit();
+        }, onError: controller.addError);
+      }
+    }
+
+    controller = StreamController<List<ElectionInvite>>(
+      onListen: () {
+        invitesSub = watchInvites(uid).listen((list) {
+          invites = list;
+          syncStatuses();
+          emit();
+        }, onError: controller.addError);
+      },
+      onCancel: () async {
+        await invitesSub?.cancel();
+        for (final sub in statusSubs.values) {
+          await sub.cancel();
+        }
+        statusSubs.clear();
+      },
+    );
+    return controller.stream;
+  }
 
   /// Registro de presença do próprio usuário; `null` até fazer o check-in.
   Stream<ElectionVoter?> watchMyVoter(String electionId, String uid) =>

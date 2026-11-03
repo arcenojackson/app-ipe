@@ -15,6 +15,8 @@ import 'package:provider/provider.dart';
 import '../../../shared/state/app_state.dart';
 import '../../teaching_forum/models/teaching_access.dart';
 import '../../teaching_forum/presentation/forum_topic_page.dart';
+import '../../elections/models/election_logic.dart';
+import '../../elections/presentation/election_vote_page.dart';
 import 'teaching_notification_url.dart';
 
 class NotificationService {
@@ -149,6 +151,7 @@ class NotificationService {
   void _navigateFromNotification(RemoteMessage message) {
     final data = message.data;
     if (_handleTeachingTap(data)) return;
+    if (_handleElectionTap(data)) return;
     final type = data['type'];
     final navigator = IpeApp.navigatorKey.currentState;
     
@@ -393,6 +396,32 @@ class NotificationService {
     }
   }
 
+  /// Eleição aberta: abre a tela de votação. Devolve `true` se tratou o toque.
+  bool _handleElectionTap(Map<String, dynamic> data, {int attempt = 0}) {
+    final electionId = electionIdFromPush(data);
+    if (electionId == null) return false;
+    final navigator = IpeApp.navigatorKey.currentState;
+    final context = IpeApp.navigatorKey.currentContext;
+    final signedIn = context != null &&
+        Provider.of<AppState>(context, listen: false).currentUser != null;
+    if (navigator == null || !signedIn) {
+      // App abrindo a frio: aguarda a navegação e a sessão ficarem prontas.
+      if (attempt < 6) {
+        Future.delayed(
+          const Duration(milliseconds: 500),
+          () => _handleElectionTap(data, attempt: attempt + 1),
+        );
+      }
+      return true;
+    }
+    navigator.push(
+      MaterialPageRoute(
+        builder: (_) => ElectionVotePage(electionId: electionId),
+      ),
+    );
+    return true;
+  }
+
   /// Handler quando o usuário toca em uma notificação local
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('Notificação tocada: ${response.payload}');
@@ -401,7 +430,7 @@ class NotificationService {
     try {
       final decoded = jsonDecode(payload);
       if (decoded is Map<String, dynamic>) {
-        _handleTeachingTap(decoded);
+        if (!_handleTeachingTap(decoded)) _handleElectionTap(decoded);
       }
     } catch (_) {
       // Payload antigo (não JSON): nada a fazer.
