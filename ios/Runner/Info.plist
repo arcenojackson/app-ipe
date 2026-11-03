@@ -60,6 +60,8 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Usamos a câmera para ler o QR code da eleição.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>O App IPE não acessa nem navega nas suas fotos. O sistema pode solicitar este acesso quando você compartilha a arte do calendário do mês e escolhe salvar a imagem na Fotos.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

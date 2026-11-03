@@ -9,6 +9,7 @@ import '../data/elections_repository.dart';
 import '../models/election.dart';
 import '../models/election_logic.dart';
 import '../models/minutes_text.dart';
+import 'election_scan_page.dart';
 import 'widgets/election_ballot.dart';
 
 const String _membersOnlyMessage = 'A votação é só para membros da sociedade.';
@@ -102,6 +103,20 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
     setState(() => _error = 'Não foi possível atualizar a votação.');
   }
 
+  /// Abre o leitor de QR. Se a pessoa entrou em outra eleição (leu o QR de
+  /// outra), segue para a votação dessa.
+  Future<void> _scan() async {
+    final enteredId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(builder: (_) => const ElectionScanPage()),
+    );
+    if (!mounted || enteredId == null || enteredId == widget.electionId) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ElectionVotePage(electionId: enteredId),
+      ),
+    );
+  }
+
   Future<void> _submit(ElectionRound round, String choice) async {
     if (_busy) return;
     setState(() {
@@ -190,8 +205,7 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
           ),
           const SizedBox(height: 16),
           FilledButton.icon(
-            // Ligado à leitura do QR na tela de scanner.
-            onPressed: null,
+            onPressed: _scan,
             icon: const Icon(Icons.qr_code_scanner),
             label: const Text('Ler QR do condutor'),
           ),
