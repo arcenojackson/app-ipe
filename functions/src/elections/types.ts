@@ -1,4 +1,4 @@
-export type ElectionStatus = "draft" | "open" | "closed";
+export type ElectionStatus = "draft" | "open" | "closed" | "completed";
 export type VoterStatus = "pending" | "approved" | "rejected";
 export type VoterKind = "member" | "guest";
 

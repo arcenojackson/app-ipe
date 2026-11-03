@@ -4,7 +4,8 @@ enum NotificationType {
   eventUpdate('event_update', 'Atualização de eventos', 'Seja notificado quando um evento for atualizado'),
   musicUpdate('music_update', 'Atualização de músicas', 'Seja notificado quando músicas forem adicionadas ou alteradas em eventos'),
   chatMention('chat_mention', 'Menções em chats de eventos', 'Receba notificações quando alguém te mencionar no chat de um evento'),
-  teachingForum('teaching_forum', 'Respostas no Fórum', 'Aviso quando alguém responder ao seu tópico ou comentário');
+  teachingForum('teaching_forum', 'Respostas no Fórum', 'Aviso quando alguém responder ao seu tópico ou comentário'),
+  electionOpen('election_open', 'Eleição aberta', 'Aviso quando a eleição da sua sociedade for aberta para votação');
 
   const NotificationType(this.id, this.title, this.description);
 

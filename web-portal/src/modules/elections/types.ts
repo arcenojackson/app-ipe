@@ -1,4 +1,4 @@
-export type ElectionStatus = "draft" | "open" | "closed";
+export type ElectionStatus = "draft" | "open" | "closed" | "completed";
 
 export interface Election {
   id: string;

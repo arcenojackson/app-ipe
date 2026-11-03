@@ -1,6 +1,7 @@
 import {FieldValue, type Firestore} from "firebase-admin/firestore";
 import {fail, logEvent, requireString} from "./common";
 import {assertElectionDirector} from "./directors";
+import {firstRoundPool, type Eligibility} from "./eligibility";
 import {countBallots, decideScrutiny, requiredVotes} from "./scrutiny";
 import {
   BLANK,
@@ -74,6 +75,7 @@ export const startScrutiny = async (
   const electionRef = db.doc(`elections/${electionId}`);
   const cargosRef = electionRef.collection("cargos");
   const roundsRef = electionRef.collection("rounds");
+  const votersRef = electionRef.collection("voters");
 
   const started = await db.runTransaction(async (tx) => {
     const cargos = await tx.get(cargosRef);
@@ -93,15 +95,26 @@ export const startScrutiny = async (
         .filter((d) => d.get("stage") === "decided" && d.get("winnerId"))
         .map((d) => String(d.get("winnerId")))
     );
+    // "Apenas os presentes": só quem já entrou na votação (aprovado) até agora.
+    const present = number === 1 && election.eligibility === "present" ?
+      new Set(
+        (await tx.get(votersRef.where("status", "==", "approved")))
+          .docs.map((d) => d.id)
+      ) :
+      new Set<string>();
     const pool: Candidate[] = number === 1 ?
-      members :
+      firstRoundPool(election.eligibility as Eligibility | undefined,
+        members, present) :
       cargo.candidates.map((c) => ({id: c.id, name: c.name}));
     const options = pool.filter((o) => !elected.has(o.id));
     if (options.length === 0) {
       throw fail(
         "failed-precondition",
         number === 1 ?
-          "Não há opções para este escrutínio." :
+          (election.eligibility === "present" ?
+            "Ninguém que já entrou na votação pode ser votado neste cargo. " +
+              "Aguarde os membros entrarem." :
+            "Não há opções para este escrutínio.") :
           "Todos os candidatos já foram eleitos em outro cargo. " +
             "Reinicie o cargo."
       );

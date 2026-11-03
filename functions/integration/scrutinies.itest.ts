@@ -87,6 +87,28 @@ describe("startScrutiny", () => {
     expect((await round(res.roundId)).options).toHaveLength(3);
   });
 
+  it("'present': o 1º escrutínio lista só os membros que já entraram", async () => {
+    await electionRef().update({eligibility: "present"});
+    await approve(MEMBER3);
+    await approve(MEMBER);
+    // Pendente (ainda não liberado) e visitante fora da lista de membros.
+    await approve(MEMBER2, "pending");
+    await approve("visitante");
+    const res = await start();
+    expect((await round(res.roundId)).options).toEqual([ana, caio]);
+  });
+
+  it("'present' sem ninguém dentro recusa com mensagem própria", async () => {
+    await electionRef().update({eligibility: "present"});
+    await expectCode(start(), "failed-precondition");
+  });
+
+  it("'all' (ou eleição sem o campo) ignora quem está presente", async () => {
+    await approve(MEMBER);
+    const res = await start();
+    expect((await round(res.roundId)).options).toEqual([ana, bia, caio]);
+  });
+
   it("só um escrutínio aberto por vez na eleição inteira", async () => {
     await start("presidente");
     await expectCode(start("vice"), "failed-precondition");

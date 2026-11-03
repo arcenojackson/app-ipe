@@ -21,6 +21,7 @@ String _statusLabel(ElectionStatus s) => switch (s) {
       ElectionStatus.draft => 'Rascunho',
       ElectionStatus.open => 'Em andamento',
       ElectionStatus.closed => 'Encerrada',
+      ElectionStatus.completed => 'Concluída',
     };
 
 String _nameOf(ElectionCargo? cargo, List<ElectionRound> rounds, String id) {

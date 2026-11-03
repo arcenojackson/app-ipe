@@ -21,10 +21,25 @@ T _parse<T extends Enum>(List<T> values, Object? raw, T fallback) {
 enum ElectionStatus {
   draft,
   open,
-  closed;
+  closed,
+
+  /// Diretoria aplicada: a eleição vira registro de quem assumiu e não se exclui.
+  completed;
 
   static ElectionStatus parse(Object? raw) =>
       _parse(values, raw, ElectionStatus.draft);
+}
+
+/// Quem pode ser votado no 1º escrutínio de cada cargo.
+enum ElectionEligibility {
+  /// Todos os membros da sociedade.
+  all,
+
+  /// Só quem já entrou na votação (presença) quando o escrutínio abre.
+  present;
+
+  static ElectionEligibility parse(Object? raw) =>
+      _parse(values, raw, ElectionEligibility.all);
 }
 
 enum RoundStatus {
@@ -145,6 +160,7 @@ class Election {
     required this.status,
     required this.positions,
     required this.directorIds,
+    this.eligibility = ElectionEligibility.all,
     this.boardAppliedAt,
   });
 
@@ -156,6 +172,7 @@ class Election {
   final ElectionStatus status;
   final List<String> positions;
   final List<String> directorIds;
+  final ElectionEligibility eligibility;
   final DateTime? boardAppliedAt;
 
   factory Election.fromJson(String id, Map<String, dynamic> json) => Election(
@@ -168,6 +185,7 @@ class Election {
         status: ElectionStatus.parse(json['status']),
         positions: _strings(json['positions']),
         directorIds: _strings(json['directorIds']),
+        eligibility: ElectionEligibility.parse(json['eligibility']),
         boardAppliedAt: _date(json['boardAppliedAt']),
       );
 }
@@ -299,5 +317,27 @@ class ElectionEvent {
         type: json['type']?.toString() ?? '',
         at: _date(json['at']),
         data: Map<String, dynamic>.from(json),
+      );
+}
+
+/// Convite gravado pelo servidor quando a eleição é aberta
+/// (`users/{uid}/election_invites/{electionId}`); alimenta o balão da home.
+class ElectionInvite {
+  const ElectionInvite({
+    required this.id,
+    required this.title,
+    required this.societyName,
+  });
+
+  /// Id da eleição.
+  final String id;
+  final String title;
+  final String societyName;
+
+  factory ElectionInvite.fromJson(String id, Map<String, dynamic> json) =>
+      ElectionInvite(
+        id: id,
+        title: json['title']?.toString() ?? '',
+        societyName: json['societyName']?.toString() ?? '',
       );
 }

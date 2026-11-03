@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../shared/state/app_state.dart';
+import '../../../core/utils/app_exception.dart';
+import '../../../shared/utils/app_toast.dart';
 import '../../../shared/widgets/glass_container.dart';
 import '../../societies/data/societies_repository.dart';
 import '../../societies/models/society.dart';
@@ -35,7 +37,41 @@ class _ElectionsPageState extends State<ElectionsPage> {
         ElectionStatus.draft => 'Rascunho',
         ElectionStatus.open => 'Em andamento',
         ElectionStatus.closed => 'Encerrada',
+        ElectionStatus.completed => 'Concluída',
       };
+
+  /// Qualquer eleição se exclui, menos a concluída (diretoria já aplicada).
+  Future<void> _delete(Election election) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Excluir a eleição?'),
+        content: Text(
+          '"${election.title}" será excluída, com presença, votos e ata. '
+          'Não dá para desfazer.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Excluir'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await context.read<ElectionsRepository>().deleteElection(election.id);
+      if (mounted) showSuccessToast(context, 'Eleição excluída.');
+    } on AppException catch (e) {
+      if (mounted) showErrorToast(context, e.message);
+    } catch (_) {
+      if (mounted) showErrorToast(context, 'Algo deu errado.');
+    }
+  }
 
   String _date(DateTime d) {
     String two(int n) => n.toString().padLeft(2, '0');
@@ -125,12 +161,28 @@ class _ElectionsPageState extends State<ElectionsPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  e.title,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        e.title,
+                                        style: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    if (e.status != ElectionStatus.completed)
+                                      IconButton(
+                                        tooltip: 'Excluir',
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          size: 20,
+                                        ),
+                                        onPressed: () => _delete(e),
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 4),
                                 Text(

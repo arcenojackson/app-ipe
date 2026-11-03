@@ -20,6 +20,20 @@ export interface Caller {
 const str = (value: unknown): string =>
   typeof value === "string" ? value.trim() : "";
 
+// Pelo app (`memberOnly`) só membros da sociedade entram: quem não é recebe
+// recusa clara, sem virar convidado pendente. A web não envia o parâmetro e
+// segue como antes.
+export const assertMemberAllowed = (
+  memberOnly: boolean,
+  isMember: boolean
+): void => {
+  if (memberOnly && !isMember) {
+    throw fail(
+      "permission-denied", "A votação é só para membros da sociedade."
+    );
+  }
+};
+
 const isAlreadyExists = (error: unknown): boolean =>
   (error as {code?: number}).code === 6;
 
@@ -41,15 +55,21 @@ export const checkIn = async (
     );
   }
 
+  const society = await db.doc(`societies/${election.societyId}`).get();
+  const members: string[] = (society.get("members") ?? []).map(String);
+  const isMember = members.includes(caller.uid);
+  // Antes do atalho "já existe": quem entrou antes como convidado na web
+  // também recebe a recusa no app.
+  assertMemberAllowed(
+    (data as {memberOnly?: unknown}).memberOnly === true,
+    isMember
+  );
+
   const voterRef = db.doc(`elections/${electionId}/voters/${caller.uid}`);
   const existing = await voterRef.get();
   if (existing.exists) {
     return {status: existing.get("status"), kind: existing.get("kind")};
   }
-
-  const society = await db.doc(`societies/${election.societyId}`).get();
-  const members: string[] = (society.get("members") ?? []).map(String);
-  const isMember = members.includes(caller.uid);
 
   const userRef = db.doc(`users/${caller.uid}`);
   const userSnap = await userRef.get();

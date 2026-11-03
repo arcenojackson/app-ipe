@@ -22,6 +22,23 @@ void main() {
     expect(empty.directorIds, isEmpty);
   });
 
+  test('Election.eligibility: lê "present" e cai em "all" sem o campo', () {
+    expect(Election.fromJson('x', {}).eligibility, ElectionEligibility.all);
+    expect(
+      Election.fromJson('x', {'eligibility': 'present'}).eligibility,
+      ElectionEligibility.present,
+    );
+    expect(
+      Election.fromJson('x', {'eligibility': 'lixo'}).eligibility,
+      ElectionEligibility.all,
+    );
+  });
+
+  test('ElectionStatus conhece "completed" (diretoria aplicada)', () {
+    expect(ElectionStatus.parse('completed'), ElectionStatus.completed);
+    expect(ElectionStatus.parse('lixo'), ElectionStatus.draft);
+  });
+
   test('CargoStage.parse conhece as 8 fases e cai em idle', () {
     expect(CargoStage.values.length, 8);
     expect(CargoStage.parse('awaiting3'), CargoStage.awaiting3);

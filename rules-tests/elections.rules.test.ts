@@ -34,6 +34,7 @@ beforeEach(async () => {
     await setDoc(doc(db, "elections/e1/rounds/r1/voted/other"), {});
     await setDoc(doc(db, "elections/e1/rounds/r1/ballots/b1"), {choice: "x"});
     await setDoc(doc(db, "elections/e1/events/ev1"), {type: "checkin"});
+    await setDoc(doc(db, "users/user1/election_invites/e1"), {electionId: "e1", title: "t", societyName: "UMP"});
   });
 });
 
@@ -140,5 +141,41 @@ describe("rounds, cargos, voters, voted, events, ballots", () => {
       await assertFails(addDoc(collection(db, "elections/e1/rounds"), {x: 1}));
       await assertFails(addDoc(collection(db, "elections/e1/events"), {x: 1}));
     }
+  });
+});
+
+describe("election_invites (convites do usuário)", () => {
+  it("o dono lê o próprio convite e lista a própria caixa", async () => {
+    await assertSucceeds(getDoc(doc(user(), "users/user1/election_invites/e1")));
+    const snap = await assertSucceeds(getDocs(collection(user(), "users/user1/election_invites")));
+    expect(snap.docs.map((d) => d.id)).toEqual(["e1"]);
+  });
+
+  it("outro usuário, anônimo e deslogado não leem", async () => {
+    for (const db of [dir(), admin(), anon(), noAuth()]) {
+      await assertFails(getDoc(doc(db, "users/user1/election_invites/e1")));
+      await assertFails(getDocs(collection(db, "users/user1/election_invites")));
+    }
+  });
+
+  it("nem o dono escreve: só o servidor grava convites", async () => {
+    for (const db of [user(), admin()]) {
+      await assertFails(setDoc(doc(db, "users/user1/election_invites/e2"), {electionId: "e2"}));
+      await assertFails(updateDoc(doc(db, "users/user1/election_invites/e1"), {title: "x"}));
+      await assertFails(deleteDoc(doc(db, "users/user1/election_invites/e1")));
+    }
+  });
+});
+
+describe("membro que não é diretor (votação no app)", () => {
+  it("lê a rodada, o próprio registro de eleitor e a própria marca de voto", async () => {
+    await assertSucceeds(getDoc(doc(user(), "elections/e1/rounds/r1")));
+    await assertSucceeds(getDoc(doc(user(), "elections/e1/voters/user1")));
+    await assertSucceeds(getDoc(doc(user(), "elections/e1/rounds/r1/voted/user1")));
+  });
+
+  it("não lê a marca de voto de outro eleitor nem as cédulas", async () => {
+    await assertFails(getDoc(doc(user(), "elections/e1/rounds/r1/voted/other")));
+    await assertFails(getDoc(doc(user(), "elections/e1/rounds/r1/ballots/b1")));
   });
 });
