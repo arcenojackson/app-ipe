@@ -312,4 +312,58 @@ void main() {
     // Largura da tela (360) menos o padding de 16 de cada lado.
     expect(tester.getRect(button).width, closeTo(328, 1));
   });
+
+  testWidgets('eleição concluída: abrir na web e os links ficam bloqueados', (
+    tester,
+  ) async {
+    narrowScreen(tester);
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await openDetail(tester, electionWith(ElectionStatus.completed));
+
+    final web = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Abrir na web'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      ),
+    );
+    expect(web.onPressed, isNull);
+
+    for (final copy in tester.widgetList<IconButton>(find.byType(IconButton))) {
+      // Só os botões de copiar (a seta de voltar não existe nesta tela).
+      expect(copy.onPressed, isNull);
+    }
+    await tester.tap(find.text('Link da condução'));
+    await tester.tap(find.text('Link da votação'));
+    await tester.pump();
+    expect(copied, isNull);
+    // A ata continua copiável.
+    expect(find.text('Copiar ata'), findsOneWidget);
+  });
+
+  testWidgets('eleição não concluída mantém os botões ativos', (tester) async {
+    await openDetail(tester, electionWith(ElectionStatus.closed));
+
+    final web = tester.widget<ButtonStyleButton>(
+      find.ancestor(
+        of: find.text('Abrir na web'),
+        matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+      ),
+    );
+    expect(web.onPressed, isNotNull);
+  });
 }

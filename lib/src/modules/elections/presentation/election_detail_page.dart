@@ -137,6 +137,9 @@ class _ElectionDetailPageState extends State<ElectionDetailPage> {
           );
         }
         final canStart = _canStart(election);
+        // Concluída: a diretoria já foi aplicada, não há mais o que conduzir
+        // nem para onde mandar o link.
+        final locked = election.status == ElectionStatus.completed;
         return Scaffold(
           appBar: AppBar(title: Text(election.title)),
           body: ListView(
@@ -158,7 +161,7 @@ class _ElectionDetailPageState extends State<ElectionDetailPage> {
                     child: _SquareAction(
                       icon: Icons.open_in_browser,
                       label: 'Abrir na web',
-                      onPressed: _openConduct,
+                      onPressed: locked ? null : _openConduct,
                       filled: true,
                     ),
                   ),
@@ -175,8 +178,8 @@ class _ElectionDetailPageState extends State<ElectionDetailPage> {
                         : AspectRatio(
                             aspectRatio: 1,
                             child: _CompactLinks(
-                              onCopyConduct: _copyConductLink,
-                              onCopyVote: _copyVoteLink,
+                              onCopyConduct: locked ? null : _copyConductLink,
+                              onCopyVote: locked ? null : _copyVoteLink,
                             ),
                           ),
                   ),
@@ -336,8 +339,9 @@ class _StatusBadge extends StatelessWidget {
 class _CompactLinks extends StatelessWidget {
   const _CompactLinks({required this.onCopyConduct, required this.onCopyVote});
 
-  final VoidCallback onCopyConduct;
-  final VoidCallback onCopyVote;
+  /// `null` bloqueia o link (eleição concluída).
+  final VoidCallback? onCopyConduct;
+  final VoidCallback? onCopyVote;
 
   @override
   Widget build(BuildContext context) {
@@ -370,29 +374,36 @@ class _CompactLinkTile extends StatelessWidget {
   const _CompactLinkTile({required this.title, required this.onCopy});
 
   final String title;
-  final VoidCallback onCopy;
+  final VoidCallback? onCopy;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onCopy,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            const Icon(Icons.link, size: 20),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(title, style: Theme.of(context).textTheme.bodyMedium),
-            ),
-            IconButton(
-              tooltip: 'Copiar ${title.toLowerCase()}',
-              icon: const Icon(Icons.copy, size: 20),
-              padding: const EdgeInsets.all(4),
-              constraints: const BoxConstraints(),
-              onPressed: onCopy,
-            ),
-          ],
+      // Bloqueado: apagado, como os botões desabilitados.
+      child: Opacity(
+        opacity: onCopy == null ? 0.4 : 1,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Row(
+            children: [
+              const Icon(Icons.link, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Copiar ${title.toLowerCase()}',
+                icon: const Icon(Icons.copy, size: 20),
+                padding: const EdgeInsets.all(4),
+                constraints: const BoxConstraints(),
+                onPressed: onCopy,
+              ),
+            ],
+          ),
         ),
       ),
     );
