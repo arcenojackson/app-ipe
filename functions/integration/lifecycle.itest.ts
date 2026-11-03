@@ -2,6 +2,7 @@ import {beforeEach, describe, expect, it} from "vitest";
 import {
   applyBoard,
   createElection,
+  deleteElection,
   setElectionStatus,
 } from "../src/elections/lifecycle";
 import {applyDueBoards} from "../src/elections/transitions";
@@ -23,6 +24,18 @@ const input = (over: Record<string, unknown> = {}) => ({
 });
 
 describe("createElection", () => {
+  it("grava quem pode ser votado; sem o campo, vale 'all'", async () => {
+    const {electionId} = await createElection(db, DIRECTOR, input());
+    expect((await db.doc(`elections/${electionId}`).get()).get("eligibility")).toBe("all");
+
+    const present = await createElection(db, DIRECTOR, input({eligibility: "present"}));
+    expect((await db.doc(`elections/${present.electionId}`).get()).get("eligibility")).toBe("present");
+  });
+
+  it("recusa valor inválido de quem pode ser votado", async () => {
+    await expectCode(createElection(db, DIRECTOR, input({eligibility: "todos"})), "invalid-argument");
+  });
+
   beforeEach(async () => {
     await clearDb();
     await seedBase();
@@ -192,6 +205,28 @@ describe("applyBoard (registra a diretoria em espera)", () => {
     expect((await db.doc(`elections/${ELECTION}`).get()).get("boardAppliedAt")).toBeDefined();
   });
 
+  it("aplicar a diretoria conclui a eleição, e repetir continua valendo", async () => {
+    await decided("presidente", MEMBER2);
+    await apply();
+    const election = (await db.doc(`elections/${ELECTION}`).get());
+    expect(election.get("status")).toBe("completed");
+    expect(election.get("completedAt")).toBeDefined();
+
+    await apply();
+    expect((await db.doc(`elections/${ELECTION}`).get()).get("status")).toBe("completed");
+  });
+
+  it("escrutínio aberto impede aplicar a diretoria", async () => {
+    await db.doc(`elections/${ELECTION}`).update({status: "open"});
+    await decided("presidente", MEMBER2);
+    await db.doc(`elections/${ELECTION}/rounds/r1`).set({
+      position: "vice", number: 1, status: "open", options: [], votedCount: 0,
+    });
+    await expectCode(apply(), "failed-precondition");
+    expect((await db.doc(`elections/${ELECTION}`).get()).get("status")).toBe("open");
+    expect(await transition()).toBeUndefined();
+  });
+
   it("presidente e vice decididos: nada obrigatório falta", async () => {
     await decided("presidente", MEMBER);
     await decided("vice", MEMBER2);
@@ -310,5 +345,46 @@ describe("applyDueBoards (rotina de 01/01)", () => {
     expect((await transition())!.status).toBe("failed");
     expect((await db.doc(`societies/${OTHER_SOCIETY}`).get()).get("board"))
       .toEqual({presidente: [MEMBER]});
+  });
+});
+
+describe("deleteElection", () => {
+  const exists = async () => (await db.doc(`elections/${ELECTION}`).get()).exists;
+  const setStatus = (status: string) =>
+    db.doc(`elections/${ELECTION}`).update({status});
+
+  it("diretor exclui a eleição com cargos e eventos", async () => {
+    await setStatus("draft");
+    await db.doc(`elections/${ELECTION}/cargos/presidente`).set({stage: "idle"});
+    await db.doc(`elections/${ELECTION}/events/e1`).set({type: "election_created"});
+
+    await deleteElection(db, DIRECTOR, {electionId: ELECTION});
+
+    expect(await exists()).toBe(false);
+    expect((await db.collection(`elections/${ELECTION}/cargos`).get()).empty).toBe(true);
+    expect((await db.collection(`elections/${ELECTION}/events`).get()).empty).toBe(true);
+  });
+
+  it("rascunho, em andamento e encerrada podem ser excluídas", async () => {
+    for (const status of ["draft", "open", "closed"]) {
+      await clearDb();
+      await seedBase(status);
+      await deleteElection(db, DIRECTOR, {electionId: ELECTION});
+      expect(await exists()).toBe(false);
+    }
+  });
+
+  it("eleição concluída não é excluída", async () => {
+    await setStatus("completed");
+    await expectCode(deleteElection(db, DIRECTOR, {electionId: ELECTION}), "failed-precondition");
+    expect(await exists()).toBe(true);
+  });
+
+  it("só diretor da eleição exclui", async () => {
+    await setStatus("draft");
+    for (const uid of [OTHER_DIRECTOR, ADMIN, MEMBER]) {
+      await expectCode(deleteElection(db, uid, {electionId: ELECTION}), "permission-denied");
+    }
+    expect(await exists()).toBe(true);
   });
 });

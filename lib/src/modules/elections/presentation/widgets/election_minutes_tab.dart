@@ -67,15 +67,18 @@ class _ElectionMinutesTabState extends State<ElectionMinutesTab> {
                 children: [
                   SelectableText(text),
                   const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Copiar ata'),
-                    onPressed: () async {
-                      await Clipboard.setData(ClipboardData(text: text));
-                      if (context.mounted) {
-                        showSuccessToast(context, 'Ata copiada.');
-                      }
-                    },
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copiar ata'),
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: text));
+                        if (context.mounted) {
+                          showSuccessToast(context, 'Ata copiada.');
+                        }
+                      },
+                    ),
                   ),
                 ],
               );

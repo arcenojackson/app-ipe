@@ -109,6 +109,7 @@ class _ElectionDetailPageState extends State<ElectionDetailPage> {
     ElectionStatus.draft => 'Rascunho',
     ElectionStatus.open => 'Em andamento',
     ElectionStatus.closed => 'Encerrada',
+    ElectionStatus.completed => 'Concluída',
   };
 
   @override
@@ -306,6 +307,7 @@ class _StatusBadge extends StatelessWidget {
     ElectionStatus.draft => const Color(0xFFFFB74D),
     ElectionStatus.open => const Color(0xFF81C784),
     ElectionStatus.closed => const Color(0xFF90A4AE),
+    ElectionStatus.completed => const Color(0xFF64B5F6),
   };
 
   @override

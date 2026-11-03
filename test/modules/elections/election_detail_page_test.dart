@@ -296,4 +296,20 @@ void main() {
 
     expect({draftColor, openColor, closedColor}, hasLength(3));
   });
+
+  testWidgets('"Copiar ata" é o botão primário, de largura total', (
+    tester,
+  ) async {
+    narrowScreen(tester);
+    await openDetail(tester, electionWith(ElectionStatus.open));
+
+    final button = find.ancestor(
+      of: find.text('Copiar ata'),
+      // FilledButton.icon é um subtipo: casa por predicado, não por tipo exato.
+      matching: find.byWidgetPredicate((w) => w is FilledButton),
+    );
+    expect(button, findsOneWidget);
+    // Largura da tela (360) menos o padding de 16 de cada lado.
+    expect(tester.getRect(button).width, closeTo(328, 1));
+  });
 }

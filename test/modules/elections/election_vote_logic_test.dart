@@ -140,6 +140,10 @@ void main() {
         derive(election: Loadable(makeElection(ElectionStatus.closed))).kind,
         VoteViewKind.closed,
       );
+      expect(
+        derive(election: Loadable(makeElection(ElectionStatus.completed))).kind,
+        VoteViewKind.closed,
+      );
     });
 
     test('sem registro de eleitor pede o check-in', () {

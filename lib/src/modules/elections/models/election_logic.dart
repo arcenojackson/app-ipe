@@ -131,7 +131,8 @@ VoteView deriveVoteView({
   if (e.status == ElectionStatus.draft) {
     return const VoteView(VoteViewKind.notOpen);
   }
-  if (e.status == ElectionStatus.closed) {
+  if (e.status == ElectionStatus.closed ||
+      e.status == ElectionStatus.completed) {
     return const VoteView(VoteViewKind.closed);
   }
 

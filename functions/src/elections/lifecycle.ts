@@ -3,6 +3,7 @@ import {fail, logEvent, requireString} from "./common";
 import {assertElectionDirector, directorIdsOf} from "./directors";
 import {nextTermStart} from "./transitions";
 import {normalizePositions, REQUIRED_POSITIONS} from "./positions";
+import {parseEligibility} from "./eligibility";
 
 // Cria a eleição em rascunho. Só quem está na diretoria *atual* da sociedade
 // cria; a lista de diretores vira o snapshot `directorIds` da eleição.
@@ -19,6 +20,9 @@ export const createElection = async (
   }
   const positions = normalizePositions(
     (data as {positions?: unknown}).positions
+  );
+  const eligibility = parseEligibility(
+    (data as {eligibility?: unknown}).eligibility
   );
 
   const society = await db.doc(`societies/${societyId}`).get();
@@ -47,6 +51,7 @@ export const createElection = async (
     scheduledAt: Timestamp.fromMillis(scheduledAtMs),
     status: "draft",
     positions,
+    eligibility,
     directorIds,
     createdBy: uid,
     createdAt: FieldValue.serverTimestamp(),
@@ -113,6 +118,16 @@ export const applyBoard = async (
         "failed-precondition", "Esta diretoria já assumiu na sociedade."
       );
     }
+    // Aplicar a diretoria conclui a eleição; um escrutínio aberto não deixa.
+    const openRound = await tx.get(
+      electionRef.collection("rounds").where("status", "==", "open").limit(1)
+    );
+    if (!openRound.empty) {
+      throw fail(
+        "failed-precondition",
+        "Encerre o escrutínio em andamento antes de aplicar a diretoria."
+      );
+    }
     tx.set(transitionRef, {
       electionId,
       societyId: election.societyId,
@@ -126,7 +141,11 @@ export const applyBoard = async (
         FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    tx.update(electionRef, {boardAppliedAt: FieldValue.serverTimestamp()});
+    tx.update(electionRef, {
+      boardAppliedAt: FieldValue.serverTimestamp(),
+      status: "completed",
+      completedAt: FieldValue.serverTimestamp(),
+    });
   });
   await logEvent(db, electionId, {
     type: "board_scheduled",
@@ -183,4 +202,35 @@ export const setElectionStatus = async (
     type: target === "open" ? "election_opened" : "election_closed",
     actorId: uid,
   });
+};
+
+// Só a eleição concluída (diretoria aplicada) não se exclui: ela é o registro
+// de quem assumiu. As demais (rascunho, em andamento, encerrada) podem sair.
+export const assertDeletable = (status: unknown): void => {
+  if (status === "completed") {
+    throw fail(
+      "failed-precondition", "Uma eleição concluída não pode ser excluída."
+    );
+  }
+};
+
+// Exclui a eleição. O documento sai numa transação que reconfere o status
+// (uma conclusão simultânea não passa); em seguida o restante (cargos,
+// presença, votos, eventos...) é apagado em lote. Se o lote falhar, sobra só
+// lixo órfão: sem o documento principal a eleição não aparece em lugar nenhum.
+export const deleteElection = async (
+  db: Firestore,
+  uid: string,
+  data: unknown
+): Promise<void> => {
+  const electionId = requireString(data, "electionId");
+  await assertElectionDirector(db, uid, electionId);
+  const ref = db.doc(`elections/${electionId}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) throw fail("not-found", "Eleição não encontrada.");
+    assertDeletable(snap.get("status"));
+    tx.delete(ref);
+  });
+  await db.recursiveDelete(ref);
 };

@@ -74,6 +74,7 @@ class ElectionsRepository {
     required String title,
     required DateTime scheduledAt,
     required List<String> positions,
+    ElectionEligibility eligibility = ElectionEligibility.all,
   }) async {
     try {
       final res = await _functions.httpsCallable('electionCreate').call<dynamic>({
@@ -81,6 +82,7 @@ class ElectionsRepository {
         'title': title,
         'scheduledAtMs': scheduledAt.millisecondsSinceEpoch,
         'positions': positions,
+        'eligibility': eligibility.name,
       });
       final data = res.data;
       final id = data is Map ? data['electionId']?.toString() : null;
@@ -104,6 +106,20 @@ class ElectionsRepository {
     } on FirebaseFunctionsException catch (e) {
       throw AppException(
         message: e.message ?? 'Não foi possível iniciar a votação.',
+      );
+    }
+  }
+
+  /// Exclui a eleição em rascunho pela Function `electionDelete`, que confere
+  /// se quem chama é diretor e se ela ainda é rascunho.
+  Future<void> deleteElection(String electionId) async {
+    try {
+      await _functions.httpsCallable('electionDelete').call<dynamic>({
+        'electionId': electionId,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw AppException(
+        message: e.message ?? 'Não foi possível excluir a eleição.',
       );
     }
   }

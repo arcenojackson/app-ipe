@@ -28,6 +28,7 @@ describe("deriveView", () => {
     expect(deriveView({...base, election: null}).kind).toBe("notFound");
     expect(deriveView({...base, election: election("draft")}).kind).toBe("notOpen");
     expect(deriveView({...base, election: election("closed")}).kind).toBe("closed");
+    expect(deriveView({...base, election: election("completed")}).kind).toBe("closed");
   });
 
   it("encerrada vale mesmo para quem está na tela de voto", () => {

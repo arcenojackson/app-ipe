@@ -6,6 +6,7 @@ import '../../../../shared/utils/app_toast.dart';
 import '../../../societies/data/societies_repository.dart';
 import '../../../societies/models/society.dart';
 import '../../data/elections_repository.dart';
+import '../../models/election.dart';
 import '../../models/election_logic.dart';
 
 /// Cargos que toda eleição precisa ter.
@@ -24,6 +25,7 @@ class _ElectionFormSheetState extends State<ElectionFormSheet> {
   SocietyModel? _society;
   DateTime _scheduledAt = DateTime.now().add(const Duration(days: 1));
   final Set<BoardPosition> _positions = {...BoardPosition.values};
+  ElectionEligibility _eligibility = ElectionEligibility.all;
   bool _loading = true;
   bool _saving = false;
 
@@ -104,6 +106,7 @@ class _ElectionFormSheetState extends State<ElectionFormSheet> {
               for (final p in BoardPosition.values)
                 if (_positions.contains(p)) p.name,
             ],
+            eligibility: _eligibility,
           );
       if (!mounted) return;
       Navigator.of(context).pop(true);
@@ -198,7 +201,32 @@ class _ElectionFormSheetState extends State<ElectionFormSheet> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Quem estará apto a ser votado?',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      RadioGroup<ElectionEligibility>(
+                        groupValue: _eligibility,
+                        onChanged: (v) {
+                          if (v != null) setState(() => _eligibility = v);
+                        },
+                        child: const Column(
+                          children: [
+                            RadioListTile<ElectionEligibility>(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('Todos os membros do grupo'),
+                              value: ElectionEligibility.all,
+                            ),
+                            RadioListTile<ElectionEligibility>(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('Apenas os presentes na votação'),
+                              value: ElectionEligibility.present,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
                       FilledButton(
                         onPressed: _saving ? null : _save,
                         child: Text(_saving ? 'Criando...' : 'Criar eleição'),

@@ -26,7 +26,7 @@ export function deriveView(input: DeriveInput): VoteView {
   if (election === undefined) return {kind: "loading"};
   if (election === null) return {kind: "notFound"};
   if (election.status === "draft") return {kind: "notOpen"};
-  if (election.status === "closed") return {kind: "closed"};
+  if (election.status === "closed" || election.status === "completed") return {kind: "closed"};
 
   if (!hasUser) return {kind: "join"};
   if (voter === undefined) return {kind: "loading"};

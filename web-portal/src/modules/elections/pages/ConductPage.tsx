@@ -139,8 +139,9 @@ export function ConductPage({electionId}: {electionId: string}) {
             </Button>
           )}
           {election.status === "closed" && <span className="text-sm text-white/70">Encerrada</span>}
+          {election.status === "completed" && <span className="text-sm text-white/70">Concluída</span>}
         </header>
-        {election.status !== "closed" && <QrPanel electionId={electionId} />}
+        {election.status !== "closed" && election.status !== "completed" && <QrPanel electionId={electionId} />}
       </GlassCard>
 
       {error && <p role="alert" className="text-sm text-error">{error}</p>}

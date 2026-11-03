@@ -3,7 +3,12 @@ import * as admin from "firebase-admin";
 import {pickOldest, removeCandidate, restartCargo} from "./cargoActions";
 import {assertNotAnonymous} from "./common";
 import {inviteMembers, isOpening} from "./invites";
-import {applyBoard, createElection, setElectionStatus} from "./lifecycle";
+import {
+  applyBoard,
+  createElection,
+  deleteElection,
+  setElectionStatus,
+} from "./lifecycle";
 import {
   bumpVotedCount, castVote, closeScrutiny, startScrutiny,
 } from "./scrutinies";
@@ -36,6 +41,9 @@ const needDirectorAuth = (context: functions.https.CallableContext) => {
 
 export const electionCreate = functions.https.onCall((data, context) =>
   createElection(admin.firestore(), needDirectorAuth(context).uid, data));
+
+export const electionDelete = functions.https.onCall((data, context) =>
+  deleteElection(admin.firestore(), needDirectorAuth(context).uid, data));
 
 export const electionSetStatus = functions.https.onCall((data, context) =>
   setElectionStatus(admin.firestore(), needDirectorAuth(context).uid, data));
