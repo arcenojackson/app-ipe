@@ -349,6 +349,11 @@ describe("applyDueBoards (rotina de 01/01)", () => {
 });
 
 describe("deleteElection", () => {
+  beforeEach(async () => {
+    await clearDb();
+    await seedBase();
+  });
+
   const exists = async () => (await db.doc(`elections/${ELECTION}`).get()).exists;
   const setStatus = (status: string) =>
     db.doc(`elections/${ELECTION}`).update({status});
