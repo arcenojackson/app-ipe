@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ipe_flutter/src/core/utils/app_exception.dart';
-import 'package:ipe_flutter/src/modules/auth/models/user.dart';
 import 'package:ipe_flutter/src/modules/elections/data/elections_repository.dart';
 import 'package:ipe_flutter/src/modules/elections/models/election.dart';
 import 'package:ipe_flutter/src/modules/elections/presentation/election_vote_page.dart';
 import 'package:ipe_flutter/src/shared/state/app_state.dart';
 import 'package:provider/provider.dart';
+
+import 'election_test_fakes.dart';
 
 class FakeRepo extends Fake implements ElectionsRepository {
   final election = StreamController<Election?>.broadcast();
@@ -37,17 +38,6 @@ class FakeRepo extends Fake implements ElectionsRepository {
     if (error != null) return Future.error(error);
     return Future.value('RECIBO1');
   }
-}
-
-class FakeAppState extends Fake with ChangeNotifier implements AppState {
-  @override
-  UserModel? get currentUser => UserModel(
-    id: 'u1',
-    name: 'Ana',
-    email: 'ana@ipe.org',
-    isAdmin: false,
-    isPending: false,
-  );
 }
 
 ElectionRound roundOf(String id, int number) => ElectionRound(

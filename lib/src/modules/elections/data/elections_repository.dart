@@ -93,6 +93,21 @@ class ElectionsRepository {
     }
   }
 
+  /// Inicia a votação: abre a eleição (rascunho → aberta) pela Function
+  /// `electionSetStatus`, que confere se quem chama é diretor da eleição.
+  Future<void> openElection(String electionId) async {
+    try {
+      await _functions.httpsCallable('electionSetStatus').call<dynamic>({
+        'electionId': electionId,
+        'status': 'open',
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw AppException(
+        message: e.message ?? 'Não foi possível iniciar a votação.',
+      );
+    }
+  }
+
   /// Convites do usuário (gravados pelo servidor ao abrir a eleição), os mais
   /// novos primeiro.
   Stream<List<ElectionInvite>> watchInvites(String uid) => _db

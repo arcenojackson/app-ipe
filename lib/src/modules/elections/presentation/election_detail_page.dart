@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/utils/app_exception.dart';
+import '../../../shared/state/app_state.dart';
 import '../../../shared/utils/app_toast.dart';
 import '../data/elections_repository.dart';
 import '../models/election.dart';
@@ -22,6 +24,7 @@ class ElectionDetailPage extends StatefulWidget {
 
 class _ElectionDetailPageState extends State<ElectionDetailPage> {
   late final Stream<Election?> _stream;
+  bool _starting = false;
 
   @override
   void initState() {
@@ -39,11 +42,56 @@ class _ElectionDetailPageState extends State<ElectionDetailPage> {
     }
   }
 
+  /// Abre a eleição para os membros entrarem. Pede confirmação: depois de
+  /// aberta não volta a rascunho.
+  Future<void> _startVoting() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Iniciar a votação?'),
+        content: const Text(
+          'Os membros da sociedade poderão entrar na votação lendo o QR '
+          'code. Os escrutínios são conduzidos pela tela web.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Iniciar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _starting = true);
+    try {
+      await context.read<ElectionsRepository>().openElection(widget.electionId);
+      if (mounted) showSuccessToast(context, 'Votação iniciada.');
+    } on AppException catch (e) {
+      if (mounted) showErrorToast(context, e.message);
+    } catch (_) {
+      if (mounted) showErrorToast(context, 'Algo deu errado.');
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
   Future<void> _copyVoteLink() async {
     await Clipboard.setData(
       ClipboardData(text: buildVoteLink(widget.electionId)),
     );
     if (mounted) showSuccessToast(context, 'Link da votação copiado.');
+  }
+
+  /// Só o diretor da eleição, e só enquanto ela é rascunho.
+  bool _canStart(Election election) {
+    final uid = context.read<AppState>().currentUser?.id;
+    return election.status == ElectionStatus.draft &&
+        uid != null &&
+        election.directorIds.contains(uid);
   }
 
   String _statusLabel(ElectionStatus s) => switch (s) {
@@ -96,6 +144,14 @@ class _ElectionDetailPageState extends State<ElectionDetailPage> {
                 child: Chip(label: Text(_statusLabel(election.status))),
               ),
               const SizedBox(height: 16),
+              if (_canStart(election)) ...[
+                FilledButton.icon(
+                  icon: const Icon(Icons.play_arrow),
+                  label: Text(_starting ? 'Iniciando...' : 'Iniciar votação'),
+                  onPressed: _starting ? null : _startVoting,
+                ),
+                const SizedBox(height: 8),
+              ],
               FilledButton.icon(
                 icon: const Icon(Icons.open_in_browser),
                 label: const Text('Abrir condução na web'),
