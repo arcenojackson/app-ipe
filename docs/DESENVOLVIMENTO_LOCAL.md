@@ -219,6 +219,7 @@ cd functions && npm run test:integration         # eleições, contra o Firestor
 - **Funções agendadas** (lembretes de liturgia, oração e ELO; fechamento automático de eleições) — dependem do emulador de Pub/Sub, que não é iniciado. As demais Functions (gatilhos do Firestore e chamadas HTTP/callable) rodam normalmente.
 - **Chaves do YouTube e do Pexels** — opcionais. Sem elas só a busca de vídeos/imagens fica inativa. Para testar a sua, defina a variável `PEXELS_API_KEY` antes de `npm run app`, ou edite o `app_secrets.dart` local (ignorado pelo git).
 - **Holyrics** — exige um servidor Holyrics na sua rede.
+- **Câmera para o QR da votação** — o simulador iOS não tem câmera. Na tela "Entrar na votação" use o campo **"Código ou link da eleição"** (cole o link `/votar/{id}` ou só o id). O push de "Eleição aberta" também não chega (sem FCM); o balão na home aparece pelo convite gravado no Firestore quando a eleição é aberta.
 
 ## 6. Garantias de isolamento
 
