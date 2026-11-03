@@ -17,9 +17,16 @@ const String _membersOnlyMessage = 'A votação é só para membros da sociedade
 /// Votação do membro dentro do app: do check-in (QR do condutor) até o
 /// comprovante de cada escrutínio. Tudo reage sozinho às mudanças do Firestore.
 class ElectionVotePage extends StatefulWidget {
-  const ElectionVotePage({super.key, required this.electionId});
+  const ElectionVotePage({
+    super.key,
+    required this.electionId,
+    @visibleForTesting this.scanPageBuilder,
+  });
 
   final String electionId;
+
+  /// Troca o leitor de QR (que precisa de câmera) nos testes.
+  final Widget Function()? scanPageBuilder;
 
   @override
   State<ElectionVotePage> createState() => _ElectionVotePageState();
@@ -35,6 +42,12 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
   Loadable<bool> _hasVoted = const Loadable.loading();
 
   final List<StreamSubscription<dynamic>> _subs = [];
+  StreamSubscription<ElectionVoter?>? _voterSub;
+
+  /// Check-in feito, mas o registro do eleitor ainda não chegou pelo
+  /// Firestore: evita voltar a oferecer a leitura do QR nesse intervalo.
+  bool _enteringPending = false;
+  Timer? _enteringTimer;
   StreamSubscription<ElectionRound?>? _roundSub;
   StreamSubscription<bool>? _votedSub;
   String? _votedRoundId;
@@ -68,15 +81,27 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
             onError: _onStreamError,
           ),
     );
-    _subs.add(
-      _repo.watchMyVoter(widget.electionId, uid).listen((v) {
-        setState(() {
-          _voter = Loadable(v);
-          _streamFailed = false;
-        });
-        _syncRound(v);
-      }, onError: _onStreamError),
-    );
+    _listenVoter(uid);
+  }
+
+  /// (Re)ouve o registro do eleitor. Refazer a escuta depois do check-in
+  /// garante uma leitura nova do servidor, mesmo que a anterior tenha ficado
+  /// parada (listener que falhou não volta sozinho).
+  void _listenVoter(String uid) {
+    _voterSub?.cancel();
+    _voterSub = _repo.watchMyVoter(widget.electionId, uid).listen((v) {
+      setState(() {
+        _voter = Loadable(v);
+        _streamFailed = false;
+        if (v != null) _stopEntering();
+      });
+      _syncRound(v);
+    }, onError: _onStreamError);
+  }
+
+  void _stopEntering() {
+    _enteringTimer?.cancel();
+    _enteringPending = false;
   }
 
   bool _isApprovedMember(ElectionVoter? v) =>
@@ -125,10 +150,24 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
   /// Abre o leitor de QR. Se a pessoa entrou em outra eleição (leu o QR de
   /// outra), segue para a votação dessa.
   Future<void> _scan() async {
-    final enteredId = await Navigator.of(
-      context,
-    ).push<String>(MaterialPageRoute(builder: (_) => const ElectionScanPage()));
-    if (!mounted || enteredId == null || enteredId == widget.electionId) return;
+    final enteredId = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) =>
+            widget.scanPageBuilder?.call() ?? const ElectionScanPage(),
+      ),
+    );
+    if (!mounted || enteredId == null) return;
+    if (enteredId == widget.electionId) {
+      final uid = _uid;
+      if (uid == null) return;
+      setState(() => _enteringPending = true);
+      _enteringTimer?.cancel();
+      _enteringTimer = Timer(const Duration(seconds: 10), () {
+        if (mounted) setState(() => _enteringPending = false);
+      });
+      _listenVoter(uid);
+      return;
+    }
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(
         builder: (_) => ElectionVotePage(electionId: enteredId),
@@ -159,6 +198,8 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
     for (final sub in _subs) {
       sub.cancel();
     }
+    _voterSub?.cancel();
+    _enteringTimer?.cancel();
     _roundSub?.cancel();
     _votedSub?.cancel();
     super.dispose();
@@ -221,6 +262,13 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
       case VoteViewKind.notMember:
         return const [Text(_membersOnlyMessage)];
       case VoteViewKind.needsCheckIn:
+        if (_enteringPending) {
+          return const [
+            Center(child: CircularProgressIndicator()),
+            SizedBox(height: 16),
+            Text('Entrando na votação…', textAlign: TextAlign.center),
+          ];
+        }
         return [
           const Text(
             'Para votar, leia o QR code mostrado por quem está conduzindo '

@@ -17,13 +17,16 @@ class FakeRepo extends Fake implements ElectionsRepository {
   final round = StreamController<ElectionRound?>.broadcast();
   final voted = StreamController<bool>.broadcast();
   Object? castError;
+  int voterListens = 0;
 
   @override
   Stream<Election?> watchElection(String id) => election.stream;
 
   @override
-  Stream<ElectionVoter?> watchMyVoter(String electionId, String uid) =>
-      voter.stream;
+  Stream<ElectionVoter?> watchMyVoter(String electionId, String uid) {
+    voterListens++;
+    return voter.stream;
+  }
 
   @override
   Stream<ElectionRound?> watchOpenRound(String electionId) => round.stream;
@@ -153,5 +156,103 @@ void main() {
 
     expect(find.text(streamError), findsNothing);
     expect(find.textContaining('Aguardando a próxima votação'), findsOneWidget);
+  });
+
+  group('depois de ler o QR', () {
+    Future<FakeRepo> pumpNeedingCheckIn(WidgetTester tester) async {
+      final repo = FakeRepo();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<ElectionsRepository>.value(value: repo),
+            ChangeNotifierProvider<AppState>.value(value: FakeAppState()),
+          ],
+          child: MaterialApp(
+            home: ElectionVotePage(
+              electionId: 'e1',
+              // No lugar da câmera: um botão que "entra" na eleição.
+              scanPageBuilder: () => Builder(
+                builder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () => Navigator.of(context).pop('e1'),
+                    child: const Text('entrar'),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      repo.election.add(
+        Election(
+          id: 'e1',
+          societyId: 's1',
+          societyName: 'UMP',
+          title: 'Eleição UMP 2026',
+          scheduledAt: DateTime(2026, 11, 8),
+          status: ElectionStatus.open,
+          positions: const ['presidente'],
+          directorIds: const ['d1'],
+        ),
+      );
+      repo.voter.add(null);
+      await tester.pump();
+      await tester.tap(find.text('Ler QR do condutor'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('entrar'));
+      // Sem pumpAndSettle: o spinner anima sem parar e adiantaria o relógio.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      return repo;
+    }
+
+    testWidgets('não volta a mostrar o botão enquanto o registro não chega', (
+      tester,
+    ) async {
+      await pumpNeedingCheckIn(tester);
+
+      expect(find.text('Ler QR do condutor'), findsNothing);
+      expect(find.textContaining('Entrando na votação'), findsOneWidget);
+    });
+
+    testWidgets('volta a ouvir o registro do eleitor ao entrar', (
+      tester,
+    ) async {
+      final repo = await pumpNeedingCheckIn(tester);
+
+      expect(repo.voterListens, 2);
+    });
+
+    testWidgets('se o registro nunca chega, o botão volta', (tester) async {
+      await pumpNeedingCheckIn(tester);
+
+      await tester.pump(const Duration(seconds: 11));
+
+      expect(find.text('Ler QR do condutor'), findsOneWidget);
+    });
+
+    testWidgets('quando o registro chega, a votação segue', (tester) async {
+      final repo = await pumpNeedingCheckIn(tester);
+
+      repo.voter.add(
+        const ElectionVoter(
+          id: 'u1',
+          name: 'Ana',
+          email: 'ana@ipe.org',
+          kind: VoterKind.member,
+          status: VoterStatus.approved,
+        ),
+      );
+      await tester.pump();
+      repo.round.add(null);
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.textContaining('Entrando na votação'), findsNothing);
+      expect(
+        find.textContaining('Aguardando a próxima votação'),
+        findsOneWidget,
+      );
+    });
   });
 }
