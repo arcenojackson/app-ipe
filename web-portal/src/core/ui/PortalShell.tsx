@@ -5,6 +5,7 @@ import Link from "next/link";
 import {usePathname, useRouter} from "next/navigation";
 import {useEffect, useRef, useState, type ReactNode} from "react";
 import {useAuth} from "@/core/auth/AuthContext";
+import {loginPathFor} from "@/core/auth/redirect";
 import {
   isPathAllowed,
   moduleForPath,
@@ -56,8 +57,8 @@ export function PortalShell({
   };
 
   useEffect(() => {
-    if (state.status === "signedOut") router.replace("/login");
-  }, [state.status, router]);
+    if (state.status === "signedOut") router.replace(loginPathFor(pathname));
+  }, [state.status, pathname, router]);
 
   if (state.status !== "signedIn") {
     return <p className="p-6 text-white/70">Carregando…</p>;

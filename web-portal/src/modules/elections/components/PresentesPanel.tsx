@@ -1,6 +1,8 @@
 "use client";
 
+import {useState} from "react";
 import {Button} from "@/core/ui/Button";
+import {Modal} from "@/core/ui/Modal";
 import type {ConductVoter} from "../types";
 
 /** Chave da ação "aceitar/recusar" de um presente, para o spinner do botão. */
@@ -17,13 +19,33 @@ interface Props {
 
 /** Quem entrou pela página de voto: aceitar ou recusar quem espera liberação. */
 export function PresentesPanel({voters, busy, pending, onReview}: Props) {
-  const approved = voters.filter((v) => v.status === "approved").length;
+  const present = voters.filter((v) => v.status === "approved");
+  const approved = present.length;
   const waiting = voters.filter((v) => v.status === "pending");
+  const [listOpen, setListOpen] = useState(false);
 
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold">Presentes</h2>
-      <p className="text-sm text-white/70">Liberados: {approved}</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm text-white/70">Liberados: {approved}</p>
+        <Button type="button" variant="text" onClick={() => setListOpen(true)}>
+          Ver presentes
+        </Button>
+      </div>
+      {listOpen && (
+        <Modal title={`Presentes (${approved})`} onClose={() => setListOpen(false)}>
+          {approved === 0 ? (
+            <p className="text-sm text-white/70">Ninguém entrou na votação ainda.</p>
+          ) : (
+            <ul className="space-y-1">
+              {present.map((v) => (
+                <li key={v.id}>{`${v.name} (${v.kind === "member" ? "membro" : "convidado"})`}</li>
+              ))}
+            </ul>
+          )}
+        </Modal>
+      )}
       {waiting.length > 0 && (
         <ul className="space-y-2">
           {waiting.map((v) => (

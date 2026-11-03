@@ -5,7 +5,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "firebase/auth";
-import {useRouter} from "next/navigation";
+import {useRouter, useSearchParams} from "next/navigation";
 import {useEffect, useState, type FormEvent} from "react";
 import {auth} from "@/core/firebase/client";
 import {Button} from "@/core/ui/Button";
@@ -13,9 +13,11 @@ import {GlassCard} from "@/core/ui/GlassCard";
 import {TextField} from "@/core/ui/TextField";
 import {useAuth} from "./AuthContext";
 import {authErrorMessage} from "./errors";
+import {safeNextPath} from "./redirect";
 
 export function LoginForm() {
   const router = useRouter();
+  const next = safeNextPath(useSearchParams().get("next"));
   const {state} = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,8 +25,8 @@ export function LoginForm() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (state.status === "signedIn") router.replace("/");
-  }, [state.status, router]);
+    if (state.status === "signedIn") router.replace(next);
+  }, [state.status, next, router]);
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);

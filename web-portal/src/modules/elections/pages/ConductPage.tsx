@@ -9,7 +9,7 @@ import {boardNotice} from "../conduct/boardNotice";
 import type {ConductActionKind} from "../conduct/cargoView";
 import {CargoCard, cargoKey} from "../components/CargoCard";
 import {PresentesPanel, reviewKey} from "../components/PresentesPanel";
-import {QrPanel} from "../components/QrPanel";
+import {QR_WIDTH, QrPanel} from "../components/QrPanel";
 import {
   applyBoard,
   closeScrutiny,
@@ -58,6 +58,8 @@ export function ConductPage({electionId}: {electionId: string}) {
   const [pending, setPending] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Diretoria aplicada nesta sessão: bloqueia o botão antes do snapshot chegar.
+  const [boardApplied, setBoardApplied] = useState(false);
 
   const isDirector = !!uid && !!election && election.directorIds.includes(uid);
 
@@ -109,6 +111,10 @@ export function ConductPage({electionId}: {electionId: string}) {
   const loaded = cargos !== null && rounds !== null && voters !== null;
   const approved = (voters ?? []).filter((v) => v.status === "approved");
   const anyDecided = (cargos ?? []).some((c) => c.stage === "decided");
+  // Encerrada (eleição que não valeu) e Concluída (diretoria aplicada): nada
+  // mais se conduz. Aplicar diretoria é o que conclui uma eleição em andamento.
+  const locked = election.status === "closed" || election.status === "completed";
+  const boardLocked = locked || boardApplied;
 
   function onAction(position: string, kind: ConductActionKind, targetId?: string) {
     void run(cargoKey(position, kind, targetId), async () => {
@@ -128,11 +134,6 @@ export function ConductPage({electionId}: {electionId: string}) {
             <h1 className="text-2xl font-semibold">{election.title}</h1>
             <p className="text-sm text-white/70">{election.societyName}</p>
           </div>
-          {election.status === "draft" && (
-            <Button type="button" disabled={busy} loading={pending === "status"} onClick={() => void run("status", () => setStatus(electionId, "open"))}>
-              Abrir eleição
-            </Button>
-          )}
           {election.status === "open" && (
             <Button type="button" variant="text" disabled={busy || openRound !== null} loading={pending === "status"} onClick={() => void run("status", () => setStatus(electionId, "closed"))}>
               Encerrar eleição
@@ -141,7 +142,16 @@ export function ConductPage({electionId}: {electionId: string}) {
           {election.status === "closed" && <span className="text-sm text-white/70">Encerrada</span>}
           {election.status === "completed" && <span className="text-sm text-white/70">Concluída</span>}
         </header>
-        {election.status !== "closed" && election.status !== "completed" && <QrPanel electionId={electionId} />}
+        {!locked && (
+          <QrPanel
+            electionId={electionId}
+            action={election.status === "draft" && (
+              <Button type="button" className={QR_WIDTH} disabled={busy} loading={pending === "status"} onClick={() => void run("status", () => setStatus(electionId, "open"))}>
+                Abrir eleição
+              </Button>
+            )}
+          />
+        )}
       </GlassCard>
 
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
@@ -150,7 +160,7 @@ export function ConductPage({electionId}: {electionId: string}) {
       <GlassCard>
         <PresentesPanel
           voters={voters ?? []}
-          busy={busy}
+          busy={busy || locked}
           pending={pending}
           onReview={(voterId, decision) => void run(reviewKey(voterId, decision), () => reviewVoter(electionId, voterId, decision))}
         />
@@ -168,7 +178,7 @@ export function ConductPage({electionId}: {electionId: string}) {
               lastClosed={lastClosedOf(rounds, position)}
               approved={approved}
               votedIds={openRound?.position === position ? votedIds : []}
-              busy={busy}
+              busy={busy || locked}
               roundOpenElsewhere={openRound !== null && openRound.position !== position}
               pending={pending}
               onAction={(kind, targetId) => onAction(position, kind, targetId)}
@@ -180,10 +190,11 @@ export function ConductPage({electionId}: {electionId: string}) {
       <GlassCard className="space-y-2">
         <Button
           type="button"
-          disabled={busy || !anyDecided || openRound !== null}
+          disabled={busy || boardLocked || !anyDecided || openRound !== null}
           loading={pending === "applyBoard"}
           onClick={() => void run("applyBoard", async () => {
             const res = await applyBoard(electionId);
+            setBoardApplied(true);
             setNotice(boardNotice(res));
           })}
         >

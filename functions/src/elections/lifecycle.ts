@@ -75,6 +75,19 @@ export const createElection = async (
 // `boardTransitions/{electionId}`. Quem assume é a rotina de 01/01
 // (`applyDueBoards`); aqui a diretoria atual não muda. Pode ser repetido até
 // a diretoria assumir: o registro é substituído.
+// A diretoria só se aplica numa eleição em andamento (que passa a Concluída).
+// Encerrada é a eleição que não valeu; Concluída já tem a diretoria aplicada e
+// repetir é inofensivo (o registro é substituído até a posse).
+export const assertCanApplyBoard = (status: unknown): void => {
+  if (status === "open" || status === "completed") return;
+  throw fail(
+    "failed-precondition",
+    status === "closed" ?
+      "Uma eleição encerrada não pode ter a diretoria aplicada." :
+      "Abra a eleição antes de aplicar a diretoria."
+  );
+};
+
 export const applyBoard = async (
   db: Firestore,
   uid: string,
@@ -86,6 +99,7 @@ export const applyBoard = async (
 }> => {
   const electionId = requireString(data, "electionId");
   const election = await assertElectionDirector(db, uid, electionId);
+  assertCanApplyBoard(election.status);
 
   const cargos = await db.collection(`elections/${electionId}/cargos`).get();
   const winners: Record<string, string> = {};

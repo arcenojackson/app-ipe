@@ -162,7 +162,7 @@ describe("ConductPage", () => {
     await waitFor(() => expect(api.closeScrutiny).toHaveBeenCalledWith("e1", "presidente"));
   });
 
-  it("escrutínio encerrado: mostra contagem por opção, branco e a meta de votos", () => {
+  it("escrutínio encerrado: mostra contagem por opção e branco, sem a meta de votos", () => {
     api.cargos = [
       cargo("presidente", {stage: "awaiting3", candidates: [{id: "a", name: "Ana", votes: 2}]}),
       cargo("vice"),
@@ -175,7 +175,7 @@ describe("ConductPage", () => {
       },
     })];
     render(<ConductPage electionId="e1" />);
-    expect(screen.getByText("6 de 10 necessários")).toBeInTheDocument();
+    expect(screen.queryByText(/necessários/)).not.toBeInTheDocument();
     expect(screen.getByText("Ana: 5")).toBeInTheDocument();
     expect(screen.getByText("Bia: 3")).toBeInTheDocument();
     expect(screen.getByText("Branco: 2")).toBeInTheDocument();
@@ -261,5 +261,86 @@ describe("ConductPage", () => {
       fireEvent.click(screen.getAllByRole("button", {name: "Iniciar 1º escrutínio"})[0]);
     });
     expect(await screen.findByRole("alert")).toHaveTextContent("Já existe um escrutínio aberto.");
+  });
+
+  it("rascunho: Abrir eleição fica abaixo do QR, com a largura dele", () => {
+    api.election = election({status: "draft"});
+    render(<ConductPage electionId="e1" />);
+    const open = screen.getByRole("button", {name: "Abrir eleição"});
+    const qrBox = screen.getByTitle("QR da votação").closest("div")!;
+    // O QR tem 224px + 16px de padding de cada lado = w-64 (16rem).
+    expect(qrBox).toHaveClass("w-64");
+    expect(open).toHaveClass("w-64");
+    expect(qrBox.parentElement).toContainElement(open);
+  });
+
+  it("QR e link somem quando a eleição está encerrada ou concluída", () => {
+    for (const status of ["closed", "completed"] as const) {
+      api.election = election({status});
+      const {unmount} = render(<ConductPage electionId="e1" />);
+      expect(screen.queryByTitle("QR da votação")).not.toBeInTheDocument();
+      expect(screen.queryByText(/\/votar\/e1/)).not.toBeInTheDocument();
+      unmount();
+    }
+  });
+
+  it("presentes: Ver presentes abre a lista dos liberados com o tipo, sem os pendentes", () => {
+    api.voters = [
+      voter("u1", "Ana"),
+      {...voter("u2", "Visitante"), kind: "guest"},
+      voter("u3", "Espera", "pending"),
+    ];
+    render(<ConductPage electionId="e1" />);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", {name: "Ver presentes"}));
+    const dialog = screen.getByRole("dialog", {name: "Presentes (2)"});
+    expect(dialog).toHaveTextContent("Ana (membro)");
+    expect(dialog).toHaveTextContent("Visitante (convidado)");
+    expect(dialog).not.toHaveTextContent("Espera");
+
+    fireEvent.click(screen.getByRole("button", {name: "Fechar"}));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("presentes: Ver presentes continua disponível com a eleição concluída", () => {
+    api.election = election({status: "completed"});
+    api.voters = [voter("u1", "Ana")];
+    render(<ConductPage electionId="e1" />);
+    expect(screen.getByRole("button", {name: "Ver presentes"})).toBeEnabled();
+  });
+
+  const decidedCargos = () => [
+    cargo("presidente", {stage: "decided", winnerId: "a", candidates: [{id: "a", name: "Ana", votes: 6}]}),
+    cargo("vice"),
+  ];
+
+  it("eleição encerrada (inválida): todos os botões bloqueados, inclusive Aplicar diretoria", () => {
+    api.election = election({status: "closed"});
+    api.cargos = decidedCargos();
+    api.voters = [voter("u2", "Visitante", "pending")];
+    render(<ConductPage electionId="e1" />);
+    for (const name of ["Iniciar 1º escrutínio", "Aceitar Visitante", "Recusar Visitante", "Aplicar diretoria"]) {
+      for (const button of screen.getAllByRole("button", {name})) expect(button).toBeDisabled();
+    }
+  });
+
+  it("eleição concluída: todos os botões bloqueados, inclusive Aplicar diretoria", () => {
+    api.election = election({status: "completed"});
+    api.cargos = decidedCargos();
+    api.voters = [voter("u2", "Visitante", "pending")];
+    render(<ConductPage electionId="e1" />);
+    for (const name of ["Iniciar 1º escrutínio", "Aceitar Visitante", "Recusar Visitante", "Aplicar diretoria"]) {
+      for (const button of screen.getAllByRole("button", {name})) expect(button).toBeDisabled();
+    }
+  });
+
+  it("aplicar diretoria com sucesso desabilita o botão na hora", async () => {
+    api.election = election({status: "open"});
+    api.cargos = decidedCargos();
+    render(<ConductPage electionId="e1" />);
+    fireEvent.click(screen.getByRole("button", {name: "Aplicar diretoria"}));
+    await waitFor(() => expect(api.applyBoard).toHaveBeenCalledWith("e1"));
+    await waitFor(() => expect(screen.getByRole("button", {name: "Aplicar diretoria"})).toBeDisabled());
   });
 });

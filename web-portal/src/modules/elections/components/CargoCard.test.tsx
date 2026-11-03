@@ -91,4 +91,11 @@ describe("CargoCard", () => {
     );
     expect(screen.getByText("Caio: 0")).toBeInTheDocument();
   });
+
+  it("o resultado de um escrutínio não repete quantos votos eram necessários", () => {
+    render(<CargoCard {...base} cargo={idle} lastClosed={closedRound(2)} />);
+    expect(screen.getByText("Resultado do 2º escrutínio")).toBeInTheDocument();
+    expect(screen.getByText("Ana: 2")).toBeInTheDocument();
+    expect(screen.queryByText(/necessários/)).not.toBeInTheDocument();
+  });
 });
