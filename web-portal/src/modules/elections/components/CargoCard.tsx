@@ -100,9 +100,6 @@ export function CargoCard({
             ))}
             <li>{`Branco: ${result.blank}`}</li>
           </ul>
-          {lastClosed.number > 1 && (
-            <p>{`${result.threshold} de ${result.presentCount} necessários`}</p>
-          )}
           {result.divergence && (
             <p role="alert" className="text-error">
               Atenção: a contagem diverge do número de votantes.

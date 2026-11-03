@@ -180,7 +180,15 @@ const JAN_1_NOON = new Date("2027-01-01T15:00:00Z");
 describe("applyBoard (registra a diretoria em espera)", () => {
   beforeEach(async () => {
     await clearDb();
-    await seedBase("closed");
+    await seedBase("open");
+  });
+
+  it("eleição encerrada (que não valeu) não tem a diretoria aplicada", async () => {
+    await db.doc(`elections/${ELECTION}`).update({status: "closed"});
+    await decided("presidente", MEMBER2);
+    await expectCode(apply(), "failed-precondition");
+    expect(await transition()).toBeUndefined();
+    expect((await db.doc(`elections/${ELECTION}`).get()).get("status")).toBe("closed");
   });
 
   it("só diretor da eleição registra", async () => {
@@ -278,7 +286,7 @@ describe("applyBoard (registra a diretoria em espera)", () => {
 describe("applyDueBoards (rotina de 01/01)", () => {
   beforeEach(async () => {
     await clearDb();
-    await seedBase("closed");
+    await seedBase("open");
   });
 
   it("antes da vigência não muda nada", async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import {useState} from "react";
+import {useState, type ReactNode} from "react";
 import {QRCodeSVG} from "qrcode.react";
 import {Button} from "@/core/ui/Button";
 
@@ -31,16 +31,21 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-/** QR e link da votação, próprios para projetar. Só renderiza no navegador. */
-export function QrPanel({electionId}: {electionId: string}) {
+/** Largura do QR (224px + 16px de padding de cada lado). Quem alinha com ele
+ *  (o botão Abrir eleição) usa a mesma classe. */
+export const QR_WIDTH = "w-64";
+
+/** QR e link da votação, próprios para projetar. Só renderiza no navegador.
+ *  `action` aparece logo abaixo do QR e do link. */
+export function QrPanel({electionId, action}: {electionId: string; action?: ReactNode}) {
   const [copy, setCopy] = useState<CopyState>("idle");
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   const link = `${origin}/votar/${electionId}`;
 
   return (
     <div className="flex flex-col items-center gap-3">
-      <div className="rounded-card bg-white p-4">
-        <QRCodeSVG value={link} size={224} title="QR da votação" />
+      <div className={`${QR_WIDTH} rounded-card bg-white p-4`}>
+        <QRCodeSVG value={link} size={224} title="QR da votação" className="mx-auto" />
       </div>
       <p className="break-all text-center text-sm text-white/70 select-all">
         {link}
@@ -60,6 +65,7 @@ export function QrPanel({electionId}: {electionId: string}) {
           Não foi possível copiar. Toque e segure o link acima para copiar.
         </p>
       )}
+      {action}
     </div>
   );
 }
