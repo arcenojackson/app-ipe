@@ -4,8 +4,9 @@ import 'package:cloud_functions/cloud_functions.dart';
 import '../../../core/utils/app_exception.dart';
 import '../models/election.dart';
 
-/// Leitura das eleições (Firestore) e criação (Function). Abrir escrutínios,
-/// liberar presentes etc. é feito na tela web de condução, não aqui.
+/// Leitura das eleições (Firestore), criação e voto (Functions). Abrir
+/// escrutínios, liberar presentes etc. é feito na tela web de condução, não
+/// aqui.
 class ElectionsRepository {
   ElectionsRepository({FirebaseFirestore? firestore, FirebaseFunctions? functions})
       : _db = firestore ?? FirebaseFirestore.instance,
@@ -86,6 +87,84 @@ class ElectionsRepository {
       return id;
     } on FirebaseFunctionsException catch (e) {
       throw AppException(message: e.message ?? 'Erro ao criar a eleição.');
+    }
+  }
+
+  /// Convites do usuário (gravados pelo servidor ao abrir a eleição), os mais
+  /// novos primeiro.
+  Stream<List<ElectionInvite>> watchInvites(String uid) => _db
+      .collection('users')
+      .doc(uid)
+      .collection('election_invites')
+      .orderBy('createdAt', descending: true)
+      .snapshots()
+      .map(
+        (s) => s.docs.map((d) => ElectionInvite.fromJson(d.id, d.data())).toList(),
+      );
+
+  /// Registro de presença do próprio usuário; `null` até fazer o check-in.
+  Stream<ElectionVoter?> watchMyVoter(String electionId, String uid) =>
+      _election(electionId).collection('voters').doc(uid).snapshots().map(
+            (d) => d.exists ? ElectionVoter.fromJson(d.id, d.data()!) : null,
+          );
+
+  /// Escrutínio aberto no momento; `null` quando não há.
+  Stream<ElectionRound?> watchOpenRound(String electionId) => _election(
+        electionId,
+      )
+          .collection('rounds')
+          .where('status', isEqualTo: 'open')
+          .limit(1)
+          .snapshots()
+          .map(
+            (s) => s.docs.isEmpty
+                ? null
+                : ElectionRound.fromJson(s.docs.first.id, s.docs.first.data()),
+          );
+
+  /// Se o usuário já votou nesta rodada (o servidor grava só a marca, nunca
+  /// em quem).
+  Stream<bool> watchHasVoted(String electionId, String roundId, String uid) =>
+      _election(electionId)
+          .collection('rounds')
+          .doc(roundId)
+          .collection('voted')
+          .doc(uid)
+          .snapshots()
+          .map((d) => d.exists);
+
+  /// Entra na votação (presença). Pelo app só membros da sociedade entram: o
+  /// servidor recusa os demais.
+  Future<void> checkIn(String electionId) async {
+    try {
+      await _functions.httpsCallable('electionCheckIn').call<dynamic>({
+        'electionId': electionId,
+        'memberOnly': true,
+      });
+    } on FirebaseFunctionsException catch (e) {
+      throw AppException(
+        message: e.message ?? 'Não foi possível entrar na votação.',
+      );
+    }
+  }
+
+  /// Registra o voto (id do candidato ou `blank`) e devolve o código do
+  /// comprovante.
+  Future<String> castVote(
+    String electionId,
+    String roundId,
+    String choice,
+  ) async {
+    try {
+      final res = await _functions.httpsCallable('electionCastVote').call<dynamic>({
+        'electionId': electionId,
+        'roundId': roundId,
+        'choice': choice,
+      });
+      final data = res.data;
+      return data is Map ? data['receipt']?.toString() ?? '' : '';
+    } on FirebaseFunctionsException catch (e) {
+      throw AppException(message: e.message ?? 'Não foi possível votar.');
     }
   }
 }
