@@ -25,6 +25,12 @@ service cloud.firestore {
       // Apenas administradores podem deletar usuários
       allow delete: if isAdmin();
     }
+
+    // Convites de eleição: gravados só pelas Cloud Functions (Admin SDK) quando
+    // a eleição é aberta; cada usuário lê apenas os próprios (balão da home).
+    match /users/{userId}/election_invites/{electionId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+    }
     
     // Regras para convites
     match /invites/{inviteId} {
