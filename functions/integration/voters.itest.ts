@@ -63,6 +63,40 @@ describe("checkIn", () => {
     expect(user).toEqual({name: "Fora", is_admin: false});
   });
 
+  describe("memberOnly (app)", () => {
+    it("recusa quem não é da sociedade, sem criar registro de eleitor", async () => {
+      await expectCode(
+        checkIn(db, outsider, {electionId: ELECTION, memberOnly: true}),
+        "permission-denied"
+      );
+      expect(await voterDoc(OUTSIDER)).toBeUndefined();
+    });
+
+    it("recusa conta Google nova sem criar o usuário", async () => {
+      await expectCode(
+        checkIn(db, google, {electionId: ELECTION, memberOnly: true}),
+        "permission-denied"
+      );
+      expect(await userDoc("g1")).toBeUndefined();
+      expect(await voterDoc("g1")).toBeUndefined();
+    });
+
+    it("recusa quem já entrou antes como convidado na web (checa antes do atalho)", async () => {
+      await db.doc(`elections/${ELECTION}/voters/${OUTSIDER}`).set({
+        name: "Fora", email: "fora@x.org", kind: "guest", status: "pending",
+      });
+      await expectCode(
+        checkIn(db, outsider, {electionId: ELECTION, memberOnly: true}),
+        "permission-denied"
+      );
+    });
+
+    it("membro entra aprovado", async () => {
+      const res = await checkIn(db, member, {electionId: ELECTION, memberOnly: true});
+      expect(res).toEqual({status: "approved", kind: "member"});
+    });
+  });
+
   it("conta sem nome no token nem no cadastro: pede o nome; com o nome informado, cadastra", async () => {
     const noName = {uid: "g2", isAnonymous: false, email: "sem@nome.org"};
     await expectCode(checkIn(db, noName, {electionId: ELECTION}), "invalid-argument");
