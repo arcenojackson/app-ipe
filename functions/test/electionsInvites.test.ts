@@ -1,5 +1,9 @@
 import {describe, expect, it} from "vitest";
-import {buildOpenMessage, isOpening} from "../src/elections/invites";
+import {
+  buildOpenMessage,
+  invitePaths,
+  isOpening,
+} from "../src/elections/invites";
 
 describe("isOpening", () => {
   it("só a transição rascunho → aberta conta", () => {
@@ -39,5 +43,18 @@ describe("buildOpenMessage", () => {
   it("prioridade alta no Android e som no iOS", () => {
     expect(message.android?.priority).toBe("high");
     expect(message.apns?.payload?.aps.sound).toBe("default");
+  });
+});
+
+describe("invitePaths", () => {
+  it("um convite por membro, no caminho em que o balão o lê", () => {
+    expect(invitePaths("e1", ["a", "b"])).toEqual([
+      "users/a/election_invites/e1",
+      "users/b/election_invites/e1",
+    ]);
+  });
+
+  it("sem membros, sem caminhos", () => {
+    expect(invitePaths("e1", [])).toEqual([]);
   });
 });

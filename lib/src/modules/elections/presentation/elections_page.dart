@@ -175,10 +175,11 @@ class _ElectionsPageState extends State<ElectionsPage> {
                                     ),
                                     if (e.status != ElectionStatus.completed)
                                       IconButton(
-                                        tooltip: 'Excluir eleição',
-                                        icon: const Icon(Icons.delete_outline),
-                                        color: Colors.white70,
-                                        visualDensity: VisualDensity.compact,
+                                        tooltip: 'Excluir',
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          size: 20,
+                                        ),
                                         onPressed: () => _delete(e),
                                       ),
                                   ],

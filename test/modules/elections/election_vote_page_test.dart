@@ -255,4 +255,51 @@ void main() {
       );
     });
   });
+
+  testWidgets('"Confirmar voto" fica fixo no rodapé e só a lista rola', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repo = await openVotePage(tester);
+    repo.round.add(
+      ElectionRound(
+        id: 'r1',
+        position: 'presidente',
+        cycle: 1,
+        number: 1,
+        status: RoundStatus.open,
+        options: [
+          for (var i = 0; i < 30; i++)
+            Candidate(
+              id: 'c$i',
+              name: 'Membro ${i.toString().padLeft(2, '0')}',
+            ),
+        ],
+        votedCount: 0,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    final button = find.text('Confirmar voto');
+    // Visível de cara, dentro da tela, sem rolar até o fim da lista.
+    expect(button, findsOneWidget);
+    expect(tester.getRect(button).bottom, lessThanOrEqualTo(640));
+    expect(find.text('Branco'), findsNothing);
+
+    // A lista cria os itens sob demanda: rola até o último aparecer.
+    await tester.scrollUntilVisible(
+      find.text('Branco'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+
+    expect(find.text('Branco'), findsOneWidget);
+    expect(
+      tester.getRect(find.text('Confirmar voto')).bottom,
+      lessThanOrEqualTo(640),
+    );
+  });
 }

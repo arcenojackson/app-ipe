@@ -22,6 +22,10 @@ export const isOpening = (
   after: {status?: unknown} | undefined
 ): boolean => before?.status === "draft" && after?.status === "open";
 
+// Caminho do convite de cada membro: é o que o balão da home lê.
+export const invitePaths = (electionId: string, uids: string[]): string[] =>
+  uids.map((uid) => `users/${uid}/election_invites/${electionId}`);
+
 export const buildOpenMessage = (
   title: string,
   electionId: string,

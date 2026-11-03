@@ -4,6 +4,7 @@ import {assertElectionDirector, directorIdsOf} from "./directors";
 import {nextTermStart} from "./transitions";
 import {normalizePositions, REQUIRED_POSITIONS} from "./positions";
 import {parseEligibility} from "./eligibility";
+import {invitePaths} from "./invites";
 
 // Cria a eleição em rascunho. Só quem está na diretoria *atual* da sociedade
 // cria; a lista de diretores vira o snapshot `directorIds` da eleição.
@@ -216,15 +217,16 @@ export const assertDeletable = (status: unknown): void => {
 
 // Exclui a eleição. O documento sai numa transação que reconfere o status
 // (uma conclusão simultânea não passa); em seguida o restante (cargos,
-// presença, votos, eventos...) é apagado em lote. Se o lote falhar, sobra só
-// lixo órfão: sem o documento principal a eleição não aparece em lugar nenhum.
+// presença, votos, eventos...) e os convites do balão são apagados em lote.
+// Se o lote falhar, sobra só lixo órfão: sem o documento principal a eleição
+// não aparece em lugar nenhum.
 export const deleteElection = async (
   db: Firestore,
   uid: string,
   data: unknown
 ): Promise<void> => {
   const electionId = requireString(data, "electionId");
-  await assertElectionDirector(db, uid, electionId);
+  const election = await assertElectionDirector(db, uid, electionId);
   const ref = db.doc(`elections/${electionId}`);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
@@ -233,4 +235,13 @@ export const deleteElection = async (
     tx.delete(ref);
   });
   await db.recursiveDelete(ref);
+
+  // Convites do balão (um por membro da sociedade, gravados ao abrir).
+  const society = await db.doc(`societies/${election.societyId}`).get();
+  const members: string[] = (society.get("members") ?? []).map(String);
+  const writer = db.bulkWriter();
+  for (const path of invitePaths(electionId, members)) {
+    void writer.delete(db.doc(path));
+  }
+  await writer.close();
 };

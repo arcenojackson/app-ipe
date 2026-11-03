@@ -219,31 +219,47 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
       hasVoted: _hasVoted,
     );
 
+    final societyName = election != null
+        ? Text(
+            election.societyName,
+            style: Theme.of(context).textTheme.bodyMedium,
+          )
+        : null;
+
     return Scaffold(
       appBar: AppBar(title: Text(election?.title ?? 'Votação')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          if (election != null) ...[
-            Text(
-              election.societyName,
-              style: Theme.of(context).textTheme.bodyMedium,
+      // Cédula: a lista rola e o botão de confirmar fica fixo no rodapé.
+      body: _uid != null && view.kind == VoteViewKind.ballot
+          ? ElectionBallot(
+              key: ValueKey(view.round!.id),
+              round: view.round!,
+              busy: _busy,
+              error: _visibleError,
+              header: societyName,
+              onSubmit: (choice) => _submit(view.round!, choice),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                if (societyName != null) ...[
+                  societyName,
+                  const SizedBox(height: 16),
+                ],
+                if (_uid == null)
+                  const Text('Entre na sua conta para votar.')
+                else
+                  ..._body(view),
+                if (_visibleError != null) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    _visibleError!,
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 16),
-          ],
-          if (_uid == null)
-            const Text('Entre na sua conta para votar.')
-          else
-            ..._body(view),
-          if (_visibleError != null && view.kind != VoteViewKind.ballot) ...[
-            const SizedBox(height: 16),
-            Text(
-              _visibleError!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ],
-        ],
-      ),
     );
   }
 
@@ -286,16 +302,8 @@ class _ElectionVotePageState extends State<ElectionVotePage> {
           Text('Aguardando a próxima votação. Esta tela atualiza sozinha.'),
         ];
       case VoteViewKind.ballot:
-        final round = view.round!;
-        return [
-          ElectionBallot(
-            key: ValueKey(round.id),
-            round: round,
-            busy: _busy,
-            error: _visibleError,
-            onSubmit: (choice) => _submit(round, choice),
-          ),
-        ];
+        // Montada em `build`, fora da lista, para o botão ficar no rodapé.
+        return const [];
       case VoteViewKind.voted:
         final round = view.round!;
         final receipt = _receipts[round.id];

@@ -25,13 +25,12 @@ Future<void> pump(
 }) => tester.pumpWidget(
   MaterialApp(
     home: Scaffold(
-      body: SingleChildScrollView(
-        child: ElectionBallot(
-          round: round,
-          busy: busy,
-          error: error,
-          onSubmit: onSubmit ?? (_) {},
-        ),
+      // A cédula ocupa a altura toda: a lista rola e o botão fica no rodapé.
+      body: ElectionBallot(
+        round: round,
+        busy: busy,
+        error: error,
+        onSubmit: onSubmit ?? (_) {},
       ),
     ),
   ),

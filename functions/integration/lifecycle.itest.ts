@@ -365,6 +365,20 @@ describe("deleteElection", () => {
     expect((await db.collection(`elections/${ELECTION}/events`).get()).empty).toBe(true);
   });
 
+  it("apaga também os convites do balão dos membros da sociedade", async () => {
+    await setStatus("open");
+    const inviteRef = (uid: string) => db.doc(`users/${uid}/election_invites/${ELECTION}`);
+    const other = db.doc(`users/${MEMBER}/election_invites/outra-eleicao`);
+    for (const uid of [MEMBER, MEMBER2, MEMBER3]) await inviteRef(uid).set({electionId: ELECTION});
+    await other.set({electionId: "outra-eleicao"});
+
+    await deleteElection(db, DIRECTOR, {electionId: ELECTION});
+
+    for (const uid of [MEMBER, MEMBER2, MEMBER3]) expect((await inviteRef(uid).get()).exists).toBe(false);
+    // Convite de outra eleição não é tocado.
+    expect((await other.get()).exists).toBe(true);
+  });
+
   it("rascunho, em andamento e encerrada podem ser excluídas", async () => {
     for (const status of ["draft", "open", "closed"]) {
       await clearDb();
