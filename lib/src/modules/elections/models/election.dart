@@ -301,3 +301,25 @@ class ElectionEvent {
         data: Map<String, dynamic>.from(json),
       );
 }
+
+/// Convite gravado pelo servidor quando a eleição é aberta
+/// (`users/{uid}/election_invites/{electionId}`); alimenta o balão da home.
+class ElectionInvite {
+  const ElectionInvite({
+    required this.id,
+    required this.title,
+    required this.societyName,
+  });
+
+  /// Id da eleição.
+  final String id;
+  final String title;
+  final String societyName;
+
+  factory ElectionInvite.fromJson(String id, Map<String, dynamic> json) =>
+      ElectionInvite(
+        id: id,
+        title: json['title']?.toString() ?? '',
+        societyName: json['societyName']?.toString() ?? '',
+      );
+}
