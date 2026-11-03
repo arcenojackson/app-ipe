@@ -76,6 +76,20 @@ void main() {
     });
   });
 
+  group('parseElectionId pela câmera (allowBareId: false)', () {
+    test('palavra solta lida de um QR qualquer não vira id de eleição', () {
+      expect(parseElectionId('HelloWorld99', allowBareId: false), isNull);
+      expect(parseElectionId('7891234567890', allowBareId: false), isNull);
+    });
+
+    test('o link de votação continua valendo', () {
+      expect(
+        parseElectionId('https://x.com/votar/abc12345XYZ', allowBareId: false),
+        'abc12345XYZ',
+      );
+    });
+  });
+
   group('filterCandidates', () {
     const options = [
       Candidate(id: 'a', name: 'João Silva'),

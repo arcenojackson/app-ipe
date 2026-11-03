@@ -126,4 +126,32 @@ void main() {
     await tester.pump();
     expect(isEnabled(tester), isTrue);
   });
+
+  testWidgets(
+    'a escolha some se a busca a esconde (não envia voto invisível)',
+    (tester) async {
+      await pump(tester, round: roundOf(1));
+
+      await tester.tap(find.text('Ana'));
+      await tester.pump();
+      expect(isEnabled(tester), isTrue);
+
+      await tester.enterText(find.byType(TextField), 'bru');
+      await tester.pump();
+
+      expect(find.text('Ana'), findsNothing);
+      expect(isEnabled(tester), isFalse);
+    },
+  );
+
+  testWidgets('a escolha continua se a busca ainda a mostra', (tester) async {
+    await pump(tester, round: roundOf(1));
+
+    await tester.tap(find.text('Bruno'));
+    await tester.pump();
+    await tester.enterText(find.byType(TextField), 'bru');
+    await tester.pump();
+
+    expect(isEnabled(tester), isTrue);
+  });
 }

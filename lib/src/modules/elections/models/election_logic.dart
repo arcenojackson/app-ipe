@@ -49,11 +49,13 @@ final RegExp _bareElectionId = RegExp(r'^[A-Za-z0-9_-]{8,64}$');
 
 /// Id da eleição a partir do que o QR (ou o campo manual) trouxe: só o caminho
 /// `/votar/{id}` importa, o host é ignorado (produção, preview ou emulador).
-/// Também aceita o id solto. Qualquer outra coisa devolve `null`.
-String? parseElectionId(String raw) {
+/// Também aceita o id solto (campo manual); a câmera passa
+/// `allowBareId: false`, para um QR qualquer (código de produto, palavra) não
+/// virar tentativa de entrar numa eleição. Qualquer outra coisa devolve `null`.
+String? parseElectionId(String raw, {bool allowBareId = true}) {
   final text = raw.trim();
   if (text.isEmpty) return null;
-  if (_bareElectionId.hasMatch(text)) return text;
+  if (allowBareId && _bareElectionId.hasMatch(text)) return text;
   final uri = Uri.tryParse(text);
   if (uri == null || !uri.hasScheme) return null;
   final segments = uri.pathSegments.where((s) => s.isNotEmpty).toList();

@@ -54,7 +54,19 @@ class _ElectionBallotState extends State<ElectionBallot> {
         if (round.number == 1) ...[
           TextField(
             decoration: const InputDecoration(labelText: 'Buscar por nome'),
-            onChanged: (value) => setState(() => _search = value),
+            onChanged: (value) => setState(() {
+              _search = value;
+              // A escolha que a busca esconde não pode ser enviada às cegas.
+              final chosen = _choice;
+              if (chosen != null &&
+                  chosen != blankChoice &&
+                  !filterCandidates(
+                    round.options,
+                    value,
+                  ).any((c) => c.id == chosen)) {
+                _choice = null;
+              }
+            }),
           ),
           const SizedBox(height: 8),
         ],

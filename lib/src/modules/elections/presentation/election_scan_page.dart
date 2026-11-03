@@ -49,7 +49,7 @@ class _ElectionScanPageState extends State<ElectionScanPage> {
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue;
       if (raw == null) continue;
-      final id = parseElectionId(raw);
+      final id = parseElectionId(raw, allowBareId: false);
       if (id == null) {
         setState(() => _message = 'QR inválido.');
         return;
