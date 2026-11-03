@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ipe_flutter/src/core/utils/app_exception.dart';
 import 'package:ipe_flutter/src/modules/elections/data/elections_repository.dart';
 import 'package:ipe_flutter/src/modules/elections/models/election.dart';
+import 'package:ipe_flutter/src/modules/elections/models/election_logic.dart';
 import 'package:ipe_flutter/src/modules/elections/presentation/election_detail_page.dart';
 import 'package:ipe_flutter/src/shared/state/app_state.dart';
 import 'package:provider/provider.dart';
@@ -71,10 +73,10 @@ Future<FakeRepo> openDetail(WidgetTester tester, Election election) async {
   return repo;
 }
 
-// FilledButton.icon é um subtipo: casa por predicado, não por tipo exato.
+// Os botões são subtipos de ButtonStyleButton: casa por predicado.
 final startButton = find.ancestor(
   of: find.text('Iniciar votação'),
-  matching: find.byWidgetPredicate((w) => w is FilledButton),
+  matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
 );
 
 void main() {
@@ -145,5 +147,153 @@ void main() {
 
     expect(repo.opened, isEmpty);
     expect(startButton, findsOneWidget);
+  });
+
+  testWidgets('copia o link da condução para o diretor abrir no computador', (
+    tester,
+  ) async {
+    String? copied;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copied = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await openDetail(tester, electionWith(ElectionStatus.open));
+
+    await tester.tap(find.text('Link da condução'));
+    await tester.pump();
+
+    expect(copied, buildConductLink('e1'));
+    expect(find.text('Link da condução copiado.'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('não repete sociedade e data acima do status', (tester) async {
+    await openDetail(tester, electionWith(ElectionStatus.open));
+
+    expect(find.text('UMP · 08/11/2026 00:00'), findsNothing);
+    expect(find.text('Em andamento'), findsOneWidget);
+  });
+
+  testWidgets('os dois links ficam juntos, sem botões soltos de copiar', (
+    tester,
+  ) async {
+    await openDetail(tester, electionWith(ElectionStatus.draft));
+
+    expect(find.text('Link da condução'), findsOneWidget);
+    expect(find.text('Link da votação'), findsOneWidget);
+    expect(find.text('Copiar link da votação'), findsNothing);
+    expect(find.text('Iniciar votação'), findsOneWidget);
+    expect(find.text('Abrir na web'), findsOneWidget);
+  });
+
+  Rect rectOfButton(WidgetTester tester, String text) => tester.getRect(
+    find.ancestor(
+      of: find.text(text),
+      matching: find.byWidgetPredicate((w) => w is ButtonStyleButton),
+    ),
+  );
+
+  void narrowScreen(WidgetTester tester) {
+    // 360 dp: o texto longo não pode estourar o quadrado.
+    tester.view.physicalSize = const Size(360, 740);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+  }
+
+  testWidgets('rascunho: abrir na web à esquerda (cheio) e iniciar à direita '
+      '(contorno), os dois quadrados', (tester) async {
+    narrowScreen(tester);
+    await openDetail(tester, electionWith(ElectionStatus.draft));
+
+    final web = rectOfButton(tester, 'Abrir na web');
+    final start = rectOfButton(tester, 'Iniciar votação');
+
+    expect(web.top, start.top);
+    expect(web.left, lessThan(start.left));
+    expect(web.width, closeTo(web.height, 1));
+    expect(start.width, closeTo(start.height, 1));
+    expect(
+      find.ancestor(
+        of: find.text('Abrir na web'),
+        matching: find.byType(FilledButton),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.ancestor(
+        of: find.text('Iniciar votação'),
+        matching: find.byType(OutlinedButton),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('depois do rascunho: abrir na web e os links de copiar ocupam '
+      'os dois quadrados', (tester) async {
+    narrowScreen(tester);
+    await openDetail(tester, electionWith(ElectionStatus.open));
+
+    final web = rectOfButton(tester, 'Abrir na web');
+    final links = tester.getRect(find.byKey(const ValueKey('links-card')));
+
+    expect(web.top, links.top);
+    expect(web.left, lessThan(links.left));
+    expect(links.width, closeTo(links.height, 1));
+    expect(find.text('Link da condução'), findsOneWidget);
+    expect(find.text('Link da votação'), findsOneWidget);
+    expect(find.text('Iniciar votação'), findsNothing);
+    // Mesmo compactos, os links mantêm o ícone de corrente.
+    expect(find.byIcon(Icons.link), findsNWidgets(2));
+  });
+
+  testWidgets('em rascunho os links ficam num cartão abaixo dos botões', (
+    tester,
+  ) async {
+    narrowScreen(tester);
+    await openDetail(tester, electionWith(ElectionStatus.draft));
+
+    final web = rectOfButton(tester, 'Abrir na web');
+    final links = tester.getRect(find.byKey(const ValueKey('links-card')));
+
+    expect(links.top, greaterThan(web.bottom));
+    expect(find.text('Link da condução'), findsOneWidget);
+  });
+
+  testWidgets('o status é pequeno, à direita e tem uma cor por situação', (
+    tester,
+  ) async {
+    narrowScreen(tester);
+    final repo = await openDetail(tester, electionWith(ElectionStatus.draft));
+
+    Color colorOf(String label) {
+      final text = tester.widget<Text>(find.text(label));
+      return text.style!.color!;
+    }
+
+    final draftColor = colorOf('Rascunho');
+    expect(tester.getRect(find.text('Rascunho')).right, greaterThan(300));
+
+    repo.election.add(electionWith(ElectionStatus.open));
+    await tester.pump();
+    await tester.pump();
+    final openColor = colorOf('Em andamento');
+
+    repo.election.add(electionWith(ElectionStatus.closed));
+    await tester.pump();
+    await tester.pump();
+    final closedColor = colorOf('Encerrada');
+
+    expect({draftColor, openColor, closedColor}, hasLength(3));
   });
 }
